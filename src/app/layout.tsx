@@ -7,13 +7,13 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
-  title: 'Assetain | Professional Asset Intelligence',
+  title: 'Asset Manager | Professional Inventory Platform',
   description: 'A mission-critical, offline-first asset management and verification platform.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Assetain',
+    title: 'Asset Manager',
   },
 };
 

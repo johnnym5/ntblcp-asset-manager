@@ -2,7 +2,6 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1000: Hardened for Deployment. Fixed Hook Violation and Hydration Pulse.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -133,7 +132,6 @@ export default function SPAHub() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // 1. Move workstation resolution into a stable memo above early returns
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -202,7 +200,6 @@ export default function SPAHub() {
     }
   };
 
-  // 2. Early returns placed after all hook initializations
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
@@ -258,12 +255,12 @@ export default function SPAHub() {
                 <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-all text-primary group tactile-pulse">
                   <Boxes className="h-3.5 w-3.5" />
                   <div className="flex flex-col text-left">
-                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
-                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control</span>
+                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Asset Manager</h1>
+                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Inventory Hub</span>
                   </div>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Home</TooltipContent>
+              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Dashboard</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -280,7 +277,7 @@ export default function SPAHub() {
                 className="flex items-center gap-3 px-3 py-1 bg-white/[0.03] border border-white/5 rounded-lg text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
               >
                 <Search className="h-3 w-3" />
-                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Registry</span>
+                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Assets</span>
               </motion.button>
             ) : (
               <motion.div
@@ -331,7 +328,7 @@ export default function SPAHub() {
 
           <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 group tactile-pulse px-1 sm:px-2">
             <div className={cn("h-1 w-1 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-            <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ON' : 'OFF'}</span>
+            <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </button>
           
           <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-white/5 rounded-md text-white/40 hover:text-primary transition-all">
@@ -362,7 +359,7 @@ export default function SPAHub() {
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary focus:text-black m-0.5">
                 <SettingsIcon className="mr-2 h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase">Settings</span>
+                <span className="text-[8px] font-black uppercase">App Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem onClick={logout} className="p-1.5 rounded-md focus:bg-red-600 focus:text-white m-0.5 text-red-500">

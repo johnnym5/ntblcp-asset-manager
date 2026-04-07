@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Inventory Dashboard - High-Fidelity Compressed Analytics.
- * Scaled for maximum content density.
+ * @fileOverview Inventory Dashboard - Compact Data Summary.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -137,8 +136,8 @@ export function AssetSummaryDashboard() {
                         <Zap className="h-4 w-4 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none">Operation Pulse</h3>
-                        <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Global registry health index</p>
+                        <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none">Status Overview</h3>
+                        <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Inventory summary index</p>
                     </div>
                 </div>
 
@@ -148,13 +147,13 @@ export function AssetSummaryDashboard() {
                             onClick={() => setView('stats')} 
                             className={cn("px-4 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest transition-all", view === 'stats' ? "bg-white/10 text-white" : "text-white/20")}
                         >
-                            Quick
+                            Summary
                         </button>
                         <button 
                             onClick={() => setView('insights')} 
                             className={cn("px-4 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest transition-all", view === 'insights' ? "bg-white/10 text-white" : "text-white/20")}
                         >
-                            Metric
+                            Metrics
                         </button>
                     </div>
                 </div>
@@ -164,9 +163,9 @@ export function AssetSummaryDashboard() {
                 {view === 'stats' ? (
                     <motion.div key="stats" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <QuickStartTile label="Browse Registry" description="Inventory View" icon={Boxes} color="bg-primary" count={metrics.total} onClick={() => setActiveView('REGISTRY')} />
-                            <QuickStartTile label="Folders" description="Category Tree" icon={FolderOpen} color="bg-blue-600" count={metrics.folders} onClick={() => {}} />
-                            <QuickStartTile label="Anomalies" description="Pattern Failures" icon={SearchCode} color="bg-red-600" count={metrics.anomalies} isDestructive={metrics.anomalies > 0} onClick={() => {}} />
+                            <QuickStartTile label="Browse Assets" description="Inventory View" icon={Boxes} color="bg-primary" count={metrics.total} onClick={() => setActiveView('REGISTRY')} />
+                            <QuickStartTile label="Categories" description="Folder Tree" icon={FolderOpen} color="bg-blue-600" count={metrics.folders} onClick={() => setActiveView('GROUPS')} />
+                            <QuickStartTile label="Data Errors" description="Quality Issues" icon={SearchCode} color="bg-red-600" count={metrics.anomalies} isDestructive={metrics.anomalies > 0} onClick={() => setActiveView('ANOMALIES')} />
                         </div>
 
                         <Accordion type="single" collapsible className="w-full">
@@ -175,17 +174,17 @@ export function AssetSummaryDashboard() {
                                     <div className="flex items-center justify-between w-full pr-2">
                                         <div className="flex items-center gap-2 px-1">
                                             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Field Readiness Hub</h4>
+                                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Verification Progress</h4>
                                         </div>
-                                        <Badge variant="outline" className="text-[7px] font-black border-white/5 uppercase px-2 py-0.5">VIEW METRICS</Badge>
+                                        <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">VIEW ALL</Badge>
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="pt-2 pb-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <ReadinessPulse label="Coverage" count={`${metrics.coverage}%`} subLabel={`${metrics.verified} items confirmed`} onClick={() => {}} />
-                                        <ReadinessPulse label="Pending" count={metrics.pending} subLabel="Awaiting physical audit" onClick={() => setActiveView('VERIFY')} />
-                                        <ReadinessPulse label="Critical" count={metrics.critical} isDestructive={metrics.critical > 0} subLabel="Reported losses/damage" onClick={() => setActiveView('ALERTS')} />
-                                        <ReadinessPulse label="Anomalies" count={metrics.anomalies} subLabel="Fidelity pattern breaks" onClick={() => {}} />
+                                        <ReadinessPulse label="Coverage" count={`${metrics.coverage}%`} subLabel={`${metrics.verified} items verified`} onClick={() => setActiveView('VERIFY')} />
+                                        <ReadinessPulse label="Pending" count={metrics.pending} subLabel="Waiting verification" onClick={() => setActiveView('VERIFY')} />
+                                        <ReadinessPulse label="Critical" count={metrics.critical} isDestructive={metrics.critical > 0} subLabel="Losses/Damage" onClick={() => setActiveView('ALERTS')} />
+                                        <ReadinessPulse label="Errors" count={metrics.anomalies} subLabel="Data gaps" onClick={() => setActiveView('ANOMALIES')} />
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
@@ -194,7 +193,7 @@ export function AssetSummaryDashboard() {
                 ) : (
                     <motion.div key="insights" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <Card className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 shadow-xl">
-                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Category Parity</h4>
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Category Status</h4>
                             <ScrollArea className="h-[250px] pr-2">
                                 <div className="space-y-1.5">
                                     {Object.entries(assets.reduce((acc, a) => {
@@ -217,7 +216,7 @@ export function AssetSummaryDashboard() {
                         </Card>
                         
                         <Card className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 shadow-xl">
-                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Regional Scope</h4>
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Regional Status</h4>
                             <ScrollArea className="h-[250px] pr-2">
                                 <div className="space-y-1.5">
                                     {Object.entries(assets.reduce((acc, a) => {

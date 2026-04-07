@@ -2,7 +2,6 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 1000: Deployment Stability Pulse. Resolved Card ReferenceError and Selection Parity.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -223,7 +222,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedCategories([]);
       setIsPurgeDialogOpen(false);
-      addNotification({ title: "Purge Complete", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
+      addNotification({ title: "Assets Removed", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -242,8 +241,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <div className="flex items-center gap-3 self-start">
             <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">{selectedCategories.length === 0 ? 'Inventory Hub' : 'Registry Pulse'}</h2>
-              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{selectedCategories.length === 0 ? 'PROJECT FOLDERS' : 'DETAILED INSPECTION'}</p>
+              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">{selectedCategories.length === 0 ? 'Asset Hub' : 'Asset List'}</h2>
+              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{selectedCategories.length === 0 ? 'CATEGORIES' : 'VIEWING ASSETS'}</p>
             </div>
           </div>
 
@@ -262,7 +261,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 ) : (
                   <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
-                    <Input ref={searchInputRef} placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
+                    <Input ref={searchInputRef} placeholder="Search Assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
@@ -295,16 +294,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-black border-white/10 text-white p-1">
                       <DropdownMenuItem onClick={() => { setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename Folder</span></DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedCategories([cat])} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Drill Down</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedCategories([cat])} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Open Folder</span></DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setCategoriesToPurge([cat]); setIsPurgeDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-destructive/10 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Delete Folder</span></DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
                 <div className="space-y-1 mb-8 pl-8">
                   <p className="text-4xl font-black tracking-tighter text-white">{groupStats[cat]?.total || 0}</p>
-                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Asset Records</p>
+                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Assets</p>
                 </div>
-                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">View Records <ChevronRight className="h-3 w-3" /></Button>
+                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">View Assets <ChevronRight className="h-3 w-3" /></Button>
               </Card>
             ))}
           </div>
@@ -334,7 +333,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="flex items-center gap-3 pl-3"><div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-white tracking-widest">Folders Selected</span></div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><X className="h-3.5 w-3.5" /> Deselect</Button>
-              {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Purge Folder</Button>}
+              {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Delete Folder</Button>}
             </div>
           </motion.div>
         )}
@@ -345,14 +344,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent className="max-w-md bg-black border-white/10 text-white p-8">
-          <DialogHeader><DialogTitle className="text-xl font-black uppercase">Rename Asset Group</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-xl font-black uppercase">Rename Category</DialogTitle></DialogHeader>
           <div className="py-6 space-y-4">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Category Label</Label>
+            <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Folder Label</Label>
             <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase text-sm" />
           </div>
           <DialogFooter className="gap-3">
             <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] text-white/40">Cancel</Button>
-            <Button onClick={handleRenameCommit} disabled={isProcessing || !newCategoryName.trim()} className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Commit Rename</Button>
+            <Button onClick={handleRenameCommit} disabled={isProcessing || !newCategoryName.trim()} className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Save Rename</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -361,12 +360,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white p-10">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><AlertTriangle className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Execute Category Purge?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">This will permanently delete {categoriesToPurge.length} folders and every record contained within them across local and cloud storage.</AlertDialogDescription>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">This will permanently delete {categoriesToPurge.length} folders and all records within them from both local and cloud storage.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Commit Purge</AlertDialogAction>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Delete Folder</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -388,7 +387,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       setAppSettings(nextSettings);
       await refreshRegistry();
       setIsRenameDialogOpen(false);
-      addNotification({ title: "Renamed Folder", variant: "success" });
+      addNotification({ title: "Folder Renamed", variant: "success" });
     } finally {
       setIsProcessing(false);
     }

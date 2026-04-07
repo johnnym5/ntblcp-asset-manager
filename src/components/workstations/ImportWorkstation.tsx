@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
- * Phase 1000: Deployment Stability Pulse. Enhanced merge logic and visibility safeguards.
+ * @fileOverview ImportWorkstation - Controlled Asset Ingestion.
  */
 
 import React, { useState, useRef } from 'react';
@@ -93,7 +92,7 @@ export function ImportWorkstation() {
         setCurrentStep('STRUCTURE');
       }, 800);
     } catch (error) {
-      addNotification({ title: "Discovery Error", variant: "destructive" });
+      addNotification({ title: "Scanning Error", variant: "destructive" });
       setCurrentStep('INGEST');
     }
   };
@@ -128,14 +127,14 @@ export function ImportWorkstation() {
       setIsProcessing(false);
       setCurrentStep('RECONCILE');
     } catch (e) {
-      addNotification({ title: "Mapping Failed", variant: "destructive" });
+      addNotification({ title: "Import Failed", variant: "destructive" });
       setIsProcessing(false);
     }
   };
 
   const handleCommitToRegistry = async () => {
     if (!activeGrantId || !appSettings) {
-      addNotification({ title: "No Project Active", variant: "destructive" });
+      addNotification({ title: "No Active Project", variant: "destructive" });
       return;
     }
 
@@ -151,7 +150,6 @@ export function ImportWorkstation() {
       const currentLocal = await storage.getAssets();
       await storage.saveAssets([...validAssetsWithGrant, ...currentLocal]);
       
-      // Update Enabled Sheets for visibility
       const newCategories = Array.from(new Set(validAssetsWithGrant.map(a => a.category)));
       const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
       
@@ -164,7 +162,7 @@ export function ImportWorkstation() {
       }
 
       await storage.clearSandbox();
-      addNotification({ title: "Registry Parity Established", variant: "success" });
+      addNotification({ title: "Assets Imported", variant: "success" });
       setDataSource('PRODUCTION');
       await refreshRegistry();
       setCurrentStep('SUMMARY');
@@ -178,10 +176,10 @@ export function ImportWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
-            <div className="p-3 bg-primary/10 rounded-2xl"><DatabaseZap className="h-8 w-8 text-primary" /></div>
-            Registry Ingestion
+            <div className="p-3 bg-primary/10 rounded-2xl"><FileUp className="h-8 w-8 text-primary" /></div>
+            Import Assets
           </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Group Discovery & Mapping</p>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Excel Workbook Processing</p>
         </div>
         {currentStep !== 'INGEST' && currentStep !== 'SUMMARY' && (
           <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] text-destructive border-2"><Trash2 className="mr-2 h-3.5 w-3.5" /> Discard</Button>
@@ -195,9 +193,9 @@ export function ImportWorkstation() {
               <Card className="border-4 border-dashed border-white/5 bg-white/[0.02] hover:border-primary/40 rounded-[3rem] p-16 flex flex-col items-center justify-center text-center h-[450px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 group-hover:scale-110 transition-all shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight">Select Workbook</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed mt-4">Identify internal group boundaries for deterministic mapping.</p>
-                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Initialize Discovery</Button>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight">Upload File</h3>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed mt-4">Select an Excel file to scan for new asset records.</p>
+                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Choose File</Button>
               </Card>
             </motion.div>
           )}
@@ -206,7 +204,7 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-32 space-y-10">
               <div className="p-16 bg-primary/10 rounded-[3rem] animate-pulse"><ScanSearch className="h-20 w-20 text-primary" /></div>
               <div className="space-y-4 max-w-sm text-center">
-                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Mapping Pulse</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Scanning Rows</h3>
                 <Progress value={progress} className="h-2 rounded-full" />
               </div>
             </div>
@@ -223,11 +221,11 @@ export function ImportWorkstation() {
                 <div className="flex items-start gap-6 max-w-xl">
                   <div className="p-4 bg-primary/10 rounded-2xl"><Layers className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Map Internal Groups?</h4>
-                    <p className="text-sm font-medium text-white/40 italic">Aligning {selectedGroupIds.size} structural sections.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Import Selected?</h4>
+                    <p className="text-sm font-medium text-white/40 italic">Reviewing {selectedGroupIds.size} folders for import.</p>
                   </div>
                 </div>
-                <Button onClick={handleExecuteImport} disabled={selectedGroupIds.size === 0} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-all">Start Mapping <ChevronRight className="h-6 w-6" /></Button>
+                <Button onClick={handleExecuteImport} disabled={selectedGroupIds.size === 0} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-all">Continue Import <ChevronRight className="h-6 w-6" /></Button>
               </div>
             </motion.div>
           )}
@@ -237,8 +235,8 @@ export function ImportWorkstation() {
               <ReconciliationView assets={stagedAssets as any} summary={runSummary!} />
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl">
                 <Button onClick={handleCommitToRegistry} disabled={isProcessing} className="h-20 w-full rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black">
-                  {isProcessing ? <Loader2 className="h-6 w-6 animate-spin mr-2" /> : <DatabaseZap className="h-6 w-6 mr-2" />} 
-                  Establish Registry Parity
+                  {isProcessing ? <Loader2 className="h-6 w-6 animate-spin mr-2" /> : <ShieldCheck className="h-6 w-6 mr-2" />} 
+                  Add to Asset List
                 </Button>
               </div>
             </motion.div>
@@ -247,10 +245,10 @@ export function ImportWorkstation() {
           {currentStep === 'SUMMARY' && (
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
               <div className="p-16 bg-green-500/10 rounded-[4rem] text-green-600 border border-green-500/20"><CheckCircle2 className="h-24 w-20" /></div>
-              <h3 className="text-4xl font-black uppercase text-white">Merge Successful</h3>
+              <h3 className="text-4xl font-black uppercase text-white">Import Successful</h3>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs">Process New File</Button>
-                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black">Browse Registry</Button>
+                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs">Import More</Button>
+                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black">Browse Assets</Button>
               </div>
             </div>
           )}

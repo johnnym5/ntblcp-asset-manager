@@ -1,9 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Records to Review - Field Verification Hub.
- * Phase 26: Added Expandable Search pulse and input sanitization.
- * Phase 1012: Applied friendlier naming "Records to Review".
+ * @fileOverview Verify Assets - Field Verification Hub.
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -83,7 +81,7 @@ export function VerifyWorkstation() {
     const current = await storage.getAssets();
     await storage.saveAssets(current.map(a => a.id === asset.id ? updated : a));
     await refreshRegistry();
-    toast({ title: "Verification Completed", description: `Asset marked as ${newStatus}.` });
+    toast({ title: "Asset Updated", description: `Marked as ${newStatus}.` });
   };
 
   const handleSearchChange = (val: string) => {
@@ -104,10 +102,10 @@ export function VerifyWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <ClipboardCheck className="h-8 w-8 text-primary" />
             </div>
-            {isAdvanced ? 'Records to Review' : 'Verification Tasks'}
+            {isAdvanced ? 'Verify Assets' : 'Verification Tasks'}
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Confirm that physical items match the digital record.
+            Confirm physical assets match the records.
           </p>
         </div>
         
@@ -132,7 +130,7 @@ export function VerifyWorkstation() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
                 <Input 
                   ref={searchInputRef}
-                  placeholder="Scan tag or ID..." 
+                  placeholder="Find asset..." 
                   className="h-12 pl-11 pr-10 rounded-xl bg-white/[0.05] border-2 border-primary/20 text-white" 
                   value={searchTerm} 
                   onChange={(e) => handleSearchChange(e.target.value)}
@@ -144,7 +142,7 @@ export function VerifyWorkstation() {
           </AnimatePresence>
 
           <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-            <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items
+            <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items Awaiting Verification
           </Badge>
         </div>
       </div>
@@ -164,7 +162,7 @@ export function VerifyWorkstation() {
                             <CheckCircle2 className="h-5 w-5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Mark this asset as physically verified.</TooltipContent>
+                        <TooltipContent>Mark Verified</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                     
@@ -175,7 +173,7 @@ export function VerifyWorkstation() {
                             <XCircle className="h-5 w-5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Flag this asset as missing or incorrect.</TooltipContent>
+                        <TooltipContent>Report Issue</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
@@ -185,7 +183,7 @@ export function VerifyWorkstation() {
           ) : (
             <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
               <CheckCircle2 className="h-32 w-32 mx-auto mb-4 text-green-600" />
-              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">All Tasks Completed</h3>
+              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Verification Complete</h3>
             </div>
           )}
         </AnimatePresence>

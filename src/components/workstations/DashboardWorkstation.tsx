@@ -2,7 +2,6 @@
 
 /**
  * @fileOverview Dashboard Workstation - Unified Mission Control.
- * Optimized for high density and maximum data visibility.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -62,7 +61,7 @@ export function DashboardWorkstation() {
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
       
-      {/* PERSISTENT CONTROL HUB HEADER */}
+      {/* PERSISTENT HEADER */}
       <div className="sticky top-[-1rem] z-50 bg-[#050505] pt-1 pb-3 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -71,10 +70,10 @@ export function DashboardWorkstation() {
             </div>
             <div className="space-y-0.5">
               <h2 className="text-base sm:text-lg font-black uppercase text-white tracking-tight leading-none">
-                Mission Control
+                Dashboard
               </h2>
               <p className="text-[7px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
-                {isAdvanced ? 'Registry Intelligence' : 'Inventory Pulse'}
+                {isAdvanced ? 'System Overview' : 'Inventory Status'}
               </p>
             </div>
           </div>
@@ -86,7 +85,7 @@ export function DashboardWorkstation() {
                   Overview
                 </TabsTrigger>
                 <TabsTrigger value="inventory" className="px-6 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                  Registry
+                  Asset List
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -115,18 +114,18 @@ export function DashboardWorkstation() {
               <Card className="bg-[#080808] border border-white/5 rounded-[1.25rem] overflow-hidden shadow-xl">
                 <div className="p-4 border-b border-white/5 bg-white/[0.02]">
                   <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
-                    <DatabaseZap className="h-3 w-3" /> Quick Logic
+                    <DatabaseZap className="h-3 w-3" /> Quick Settings
                   </h4>
                 </div>
                 <CardContent className="p-4 space-y-2">
                   <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-10 rounded-lg border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/5 transition-all justify-start px-4">
-                    <Settings className="h-3.5 w-3.5 text-primary" /> Settings
+                    <Settings className="h-3.5 w-3.5 text-primary" /> App Settings
                   </Button>
                   
                   {isAdmin && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
                       <p className="text-[8px] font-bold text-primary uppercase leading-relaxed italic">
-                        Administrative access granted. Full mutation protocol available.
+                        Admin access active. You can modify all registry data.
                       </p>
                     </div>
                   )}
@@ -140,11 +139,11 @@ export function DashboardWorkstation() {
               <div className="flex items-center justify-between px-1 mb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-1.5 bg-white/5 rounded-lg"><FolderOpen className="h-4 w-4 text-primary" /></div>
-                  <h3 className="text-base font-black uppercase text-white tracking-tight">Registry Structure</h3>
+                  <h3 className="text-base font-black uppercase text-white tracking-tight">Asset Folders</h3>
                 </div>
                 <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
                   <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-white/5 gap-1.5">
-                    View Tree <ChevronDown className="h-2.5 w-2.5" />
+                    View Folders <ChevronDown className="h-2.5 w-2.5" />
                   </Badge>
                 </AccordionTrigger>
               </div>
@@ -162,12 +161,12 @@ export function DashboardWorkstation() {
                 <div className="flex items-center gap-2">
                   {anomalyCount > 0 && (
                     <Badge className="bg-red-600 text-white font-black uppercase text-[7px] h-5 px-2 animate-pulse">
-                      {anomalyCount} PULSES
+                      {anomalyCount} ERRORS
                     </Badge>
                   )}
                   <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
                     <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-white/5 gap-1.5">
-                      Inspect <ChevronDown className="h-2.5 w-2.5" />
+                      Review <ChevronDown className="h-2.5 w-2.5" />
                     </Badge>
                   </AccordionTrigger>
                 </div>
@@ -182,7 +181,7 @@ export function DashboardWorkstation() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <FileText className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Report Pulse</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Reports</h3>
               </div>
               <ReportsWorkstation isEmbedded={true} />
             </div>
@@ -190,7 +189,7 @@ export function DashboardWorkstation() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <Activity className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Sync State</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Sync Status</h3>
               </div>
               <SyncQueueWorkstation isEmbedded={true} />
             </div>

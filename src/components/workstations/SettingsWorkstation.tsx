@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 1000: Deployment Stability Pulse. Resolved handleFileImport and originalSheetName errors.
+ * @fileOverview App Settings - Executive Configuration Hub.
  */
 
 import React, { useState, useRef } from 'react';
@@ -10,7 +9,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { 
-  Settings, 
+  Settings as SettingsIcon, 
   Palette, 
   Trash2, 
   Users, 
@@ -123,13 +122,13 @@ export function SettingsWorkstation() {
       if (isOnline) await FirestoreService.updateSettings({ [key]: value });
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
-      addNotification({ title: "Governance Update", variant: "success" });
+      addNotification({ title: "Settings Updated", variant: "success" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSaveChangePulse = async () => {
+  const handleSaveChange = async () => {
     if (!appSettings) return;
     setIsSaving(true);
     try {
@@ -139,7 +138,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      addNotification({ title: `v${nextVersion} Committed`, variant: "success" });
+      addNotification({ title: `Settings v${nextVersion} Saved`, variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -211,17 +210,17 @@ export function SettingsWorkstation() {
         <div className="flex flex-col gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
-              <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest">Operational Control Hub</p>
+              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">App Settings</h2>
+              <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest">Configuration Center</p>
             </div>
             <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all"><X className="h-4 w-4 text-white/40" /></button>
           </div>
           <div className="bg-[#080808] p-0.5 rounded-xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center w-full min-max-content">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><Settings className="h-3 w-3" /> General</TabsTrigger>
+              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><SettingsIcon className="h-3 w-3" /> General</TabsTrigger>
               {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><LayoutGrid className="h-3 w-3" /> Projects</TabsTrigger>}
               {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><Users className="h-3 w-3" /> Users</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><HeartPulse className="h-3 w-3" /> Resilience</TabsTrigger>}
+              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><HeartPulse className="h-3 w-3" /> App Health</TabsTrigger>}
               <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><History className="h-3 w-3" /> History</TabsTrigger>
             </TabsList>
           </div>
@@ -231,26 +230,26 @@ export function SettingsWorkstation() {
       <div className="flex-1 min-h-0 pt-2 overflow-y-auto custom-scrollbar pb-20 px-1">
         <TabsContent value="general" className="space-y-8 m-0 outline-none">
           <section>
-            <SectionTitle title="Version Control" description="Registry Orchestration Pulse" icon={Database} />
+            <SectionTitle title="System Version" description="Current software build" icon={Database} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-white">System Index</span>
+                <span className="text-xs font-black uppercase text-white">Version Index</span>
                 <span className="text-2xl font-black text-primary tracking-tighter">v{appSettings.version || 1}.0</span>
               </div>
             </Card>
           </section>
 
           <section>
-            <SectionTitle title="Security" description="Passphrase Management" icon={Lock} />
+            <SectionTitle title="Security" description="Password Management" icon={Lock} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl text-right">
               <Button onClick={() => setIsPassphraseDialogOpen(true)} variant="outline" className="h-9 px-6 rounded-lg border-white/10 text-white font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5">
-                <KeyRound className="h-3.5 w-3.5 text-primary" /> Update Passphrase
+                <KeyRound className="h-3.5 w-3.5 text-primary" /> Update Password
               </Button>
             </Card>
           </section>
 
           <section>
-            <SectionTitle title="Appearance" description="Visual Identity" icon={Palette} />
+            <SectionTitle title="App Theme" description="Visual Identity" icon={Palette} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
               <div className="flex wrap gap-2">
                 <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-10 rounded-lg font-black uppercase text-[9px]">Light</Button>
@@ -262,10 +261,10 @@ export function SettingsWorkstation() {
 
         <TabsContent value="groups" className="m-0 outline-none space-y-8">
           <div className="space-y-4">
-            <h3 className="text-lg font-black uppercase text-white tracking-tight leading-none px-1">Project Registry</h3>
+            <h3 className="text-lg font-black uppercase text-white tracking-tight leading-none px-1">Project Management</h3>
             <div className="flex gap-2">
-              <Input placeholder="New project label..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-9 bg-black border-white/10 rounded-lg font-medium text-xs text-white" />
-              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest">Add Project</Button>
+              <Input placeholder="Enter project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-9 bg-black border-white/10 rounded-lg font-medium text-xs text-white" />
+              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest">Create Project</Button>
             </div>
           </div>
 
@@ -288,9 +287,9 @@ export function SettingsWorkstation() {
                     ))}
                   </div>
                   <div className="flex gap-2 pt-4 border-t border-white/5">
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest">Add Manually</Button>
+                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest">Add Category</Button>
                     <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest" onClick={() => fileInputRef.current?.click()}>Import Template</Button>
-                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest text-primary">Scan Pulse</Button>
+                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest text-primary">Import Assets</Button>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -313,10 +312,10 @@ export function SettingsWorkstation() {
       </div>
 
       <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-[#0A0A0A] text-white/60 font-black uppercase text-[9px] tracking-widest">Dismiss</Button>
-        <Button onClick={handleSaveChangePulse} disabled={isSaving} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-[#0A0A0A] text-white/60 font-black uppercase text-[9px] tracking-widest">Discard</Button>
+        <Button onClick={handleSaveChange} disabled={isSaving} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-          Save Change
+          Save Changes
         </Button>
       </div>
 

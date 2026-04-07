@@ -1,8 +1,7 @@
-
 'use client';
 
 /**
- * @fileOverview Critical Exceptions Workstation - High-Priority Issues.
+ * @fileOverview Critical Alerts Workstation - High-Priority Asset Issues.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -28,6 +27,7 @@ import { RegistryCard } from '@/components/registry/RegistryCard';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
+import type { Asset } from '@/types/domain';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function AlertsWorkstation() {
@@ -88,10 +88,10 @@ export function AlertsWorkstation() {
             <div className="p-3 bg-destructive/10 rounded-2xl">
               <ShieldAlert className="h-8 w-8 text-destructive animate-pulse" />
             </div>
-            {isAdvanced ? 'Critical Exceptions' : 'Asset Issues'}
+            Critical Alerts
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Manage stolen, damaged, or problematic records.
+            High-Priority issues requiring management attention.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -102,13 +102,13 @@ export function AlertsWorkstation() {
                   <Megaphone className="h-4 w-4" /> Notify Manager
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Send an alert to the management team about these records.</TooltipContent>
+              <TooltipContent>Alert management about these items.</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
       </div>
 
-      {/* Risk Matrix */}
+      {/* Stats Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
         <Card className="rounded-[2.5rem] border-2 border-destructive/20 bg-destructive/[0.02]">
           <CardHeader className="pb-2">
@@ -135,7 +135,7 @@ export function AlertsWorkstation() {
         <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02]">
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-              <AlertTriangle className="h-3.5 w-3.5" /> Out of Sync
+              <AlertTriangle className="h-3.5 w-3.5" /> Issues
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -144,11 +144,11 @@ export function AlertsWorkstation() {
         </Card>
       </div>
 
-      {/* Search Pulse */}
+      {/* Search */}
       <div className="relative group px-2">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-destructive transition-colors" />
         <Input 
-          placeholder="Search by ID or description..." 
+          placeholder="Search for asset issues..." 
           className="h-16 pl-14 rounded-[1.5rem] bg-card border-none shadow-xl font-bold text-sm focus-visible:ring-destructive/20 transition-all placeholder:opacity-30"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -179,7 +179,7 @@ export function AlertsWorkstation() {
                       "h-6 px-3 font-black uppercase text-[8px] tracking-widest shadow-lg",
                       asset.condition === 'Stolen' ? "bg-red-600 animate-pulse" : "bg-orange-600"
                     )}>
-                      {asset.condition?.toUpperCase() || 'ISSUE'}
+                      {asset.condition?.toUpperCase() || 'ERROR'}
                     </Badge>
                   </div>
                 </motion.div>
@@ -190,8 +190,8 @@ export function AlertsWorkstation() {
           <div className="py-40 text-center opacity-20 flex flex-col items-center gap-8 border-4 border-dashed rounded-[4rem]">
             <CheckCircle2 className="h-32 w-32 text-green-600" />
             <div className="space-y-2">
-              <h3 className="text-3xl font-black uppercase tracking-widest">No Issues Found</h3>
-              <p className="text-sm font-medium italic max-w-sm mx-auto">All assets are in good standing.</p>
+              <h3 className="text-3xl font-black uppercase tracking-widest">No Alerts</h3>
+              <p className="text-sm font-medium italic max-w-sm mx-auto">All assets are in good condition.</p>
             </div>
           </div>
         )}
