@@ -13,6 +13,8 @@ export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
 export type LocationMatchStatus = 'MATCHED' | 'PARTIAL' | 'UNASSIGNED' | 'NEEDS_REVIEW' | 'INVALID';
 
+export type ValidationGroup = 'electronics' | 'vehicles' | 'furniture' | 'medical' | 'infrastructure' | 'unknown';
+
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
@@ -70,6 +72,7 @@ export interface AssetClassification {
   yearBucket: number | null;
   isTransfer: boolean;
   transferSource: string | null;
+  validationGroup: ValidationGroup;
 }
 
 export type DiscrepancySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -208,6 +211,8 @@ export interface AuthorizedUser {
   isZonalAdmin?: boolean;
   assignedZone?: string;
 }
+
+export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'DISCREPANCY_RESOLVED' | 'DISCREPANCY_IGNORED';
 

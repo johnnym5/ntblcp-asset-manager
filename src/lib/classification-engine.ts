@@ -4,10 +4,11 @@
  * Phase 100: Rule-based keyword matching & normalization pulse.
  */
 
-import type { Asset, AssetClassification } from '@/types/domain';
+import type { Asset, AssetClassification, ValidationGroup } from '@/types/domain';
 
 interface ClassificationRule {
   group: string;
+  validationGroup: ValidationGroup;
   keywords: string[];
   subgroups: Record<string, string[]>;
   brands: string[];
@@ -16,6 +17,7 @@ interface ClassificationRule {
 const RULES: ClassificationRule[] = [
   {
     group: 'Laptops',
+    validationGroup: 'electronics',
     keywords: ['laptop', 'notebook', 'ultrabook', 'computer', 'envy', 'latitude', 'thinkpad'],
     subgroups: {
       'HP': ['hp', 'envy', 'elitebook', 'probook'],
@@ -27,6 +29,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Batteries',
+    validationGroup: 'infrastructure',
     keywords: ['battery', 'batteries', 'ah'],
     subgroups: {
       'Inverter Batteries': ['inverter', 'solar', 'deep cycle'],
@@ -37,6 +40,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Vehicles',
+    validationGroup: 'vehicles',
     keywords: ['vehicle', 'motor', 'car', 'van', 'ambulance', 'motorcycle', 'truck', 'bike', 'bus'],
     subgroups: {
       'Motor Vehicles': ['car', 'toyota', 'hilux', 'prado', 'bus'],
@@ -48,6 +52,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Inverters',
+    validationGroup: 'electronics',
     keywords: ['inverter'],
     subgroups: {
       'Hybrid Inverters': ['hybrid'],
@@ -58,6 +63,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Printers',
+    validationGroup: 'electronics',
     keywords: ['printer', 'laserjet', 'inkjet', 'deskjet'],
     subgroups: {
       'Laser Printers': ['laserjet', 'laser'],
@@ -68,6 +74,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'GeneXpert Machines',
+    validationGroup: 'medical',
     keywords: ['gene xpert', 'genexpert', 'cepheid'],
     subgroups: {
       'GX-4': ['4 module', '4-module'],
@@ -77,6 +84,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Office Furniture',
+    validationGroup: 'furniture',
     keywords: ['chair', 'table', 'cabinet', 'shelf', 'shelves', 'desk'],
     subgroups: {
       'Chairs': ['chair', 'swivel'],
@@ -88,6 +96,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Air Conditioners',
+    validationGroup: 'electronics',
     keywords: ['air conditioner', 'ac', 'split unit'],
     subgroups: {
       'Split Units': ['split'],
@@ -98,6 +107,7 @@ const RULES: ClassificationRule[] = [
   },
   {
     group: 'Generators',
+    validationGroup: 'infrastructure',
     keywords: ['generator', 'genset', 'kva'],
     subgroups: {
       'Diesel': ['diesel', 'mikano'],
@@ -117,6 +127,7 @@ export const ClassificationEngine = {
     const text = `${desc} ${cat}`;
 
     let group = 'Uncategorized';
+    let validationGroup: ValidationGroup = 'unknown';
     let subgroup = 'General';
     let brand = 'Unknown';
     let type = 'Standard';
@@ -125,6 +136,7 @@ export const ClassificationEngine = {
     const rule = RULES.find(r => r.keywords.some(k => text.includes(k)));
     if (rule) {
       group = rule.group;
+      validationGroup = rule.validationGroup;
       
       // Find Subgroup
       for (const [subName, subKeywords] of Object.entries(rule.subgroups)) {
@@ -162,6 +174,7 @@ export const ClassificationEngine = {
 
     return {
       group,
+      validationGroup,
       subgroup,
       type,
       brand,
@@ -203,7 +216,7 @@ export const ClassificationEngine = {
     return tree;
   },
 
-  private normalize(group: string, subgroup: string, brand: string): string {
+  normalize(group: string, subgroup: string, brand: string): string {
     if (brand !== 'Unknown') return `${brand} ${subgroup}`;
     if (subgroup !== 'General') return subgroup;
     return group;
