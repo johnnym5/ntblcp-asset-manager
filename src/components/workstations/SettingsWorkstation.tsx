@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 317: Fixed ReferenceErrors (handleCommitAll, originalSheetName).
+ * Phase 318: Updated primary action label to "Save Change".
  */
 
 import React, { useState } from 'react';
@@ -190,7 +190,7 @@ export function SettingsWorkstation() {
     setIsColumnSheetOpen(true);
   };
 
-  const handleCommitAll = async () => {
+  const handleSaveChange = async () => {
     setIsSaving(true);
     try {
       await refreshRegistry();
@@ -365,7 +365,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="users" className="m-0 outline-none">
-          <Card className="bg-[#050505] border-white/5 rounded-2xl p-5 shadow-xl">
+          <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
             <UserManagement 
               users={appSettings.authorizedUsers} 
               onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} 
@@ -386,8 +386,8 @@ export function SettingsWorkstation() {
 
       <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-[#0A0A0A] text-white/60 font-black uppercase text-[9px] tracking-widest">Dismiss</Button>
-        <Button onClick={handleCommitAll} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl transition-all hover:scale-105 active:scale-95">
-          Establish Parity
+        <Button onClick={handleSaveChange} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl transition-all hover:scale-105 active:scale-95">
+          Save Change
         </Button>
       </div>
 
@@ -442,7 +442,10 @@ export function SettingsWorkstation() {
               }
               return grant;
             });
-            handleSettingChange('grants', updatedGrants);
+            const nextSettings = { ...appSettings, grants: updatedGrants };
+            setAppSettings(nextSettings);
+            storage.saveSettings(nextSettings);
+            if (isOnline) FirestoreService.updateSettings(nextSettings);
           }}
         />
       )}
