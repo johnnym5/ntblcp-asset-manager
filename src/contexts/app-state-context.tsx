@@ -76,6 +76,10 @@ interface AppStateContextType {
   assigneeOptions: OptionType[];
   conditionOptions: OptionType[];
   statusOptions: OptionType[];
+
+  // NEW: Category Hub State
+  selectedCategory: string | null;
+  setSelectedCategory: Dispatch<SetStateAction<string | null>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -126,6 +130,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
+
+  // Category Hub state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
@@ -358,7 +365,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
-      locationOptions, assigneeOptions, conditionOptions, statusOptions
+      locationOptions, assigneeOptions, conditionOptions, statusOptions,
+      selectedCategory, setSelectedCategory
     }}>
       <Suspense fallback={null}>
         <ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} />

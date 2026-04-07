@@ -20,7 +20,12 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  FolderOpen,
+  Boxes,
+  PlusCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -43,14 +48,29 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Progress } from '@/components/ui/progress';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { ExcelService } from '@/services/excel-service';
+import { FirestoreService } from '@/services/firebase/firestore';
+import type { SheetDefinition } from '@/types/domain';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -61,10 +81,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setHeaders,
     refreshRegistry,
     appSettings,
+    setAppSettings,
     sortKey,
     setSortKey,
     sortDir,
-    setSortDir
+    setSortDir,
+    selectedCategory,
+    setSelectedCategory,
+    isOnline
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -80,10 +104,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Category Hub state
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   // Filter & Sort Pulse
   const processedAssets = useMemo(() => {
     let results = [...assets];
+    
+    // Category Filter
+    if (selectedCategory) {
+      results = results.filter(a => a.category === selectedCategory);
+    }
     
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -104,7 +137,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
 
     return results;
-  }, [assets, searchTerm, sortKey, sortDir]);
+  }, [assets, searchTerm, sortKey, sortDir, selectedCategory]);
 
   const currentIndex = useMemo(() => {
     if (!selectedAssetId) return -1;
@@ -159,6 +192,72 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleAddCategory = async (name: string) => {
+    if (!name.trim() || !appSettings) return;
+    setIsProcessing(true);
+    
+    const newSheet: SheetDefinition = {
+      name: name.trim(),
+      headers: ['S/N', 'Description', 'Location', 'Serial Number', 'Condition'],
+      displayFields: [
+        { key: 'sn', label: 'S/N', table: true, quickView: true },
+        { key: 'description', label: 'Description', table: true, quickView: true },
+        { key: 'location', label: 'Location', table: true, quickView: true },
+        { key: 'serialNumber', label: 'Serial Number', table: true, quickView: true },
+        { key: 'condition', label: 'Condition', table: true, quickView: true },
+      ]
+    };
+
+    const nextSettings = {
+      ...appSettings,
+      sheetDefinitions: { ...appSettings.sheetDefinitions, [name.trim()]: newSheet },
+      enabledSheets: [...appSettings.enabledSheets, name.trim()]
+    };
+
+    try {
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+      toast({ title: "Category Identity Created" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExportCategory = async (category: string) => {
+    const categoryAssets = assets.filter(a => a.category === category);
+    if (categoryAssets.length === 0) {
+      toast({ variant: "destructive", title: "Empty Pulse", description: "No records found in this category." });
+      return;
+    }
+    try {
+      await ExcelService.exportRegistry(categoryAssets, headers, `${category}-Audit-Pulse.xlsx`);
+      toast({ title: "Batch Export Complete" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Export Failure" });
+    }
+  };
+
+  const handleWipeCategory = async (category: string) => {
+    const categoryAssets = assets.filter(a => a.category === category);
+    if (categoryAssets.length === 0) return;
+    
+    setIsProcessing(true);
+    try {
+      for (const asset of categoryAssets) {
+        await enqueueMutation('DELETE', 'assets', { id: asset.id });
+      }
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.filter(a => a.category !== category));
+      await refreshRegistry();
+      toast({ title: "Category Purged", description: `Removed ${categoryAssets.length} records from registry.` });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+
   return (
     <div className="space-y-6 md:space-y-10 h-full flex flex-col animate-in fade-in duration-700">
       
@@ -203,9 +302,71 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         <Badge variant="outline" className="h-8 px-4 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest whitespace-nowrap">
           {processedAssets.length} RECORDS
         </Badge>
-        <Badge variant="outline" className="h-8 px-4 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[9px] tracking-widest whitespace-nowrap">
-          SCOPE: {userProfile?.state || 'GLOBAL'}
-        </Badge>
+        
+        {/* Category Hub Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-8 px-4 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[9px] tracking-widest whitespace-nowrap gap-2 hover:text-white hover:border-primary/20 transition-all">
+              <FolderOpen className="h-3.5 w-3.5 text-primary opacity-60" />
+              Category: {selectedCategory || 'Overall Scope'}
+              <ChevronDown className="h-3 w-3 opacity-40" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64 bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white">
+            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest px-3 py-2 opacity-40">Registry Hub</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+              <Database className="h-4 w-4 opacity-40" />
+              <span className="text-[11px] font-black uppercase">All records</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/5" />
+            
+            <ScrollArea className="h-64">
+              {Object.keys(appSettings?.sheetDefinitions || {}).sort().map(cat => (
+                <DropdownMenuSub key={cat}>
+                  <DropdownMenuSubTrigger className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                    <Boxes className="h-4 w-4 opacity-40" />
+                    <span className="text-[11px] font-black uppercase truncate">{cat}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white w-56">
+                      <DropdownMenuItem onClick={() => setSelectedCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                        <ChevronRight className="h-4 w-4 text-primary" />
+                        <span className="text-[11px] font-black uppercase">View Inventory</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                        <FileSpreadsheet className="h-4 w-4 text-green-500" />
+                        <span className="text-[11px] font-black uppercase">Batch Export</span>
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <>
+                          <DropdownMenuItem onClick={() => { setSelectedCategory(cat); setIsHeaderManagerOpen(true); }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                            <Settings2 className="h-4 w-4 text-primary" />
+                            <span className="text-[11px] font-black uppercase">Edit Layout</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem onClick={() => handleWipeCategory(cat)} className="rounded-xl p-3 focus:bg-red-600/10 text-red-500 gap-3">
+                            <Trash2 className="h-4 w-4" />
+                            <span className="text-[11px] font-black uppercase">Wipe Group</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+              ))}
+            </ScrollArea>
+
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => setIsAddCategoryOpen(true)} className="rounded-xl p-3 focus:bg-primary/10 gap-3 text-primary">
+                  <PlusCircle className="h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase">Provision New Group</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Main Display Surface */}
@@ -267,6 +428,36 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Category Creation Dialog */}
+      <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+        <DialogContent className="max-w-md bg-black border-white/10 rounded-[2.5rem] shadow-3xl text-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Provision Group</DialogTitle>
+            <DialogDescription className="text-xs font-medium text-white/40 italic">Initialize a new technical container in the registry pulse.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Group Title</Label>
+              <Input 
+                placeholder="e.g. INVERTER BATTERIES, PRINTERS..." 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-14 bg-white/5 border-white/10 rounded-2xl font-black uppercase text-sm focus-visible:ring-primary/20"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setIsAddCategoryOpen(false)} className="h-12 px-8 rounded-xl font-bold">Cancel</Button>
+            <Button 
+              onClick={() => { handleAddCategory(newCategoryName); setIsAddCategoryOpen(false); setNewCategoryName(''); }}
+              className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+            >
+              Confirm Creation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Global Modals */}
       <AssetDetailSheet 
