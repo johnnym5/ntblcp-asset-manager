@@ -62,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
+import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
 import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import {
