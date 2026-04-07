@@ -1,6 +1,7 @@
 /**
  * @fileOverview StructurePreview - The Template Visualization Layer.
  * Phase 750: Enhanced with Header Source (Explicit/Inferred/Synthetic) visibility.
+ * Phase 751: Added Select All functionality for discovered groups.
  */
 
 import React from 'react';
@@ -64,16 +65,19 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll 
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white/5 p-2 rounded-2xl border border-white/5">
-          <Checkbox 
-            id="select-all-groups" 
-            checked={allSelected} 
-            onCheckedChange={(c) => onSelectAll(!!c)} 
-            className="h-5 w-5 rounded-lg border-2"
-          />
-          <label htmlFor="select-all-groups" className="text-[10px] font-black uppercase tracking-widest text-white/60 cursor-pointer pr-4">
-            Select All Groups ({groups.length})
-          </label>
+        <div className="flex items-center gap-3 bg-white/5 p-3 px-6 rounded-2xl border border-white/5 shadow-xl">
+          <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+            <Checkbox 
+              id="select-all-groups" 
+              checked={allSelected} 
+              onCheckedChange={(c) => onSelectAll(!!c)} 
+              className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
+            />
+            <label htmlFor="select-all-groups" className="text-[11px] font-black uppercase tracking-widest text-primary cursor-pointer">
+              Select All Blocks
+            </label>
+          </div>
+          <Badge variant="outline" className="h-6 px-3 border-white/10 text-white/40 font-mono text-[9px]">{groups.length} Groups Discovered</Badge>
         </div>
       </div>
 

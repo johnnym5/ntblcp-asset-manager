@@ -2,6 +2,7 @@
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
  * Optimized for Responsive Stacking and High-Density Registry Pulse.
  * Phase 406: Added Sync Status icons to list view.
+ * Phase 407: Standardized Select All checkbox logic.
  */
 
 import React from 'react';

@@ -4,6 +4,7 @@
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Phase 1013: Upgraded to multi-select Group Orchestrator with metrics and renaming.
  * Phase 1014: Optimized Sticky Header Pulse for enclosed workstation cage.
+ * Phase 1015: Added Grid View Select All logic.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -279,6 +280,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const handleSearchChange = (val: string) => { setSearchTerm(sanitizeSearch(val)); setCurrentPage(1); };
   const handleExpandSearch = () => { setIsSearchExpanded(true); setTimeout(() => searchInputRef.current?.focus(), 100); };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
+    } else {
+      setSelectedAssetIds(new Set());
+    }
+  };
+
   const handleDeleteSelected = async () => {
     if (selectedAssetIds.size === 0) return;
     setIsProcessing(true);
@@ -329,6 +338,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       setIsProcessing(false);
     }
   };
+
+  const allInViewSelected = processedAssets.length > 0 && processedAssets.every(a => selectedAssetIds.has(a.id));
 
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
@@ -392,6 +403,18 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
         {/* Multifunctional Group Selector Pulse */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
+          {viewMode === 'grid' && (
+            <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded-full border border-white/5 mr-2 shrink-0">
+              <Checkbox 
+                id="grid-select-all" 
+                checked={allInViewSelected} 
+                onCheckedChange={handleSelectAll}
+                className="h-4 w-4 rounded-full border-white/20"
+              />
+              <label htmlFor="grid-select-all" className="text-[8px] font-black uppercase tracking-widest text-white/40 cursor-pointer pr-1">Mark All</label>
+            </div>
+          )}
+
           <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
           
           <Popover>
@@ -424,6 +447,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               
               <ScrollArea className="h-72">
                 <div className="p-2 space-y-1">
+                  <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer" onClick={() => {
+                    if (selectedCategories.length === categories.length) setSelectedCategories([]);
+                    else setSelectedCategories(categories);
+                  }}>
+                    <Checkbox checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => {
+                      if (c) setSelectedCategories(categories);
+                      else setSelectedCategories([]);
+                    }} className="h-4 w-4 border-white/20" />
+                    <span className="text-[11px] font-black uppercase text-white/40">Select All Groups</span>
+                  </div>
+                  <div className="h-px bg-white/5 my-1" />
                   {categories.map(cat => {
                     const stats = groupStats[cat] || { total: 0, verified: 0 };
                     const isSelected = selectedCategories.includes(cat);
@@ -501,7 +535,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             onInspect={handleInspect}
             selectedIds={selectedAssetIds}
             onToggleSelect={handleToggleSelect}
-            onSelectAll={(checked) => setSelectedAssetIds(checked ? new Set(paginatedAssets.map(a => a.id)) : new Set())}
+            onSelectAll={handleSelectAll}
           />
         )}
         
