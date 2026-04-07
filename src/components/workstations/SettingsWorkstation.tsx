@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 1000: Deployment Stability Pulse. Resolved handleCommitAll and originalSheetName errors.
+ * Phase 1000: Deployment Stability Pulse. Resolved handleFileImport and originalSheetName errors.
  */
 
 import React, { useState, useRef } from 'react';
@@ -156,6 +156,40 @@ export function SettingsWorkstation() {
     setActiveGrantIdForSchema(grantId);
     setSelectedSheetDef(sheetDef);
     setIsColumnSheetOpen(true);
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!appSettings || !activeGrantId) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsSaving(true);
+    try {
+      const templates = await parseExcelForTemplate(file);
+      const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
+      if (!activeGrant) return;
+
+      const nextSheetDefs = { ...activeGrant.sheetDefinitions };
+      templates.forEach(t => {
+        nextSheetDefs[t.name] = t;
+      });
+
+      const updatedGrants = appSettings.grants.map(g => 
+        g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g
+      );
+
+      const nextSettings = { ...appSettings, grants: updatedGrants };
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+
+      addNotification({ title: 'Templates Imported', description: `${templates.length} group definitions added to ${activeGrant.name}.` });
+    } catch (error) {
+      addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   if (!settingsLoaded || !appSettings) return null;
