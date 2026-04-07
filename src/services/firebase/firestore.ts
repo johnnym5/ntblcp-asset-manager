@@ -25,7 +25,6 @@ import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
 import { batchSetAssets as mirrorToRtdb, clearAssets as clearRtdb } from '@/lib/database';
-import { getCanonicalGroup } from '@/lib/condition-logic';
 import { isWithinScope } from '@/core/auth/rbac';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
@@ -150,6 +149,12 @@ export const FirestoreService = {
     const q = query(collection(db, 'error_logs'), orderBy('timestamp', 'desc'), limit(50));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
+  },
+
+  async logErrorAudit(entry: ErrorLogEntry) {
+    if (!db) return;
+    const logRef = doc(db, 'error_logs', entry.id);
+    setDoc(logRef, sanitizeForFirestore(entry)).catch(() => {});
   },
 
   async updateErrorStatus(id: string, status: ErrorLogStatus, adminComment?: string) {

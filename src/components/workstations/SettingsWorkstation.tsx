@@ -36,7 +36,8 @@ import {
   ScanSearch,
   ChevronsUpDown,
   Layers,
-  Search
+  Search,
+  HeartPulse
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -52,6 +53,7 @@ import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
+import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
   Select,
@@ -92,6 +94,7 @@ export function SettingsWorkstation() {
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
 
   const handleSettingChange = async (key: keyof AppSettings, value: any) => {
     if (!appSettings) return;
@@ -168,6 +171,11 @@ export function SettingsWorkstation() {
             {isAdmin && (
               <TabsTrigger value="users" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
                 <Users className="h-3.5 w-3.5" /> Users
+              </TabsTrigger>
+            )}
+            {isSuperAdmin && (
+              <TabsTrigger value="system" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <HeartPulse className="h-3.5 w-3.5" /> System Health
               </TabsTrigger>
             )}
             <TabsTrigger value="history" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
@@ -361,6 +369,10 @@ export function SettingsWorkstation() {
           <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
             <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
           </Card>
+        </TabsContent>
+
+        <TabsContent value="system" className="m-0 outline-none px-1">
+          <ErrorAuditWorkstation />
         </TabsContent>
 
         <TabsContent value="history" className="m-0 outline-none px-1">

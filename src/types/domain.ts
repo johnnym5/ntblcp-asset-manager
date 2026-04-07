@@ -270,4 +270,5 @@ export interface ErrorLogEntry {
     action?: string; 
     result?: string; 
   };
+  adminComment?: string;
 }

@@ -29,15 +29,15 @@ class MonitoringService {
     if (typeof window === 'undefined' || this.isInitialized) return;
 
     window.addEventListener('error', (event) => {
-      this.trackError(event.error, { action: 'GLOBAL_WINDOW_ERROR', module: 'Client Runtime' });
+      this.trackError(event.error, { action: 'GLOBAL_WINDOW_ERROR', module: 'Client Runtime' }, 'CRITICAL');
     });
 
     window.addEventListener('unhandledrejection', (event) => {
-      this.trackError(event.reason, { action: 'UNHANDLED_PROMISE_REJECTION', module: 'Async Runtime' });
+      this.trackError(event.reason, { action: 'UNHANDLED_PROMISE_REJECTION', module: 'Async Runtime' }, 'CRITICAL');
     });
 
     this.isInitialized = true;
-    console.log("🚀 Assetain Intelligence Monitoring Initialized");
+    console.log("🚀 Assetain Resilience Pulse Active");
   }
 
   /**
@@ -111,28 +111,28 @@ class MonitoringService {
     const msg = message.toLowerCase();
 
     if (msg.includes('permission-denied') || msg.includes('insufficient permissions')) {
-      return "You do not have the required administrative permission to perform this update.";
+      return "Administrative clearance denied for this mutation pulse.";
     }
     if (msg.includes('network-error') || msg.includes('failed to fetch') || msg.includes('timeout')) {
-      return "The connection to the cloud was interrupted. Your change has been queued locally.";
+      return "The cloud heartbeat was interrupted. Operation enqueued for background sync.";
     }
     if (msg.includes('not-found') || msg.includes('document missing')) {
-      return "The requested record could not be found. It may have been removed by another auditor.";
+      return "The requested record pulse could not be found in the active registry.";
     }
     if (msg.includes('quota-exceeded')) {
-      return "The project's data limit has been reached. Please contact a system administrator.";
+      return "Registry data capacity reached. Contact system architecture team.";
     }
     if (msg.includes('offline')) {
-      return "You are currently working in an offline zone. Changes will sync when connectivity returns.";
+      return "Working in offline regional scope. Changes saved to local persistence.";
     }
     if (msg.includes('parsing failed') || msg.includes('invalid workbook')) {
-      return "The uploaded file format is not deterministic. Please check the Excel template structure.";
+      return "Deterministic parsing failed. Workbook structure deviates from registry contract.";
     }
     if (msg.includes('validation')) {
-      return "Some required fields are missing or in an invalid format. Check the record and try again.";
+      return "Record fidelity check failed. Required parameters missing or malformed.";
     }
 
-    return "An unexpected operational glitch occurred. The system is attempting to recover.";
+    return "An unexpected operational pulse anomaly occurred. Recovery protocols active.";
   }
 }
 

@@ -8,7 +8,7 @@ import { storage } from '@/offline/storage';
 import { getSettings as getRtdbSettings } from '@/lib/database';
 
 export interface DiagnosticResult {
-  node: 'CLOUD' | 'MIRROR' | 'LOCAL';
+  node: 'CLOUD' | 'MIRROR' | 'LOCAL' | 'AUTH';
   status: 'STABLE' | 'LATENT' | 'DISCONNECTED';
   latency: number; // ms
   message: string;
@@ -43,7 +43,7 @@ export const SystemDiagnostics = {
     // 2. Cloud Node Test (Firestore)
     const cloudStart = performance.now();
     try {
-      if (navigator.onLine) {
+      if (typeof window !== 'undefined' && navigator.onLine) {
         await FirestoreService.getSettings();
         results.push({
           node: 'CLOUD',
@@ -59,14 +59,14 @@ export const SystemDiagnostics = {
         node: 'CLOUD',
         status: 'DISCONNECTED',
         latency: 0,
-        message: 'Cloud heartbeat missing.'
+        message: 'Cloud heartbeat missing or offline.'
       });
     }
 
     // 3. Mirror Node Test (RTDB)
     const mirrorStart = performance.now();
     try {
-      if (navigator.onLine) {
+      if (typeof window !== 'undefined' && navigator.onLine) {
         await getRtdbSettings();
         results.push({
           node: 'MIRROR',
