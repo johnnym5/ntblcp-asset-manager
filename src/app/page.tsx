@@ -16,7 +16,7 @@ import {
   LogOut, 
   Bell, 
   Settings as SettingsIcon,
-  Wifi,
+  Wifi, 
   WifiOff,
   Search,
   X,
@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   Filter,
   ShieldAlert,
+  ShieldCheck,
   HelpCircle,
   ClipboardList
 } from 'lucide-react';
@@ -273,13 +274,13 @@ export default function SPAHub() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all overflow-hidden shrink-0">
-                  {userProfile.displayName[0]}
+                  {userProfile?.displayName?.[0] || 'U'}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 text-white rounded-xl shadow-3xl p-1">
                 <DropdownMenuLabel className="p-3">
-                  <p className="text-xs font-black uppercase">{userProfile.displayName}</p>
-                  <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile.role} &bull; {userProfile.state}</p>
+                  <p className="text-xs font-black uppercase">{userProfile?.displayName}</p>
+                  <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role} &bull; {userProfile?.state}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('REGISTRY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
