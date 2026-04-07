@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
+ * Phase 1205: Implemented deterministic optionsMap discovery to resolve ReferenceError.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -44,7 +45,6 @@ import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
-import { processSelectedSyncQueue } from '@/offline/sync';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { addNotification } from '@/hooks/use-notifications';
@@ -52,7 +52,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -127,6 +126,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
 
+  /**
+   * Discovery Pulse: Generates the optionsMap required for the Filter Engine.
+   */
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    headers.forEach(header => {
+      const uniqueValues = new Set<string>();
+      activeAssets.forEach(asset => {
+        let val: any = "";
+        switch(header.normalizedName) {
+          case "sn": val = asset.sn; break;
+          case "location": val = asset.location; break;
+          case "asset_description": val = asset.description; break;
+          case "asset_id_code": val = asset.assetIdCode; break;
+          case "asset_class": val = asset.category; break;
+          case "condition": val = asset.condition; break;
+          default:
+            val = (asset.metadata as any)?.[header.rawName] || (asset.metadata as any)?.[header.normalizedName];
+        }
+        if (val !== undefined && val !== null && String(val).trim() !== "") {
+          uniqueValues.add(String(val).trim());
+        }
+      });
+      map[header.id] = Array.from(uniqueValues).sort();
+    });
+    return map;
+  }, [activeAssets, headers]);
+
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
     activeAssets.forEach(a => {
@@ -169,7 +196,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           switch(sortHeader.normalizedName) {
             case "sn": return item.sn || "";
             case "asset_description": return item.description || "";
-            default: return String(item.metadata?.[sortHeader.rawName] || "");
+            default: return String((item.metadata as any)?.[sortHeader.rawName] || (item.metadata as any)?.[sortHeader.normalizedName] || "");
           }
         };
         const valA = String(getVal(a));
