@@ -1,38 +1,23 @@
 'use client';
 
 /**
- * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
- * Phase 1201: Wrapped Operational Readiness Hub in a closed-by-default dropdown.
+ * @fileOverview Inventory Dashboard - High-Fidelity Compressed Analytics.
+ * Scaled for maximum content density.
  */
 
 import React, { useMemo, useState } from 'react';
 import { 
-    BarChart2,
+    Zap, 
+    ArrowRight, 
+    Boxes, 
+    FolderOpen, 
+    SearchCode, 
     ShieldCheck,
-    Zap,
-    Tag,
-    Hash,
-    AlertCircle,
-    Wrench,
-    FileWarning,
-    MessageSquare,
-    Clock,
-    PlusCircle,
     ChevronDown,
     RefreshCw,
-    MousePointer2,
-    MapPin,
-    Boxes,
-    ChevronRight,
     Activity,
-    FolderOpen,
-    SearchCode,
-    ClipboardCheck,
-    FileUp,
-    ArrowRight,
-    Fingerprint,
-    TrendingUp,
-    History
+    MousePointer2,
+    TrendingUp
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -49,8 +34,6 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 
-type DashboardView = 'stats' | 'insights';
-
 interface QuickStartTileProps {
     label: string;
     description: string;
@@ -65,52 +48,49 @@ const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count,
     <button 
         onClick={onClick}
         className={cn(
-            "p-6 rounded-[2rem] border-2 bg-white/[0.02] border-white/5 text-left transition-all group relative overflow-hidden active:scale-95 h-full",
+            "p-4 rounded-[1.25rem] border bg-white/[0.02] border-white/5 text-left transition-all group relative overflow-hidden active:scale-95 h-full",
             isDestructive ? "hover:border-destructive/40 hover:bg-destructive/[0.02]" : "hover:border-primary/40 hover:bg-primary/[0.02]"
         )}
     >
-        <div className="flex justify-between items-start mb-6">
-            <div className={cn("p-3 rounded-2xl transition-colors", color)}>
-                <Icon className="h-6 w-6 text-white" />
+        <div className="flex justify-between items-start mb-4">
+            <div className={cn("p-2 rounded-lg transition-colors", color)}>
+                <Icon className="h-4 w-4 text-white" />
             </div>
             {count !== undefined && (
                 <div className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
                     isDestructive ? "bg-destructive text-white" : "bg-primary text-black"
                 )}>
                     {count}
                 </div>
             )}
         </div>
-        <div className="space-y-1">
-            <h4 className="text-sm font-black uppercase text-white tracking-tight">{label}</h4>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-tighter leading-tight italic">{description}</p>
-        </div>
-        <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-40 transition-opacity">
-            <ArrowRight className="h-4 w-4 text-white" />
+        <div className="space-y-0.5">
+            <h4 className="text-[11px] font-black uppercase text-white tracking-tight">{label}</h4>
+            <p className="text-[8px] font-bold text-white/30 uppercase tracking-tighter leading-tight italic">{description}</p>
         </div>
     </button>
 );
 
-const ReadinessPulse = ({ label, count, subLabel, onClick, color, isDestructive }: any) => (
+const ReadinessPulse = ({ label, count, subLabel, onClick, isDestructive }: any) => (
     <div className={cn(
-        "flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl border-2 transition-all group gap-4",
+        "flex items-center justify-between p-3 rounded-xl border transition-all group gap-3",
         isDestructive ? "bg-red-600/5 border-red-600/10 hover:border-red-600/40" : "bg-white/[0.02] border-white/5 hover:border-primary/20"
     )}>
-        <div className="space-y-1 flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-                <span className={cn("text-2xl font-black tracking-tighter", isDestructive ? "text-red-600" : "text-white")}>{count}</span>
-                <span className={cn("text-[10px] font-black uppercase tracking-widest", isDestructive ? "text-red-500" : "text-primary")}>{label}</span>
+        <div className="space-y-0.5 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+                <span className={cn("text-xl font-black tracking-tighter", isDestructive ? "text-red-600" : "text-white")}>{count}</span>
+                <span className={cn("text-[8px] font-black uppercase tracking-widest", isDestructive ? "text-red-500" : "text-primary")}>{label}</span>
             </div>
-            <p className="text-[9px] font-medium text-white/40 leading-relaxed italic pr-4 line-clamp-2">{subLabel}</p>
+            <p className="text-[8px] font-medium text-white/40 leading-relaxed italic truncate">{subLabel}</p>
         </div>
         <Button 
             variant="ghost" 
             size="sm" 
             onClick={onClick} 
-            className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5 hover:bg-white/5 text-white/40 hover:text-white"
+            className="h-7 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-white/40"
         >
-            View Details
+            View
         </Button>
     </div>
 );
@@ -126,301 +106,131 @@ export function AssetSummaryDashboard() {
         setSelectedStatuses,
         setSelectedCategory,
         setSelectedLocations,
-        setFilters,
         setMissingFieldFilter
     } = useAppState();
     
-    const [view, setView] = useState<DashboardView>('stats');
+    const [view, setView] = useState<'stats' | 'insights'>('stats');
 
     const metrics = useMemo(() => {
         const total = assets.length;
         const verified = assets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
         
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-        const oneWeek = 7 * oneDay;
-
         return {
             coverage,
             total,
             verified,
             pending: assets.filter(a => a.status === 'UNVERIFIED').length,
             missingId: assets.filter(a => !a.assetIdCode).length,
-            missingSerials: assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length,
-            critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length,
-            maintenance: assets.filter(a => ['Bad condition', 'Used but in poor condition'].includes(a.condition || '')).length,
+            critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length,
             exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
-            feedback: assets.filter(a => !!a.remarks && a.remarks.trim() !== '').length,
-            modifiedToday: assets.filter(a => now - new Date(a.lastModified).getTime() < oneDay).length,
-            newInFlow: assets.filter(a => now - new Date(a.importMetadata?.importedAt || 0).getTime() < oneWeek).length,
             folders: new Set(assets.map(a => a.category)).size,
             anomalies: assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length
         };
     }, [assets]);
 
-    const scrollTo = (id: string) => {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
     return (
-        <div className="space-y-10">
-            {/* Header Terminal */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-[2.5rem] bg-white/[0.03] border border-white/5 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center gap-5">
-                    <div className="p-3.5 bg-primary/10 rounded-2xl shadow-inner">
-                        <Zap className="h-6 w-6 text-primary" />
+        <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4 p-4 rounded-[1.25rem] bg-white/[0.03] border border-white/5 shadow-xl backdrop-blur-md">
+                <div className="flex items-center gap-4">
+                    <div className="p-2.5 bg-primary/10 rounded-xl shadow-inner">
+                        <Zap className="h-4 w-4 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Quick Start Pulse</h3>
-                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
-                            Immediate operational triggers for current registry
-                        </p>
+                        <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none">Operation Pulse</h3>
+                        <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Global registry health index</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5">
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/5">
                         <button 
                             onClick={() => setView('stats')} 
-                            className={cn(
-                                "px-6 py-2.5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
-                                view === 'stats' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
-                            )}
+                            className={cn("px-4 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest transition-all", view === 'stats' ? "bg-white/10 text-white" : "text-white/20")}
                         >
-                            Quick Actions
+                            Quick
                         </button>
                         <button 
                             onClick={() => setView('insights')} 
-                            className={cn(
-                                "px-6 py-2.5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
-                                view === 'insights' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
-                            )}
+                            className={cn("px-4 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest transition-all", view === 'insights' ? "bg-white/10 text-white" : "text-white/20")}
                         >
-                            ACTIONS
+                            Metric
                         </button>
                     </div>
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={manualDownload} 
-                        disabled={isSyncing || !isOnline}
-                        className="rounded-xl h-12 w-12 bg-white/5 border border-white/5 text-white/40 hover:text-primary"
-                    >
-                        <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
-                    </Button>
                 </div>
             </div>
 
             <AnimatePresence mode="wait">
                 {view === 'stats' ? (
-                    <motion.div 
-                        key="quick-start"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-10"
-                    >
-                        {/* Primary Pulse Row */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <QuickStartTile 
-                                label="Browse Registry" 
-                                description="Full Category Inventory" 
-                                icon={Boxes} 
-                                color="bg-primary shadow-primary/20"
-                                count={metrics.total}
-                                onClick={() => setActiveView('REGISTRY')}
-                            />
-                            <QuickStartTile 
-                                label="Registry Folders" 
-                                description="Structural Data Tree" 
-                                icon={FolderOpen} 
-                                color="bg-blue-600 shadow-blue-600/20"
-                                count={metrics.folders}
-                                onClick={() => scrollTo('folders-section')}
-                            />
-                            <QuickStartTile 
-                                label="Resolve Anomalies" 
-                                description="Pattern Fidelity Review" 
-                                icon={SearchCode} 
-                                color="bg-red-600 shadow-red-600/20"
-                                count={metrics.anomalies}
-                                isDestructive={metrics.anomalies > 0}
-                                onClick={() => scrollTo('anomalies-section')}
-                            />
+                    <motion.div key="stats" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <QuickStartTile label="Browse Registry" description="Inventory View" icon={Boxes} color="bg-primary" count={metrics.total} onClick={() => setActiveView('REGISTRY')} />
+                            <QuickStartTile label="Folders" description="Category Tree" icon={FolderOpen} color="bg-blue-600" count={metrics.folders} onClick={() => {}} />
+                            <QuickStartTile label="Anomalies" description="Pattern Failures" icon={SearchCode} color="bg-red-600" count={metrics.anomalies} isDestructive={metrics.anomalies > 0} onClick={() => {}} />
                         </div>
 
-                        {/* Readiness Metric Hub - Collapsible */}
                         <Accordion type="single" collapsible className="w-full">
-                            <AccordionItem value="readiness-hub" className="border-none">
-                                <AccordionTrigger className="hover:no-underline p-0 py-4 group/trigger">
-                                    <div className="flex items-center justify-between w-full pr-4">
-                                        <div className="flex items-center gap-3 px-1">
-                                            <ShieldCheck className="h-4 w-4 text-primary" />
-                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Operational Readiness Hub</h4>
+                            <AccordionItem value="readiness" className="border-none">
+                                <AccordionTrigger className="hover:no-underline p-0 py-2">
+                                    <div className="flex items-center justify-between w-full pr-2">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Field Readiness Hub</h4>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className={cn(
-                                                "text-[8px] font-black border-white/10 uppercase transition-all",
-                                                metrics.pending > 0 ? "text-primary border-primary/20" : "text-white/20"
-                                            )}>
-                                                {metrics.pending > 0 ? `${metrics.pending} PULSES PENDING` : 'STATUS: STABLE'}
-                                            </Badge>
-                                            <ChevronDown className="h-3 w-3 text-white/20 group-data-[state=open]:rotate-180 transition-transform" />
-                                        </div>
+                                        <Badge variant="outline" className="text-[7px] font-black border-white/5 uppercase px-2 py-0.5">VIEW METRICS</Badge>
                                     </div>
                                 </AccordionTrigger>
-                                <AccordionContent className="pt-4 pb-8 outline-none">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                        <ReadinessPulse 
-                                            label="Verification Coverage" 
-                                            count={`${metrics.coverage}%`} 
-                                            subLabel={`Showing ${metrics.verified} verified items out of ${metrics.total} assets in this scope.`}
-                                            onClick={() => { setSelectedStatuses(['VERIFIED']); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Pending Action" 
-                                            count={metrics.pending} 
-                                            subLabel="Assets currently marked as unverified and requiring field inspection."
-                                            onClick={() => setActiveView('VERIFY')}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Missing Asset ID" 
-                                            count={metrics.missingId} 
-                                            subLabel="Assets lacking a unique tag or system ID code. Crucial for audits."
-                                            onClick={() => { setMissingFieldFilter('assetIdCode'); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Missing Serials" 
-                                            count={metrics.missingSerials} 
-                                            subLabel="Items missing manufacturer serial numbers. Risk for identification."
-                                            onClick={() => { setMissingFieldFilter('serialNumber'); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Critical Condition" 
-                                            count={metrics.critical} 
-                                            isDestructive={metrics.critical > 0}
-                                            subLabel="Assets reported as stolen, burnt, or unsalvageable."
-                                            onClick={() => setActiveView('ALERTS')}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Maintenance Alert" 
-                                            count={metrics.maintenance} 
-                                            subLabel="Assets in poor or bad condition requiring technical assessment."
-                                            onClick={() => { setSearchTerm('bad'); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Audit Exceptions" 
-                                            count={metrics.exceptions} 
-                                            isDestructive={metrics.exceptions > 0}
-                                            subLabel="Records where field data conflicts with previous system information."
-                                            onClick={() => { setSelectedStatuses(['DISCREPANCY']); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Field Feedback" 
-                                            count={metrics.feedback} 
-                                            subLabel="Assets containing specific comments or remarks from field officers."
-                                            onClick={() => { setSearchTerm('remark'); setActiveView('REGISTRY'); }}
-                                        />
-                                        <ReadinessPulse 
-                                            label="Modified Today" 
-                                            count={metrics.modifiedToday} 
-                                            subLabel="Updates or creations performed in the last 24 hours."
-                                            onClick={() => setActiveView('AUDIT_LOG')}
-                                        />
-                                        <ReadinessPulse 
-                                            label="New In-Flow" 
-                                            count={metrics.newInFlow} 
-                                            subLabel="Fresh records newly registered in the system this week."
-                                            onClick={() => { setActiveView('REGISTRY'); setSearchTerm('2025'); }}
-                                        />
+                                <AccordionContent className="pt-2 pb-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <ReadinessPulse label="Coverage" count={`${metrics.coverage}%`} subLabel={`${metrics.verified} items confirmed`} onClick={() => {}} />
+                                        <ReadinessPulse label="Pending" count={metrics.pending} subLabel="Awaiting physical audit" onClick={() => setActiveView('VERIFY')} />
+                                        <ReadinessPulse label="Critical" count={metrics.critical} isDestructive={metrics.critical > 0} subLabel="Reported losses/damage" onClick={() => setActiveView('ALERTS')} />
+                                        <ReadinessPulse label="Anomalies" count={metrics.anomalies} subLabel="Fidelity pattern breaks" onClick={() => {}} />
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
                         </Accordion>
                     </motion.div>
                 ) : (
-                    <motion.div 
-                        key="insights"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
-                    >
-                        <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2 bg-primary/10 rounded-xl"><Boxes className="h-4 w-4 text-primary" /></div>
-                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Category Integrity Pulse</h4>
-                            </div>
-                            <ScrollArea className="h-[400px] pr-4">
-                                <div className="space-y-2">
+                    <motion.div key="insights" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 shadow-xl">
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Category Parity</h4>
+                            <ScrollArea className="h-[250px] pr-2">
+                                <div className="space-y-1.5">
                                     {Object.entries(assets.reduce((acc, a) => {
-                                        const cat = a.category || 'Uncategorized';
+                                        const cat = a.category || 'Other';
                                         if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
                                         acc[cat].total++;
                                         if (a.status === 'VERIFIED') acc[cat].verified++;
                                         return acc;
-                                    }, {} as any)).sort((a: any, b: any) => b[1].total - a[1].total).map(([cat, data]: any) => {
-                                        const percent = Math.round((data.verified / data.total) * 100);
-                                        return (
-                                            <div 
-                                                key={cat} 
-                                                onClick={() => { setSelectedCategory(cat); setActiveView('REGISTRY'); }}
-                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 transition-all cursor-pointer flex items-center justify-between"
-                                            >
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex items-center justify-between pr-4">
-                                                        <span className="text-[11px] font-black uppercase text-white/80">{cat}</span>
-                                                        <span className="text-[9px] font-mono font-bold text-primary">{data.verified} / {data.total}</span>
-                                                    </div>
-                                                    <Progress value={percent} className="h-1 bg-white/5" />
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-primary transition-all ml-4" />
+                                    }, {} as any)).map(([cat, data]: any) => (
+                                        <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 flex flex-col gap-1.5">
+                                            <div className="flex justify-between items-center text-[9px] font-black uppercase">
+                                                <span className="text-white/60 truncate pr-4">{cat}</span>
+                                                <span className="text-primary">{Math.round((data.verified/data.total)*100)}%</span>
                                             </div>
-                                        );
-                                    })}
+                                            <Progress value={(data.verified/data.total)*100} className="h-0.5 bg-white/5" />
+                                        </div>
+                                    ))}
                                 </div>
                             </ScrollArea>
                         </Card>
-
-                        <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2 bg-primary/10 rounded-xl"><MapPin className="h-4 w-4 text-primary" /></div>
-                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Regional Activity</h4>
-                            </div>
-                            <ScrollArea className="h-[400px] pr-4">
-                                <div className="space-y-2">
+                        
+                        <Card className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 shadow-xl">
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Regional Scope</h4>
+                            <ScrollArea className="h-[250px] pr-2">
+                                <div className="space-y-1.5">
                                     {Object.entries(assets.reduce((acc, a) => {
                                         const loc = a.location || 'Unknown';
-                                        if (!acc[loc]) acc[loc] = { total: 0, verified: 0 };
-                                        acc[loc].total++;
-                                        if (a.status === 'VERIFIED') acc[loc].verified++;
+                                        if (!acc[loc]) acc[loc] = 0;
+                                        acc[loc]++;
                                         return acc;
-                                    }, {} as any)).sort((a: any, b: any) => b[1].total - a[1].total).slice(0, 10).map(([loc, data]: any) => {
-                                        const percent = Math.round((data.verified / data.total) * 100);
-                                        return (
-                                            <div 
-                                                key={loc} 
-                                                onClick={() => { setSelectedLocations([loc]); setActiveView('REGISTRY'); }}
-                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 transition-all cursor-pointer flex items-center justify-between"
-                                            >
-                                                <div className="flex items-center gap-4 flex-1">
-                                                    <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-[10px] text-white/20 group-hover:text-primary transition-colors">
-                                                        {loc.substring(0, 2).toUpperCase()}
-                                                    </div>
-                                                    <div className="flex-1 space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[11px] font-black uppercase text-white/80">{loc}</span>
-                                                            <span className="text-[9px] font-black uppercase text-white/40">{percent}% COMPLETE</span>
-                                                        </div>
-                                                        <Progress value={percent} className="h-1 bg-white/5" />
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-primary transition-all ml-4" />
-                                            </div>
-                                        );
-                                    })}
+                                    }, {} as any)).sort((a:any, b:any) => b[1] - a[1]).slice(0, 8).map(([loc, count]: any) => (
+                                        <div key={loc} className="flex justify-between items-center p-2 rounded-lg bg-white/[0.01] hover:bg-white/[0.03] transition-colors border-b border-white/5">
+                                            <span className="text-[10px] font-black uppercase text-white/40">{loc}</span>
+                                            <span className="text-[10px] font-mono font-bold text-white">{count}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </ScrollArea>
                         </Card>

@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 306: Implemented Bell-Anchored Notification Toast Pulse.
- * Phase 307: Fixed HelpCircle ReferenceError.
+ * Optimized for High-Density Operational Flow.
+ * Phase 400: Reduced size by 50% across all UI elements.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -38,7 +38,7 @@ import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
-import { NotificationsCenter } from '@/components/NotificationsSheet';
+import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
@@ -65,22 +65,22 @@ function NotificationToast({ notification }: { notification: Notification }) {
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.9 }}
+      initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+      exit={{ opacity: 0, scale: 0.95, y: -5 }}
       className={cn(
-        "absolute top-full right-0 mt-4 w-72 p-4 rounded-2xl border-2 shadow-3xl z-[100] flex items-center gap-4 backdrop-blur-xl",
+        "absolute top-full right-0 mt-2 w-56 p-2 rounded-lg border shadow-2xl z-[100] flex items-center gap-2 backdrop-blur-xl",
         notification.variant === 'destructive' ? "bg-red-600 border-red-500 text-white" :
         notification.variant === 'success' ? "bg-green-600 border-green-500 text-white" :
         "bg-[#0A0A0A] border-white/10 text-white"
       )}
     >
       <div className="shrink-0">
-        <Icon className="h-5 w-5" />
+        <Icon className="h-3 w-3" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
-        <p className="text-[9px] font-medium opacity-80 line-clamp-1 mt-1">{notification.description}</p>
+        <p className="text-[9px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
+        <p className="text-[7px] font-medium opacity-80 line-clamp-1 mt-0.5">{notification.description}</p>
       </div>
     </motion.div>
   );
@@ -172,7 +172,7 @@ export default function SPAHub() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
   const renderWorkstation = () => {
@@ -221,76 +221,68 @@ export default function SPAHub() {
         setMissingFieldFilter={setMissingFieldFilter}
       />
       
-      <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
+      <header className="h-11 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
           <TooltipProvider disableHoverableContent={!showTooltips}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2.5 p-1.5 sm:p-2 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary group tactile-pulse">
-                  <Boxes className="h-5 w-5" />
+                <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-all text-primary group tactile-pulse">
+                  <Boxes className="h-3.5 w-3.5" />
                   <div className="flex flex-col text-left">
-                    <h1 className="text-xs sm:text-sm font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
-                    <span className="text-[6px] sm:text-[7px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control Hub</span>
+                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
+                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control</span>
                   </div>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-[10px] font-black uppercase">Return to Overview Dashboard</TooltipContent>
+              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Home</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
 
-        <div className="flex-1 flex items-center justify-center mx-2 sm:mx-12">
+        <div className="flex-1 flex items-center justify-center mx-2 sm:mx-8">
           <AnimatePresence mode="wait">
             {!isSearchExpanded ? (
               <motion.button
                 key="search-trigger"
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                exit={{ opacity: 0, scale: 0.98 }}
                 onClick={() => setIsSearchExpanded(true)}
-                className="flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
+                className="flex items-center gap-3 px-3 py-1 bg-white/[0.03] border border-white/5 rounded-lg text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
               >
-                <Search className="h-3.5 w-3.5" />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Registry Search</span>
-                {!isMobile && (
-                  <div className="flex items-center gap-1 ml-4 px-1 py-0.5 rounded-md bg-white/5 border border-white/5 text-[7px] font-black opacity-40">
-                    <span>⌘</span>
-                    <span>K</span>
-                  </div>
-                )}
+                <Search className="h-3 w-3" />
+                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Registry</span>
               </motion.button>
             ) : (
               <motion.div
                 key="search-input"
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", maxWidth: "500px", opacity: 1 }}
+                animate={{ width: "100%", maxWidth: "350px", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 className="relative flex items-center group"
               >
-                <Search className="absolute left-4 h-3.5 w-3.5 text-primary" />
+                <Search className="absolute left-3 h-3 w-3 text-primary" />
                 <input 
                   ref={searchInputRef}
                   autoFocus
                   type="text"
-                  placeholder={isMobile ? "Search..." : "Quick Search Records..."}
-                  className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-12 sm:pr-24 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
+                  placeholder="Quick Search..."
+                  className="w-full h-7 bg-white/[0.05] border-2 border-primary/20 rounded-lg pl-8 pr-16 text-[9px] font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                   onBlur={() => !searchTerm && setIsSearchExpanded(false)}
                 />
-                <div className="absolute right-2 flex items-center gap-1">
-                  {!isMobile && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setIsFilterOpen(true)}
-                      className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", isFilterOpen && "text-primary")}
-                    >
-                      <Filter className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-lg text-white/20 hover:text-white">
-                    <X className="h-3.5 w-3.5" />
+                <div className="absolute right-1 flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsFilterOpen(true)}
+                    className={cn("h-5 w-5 rounded-md text-white/20 hover:text-primary relative", isFilterOpen && "text-primary")}
+                  >
+                    <Filter className="h-2.5 w-2.5" />
+                  </Button>
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-md text-white/20 hover:text-white">
+                    <X className="h-2.5 w-2.5" />
                   </button>
                 </div>
               </motion.div>
@@ -299,49 +291,28 @@ export default function SPAHub() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden sm:flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5">
-            <TooltipProvider disableHoverableContent={!showTooltips}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[9px] font-black uppercase">Fetch latest from Cloud</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider disableHoverableContent={!showTooltips}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
-                    <Upload className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[9px] font-black uppercase">Push changes to Cloud</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="hidden sm:flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/5">
+            <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+              <Download className="h-2.5 w-2.5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+              <Upload className="h-2.5 w-2.5" />
+            </Button>
           </div>
 
-          <TooltipProvider disableHoverableContent={!showTooltips}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 sm:gap-2 group tactile-pulse px-1 sm:px-2">
-                  <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-                  <span className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? (isMobile ? 'ON' : 'Online') : (isMobile ? 'OFF' : 'Offline')}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="text-[9px] font-black uppercase">{isOnline ? 'System is connected' : 'Working in local scope'}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 group tactile-pulse px-1 sm:px-2">
+            <div className={cn("h-1 w-1 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+            <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ON' : 'OFF'}</span>
+          </button>
           
-          <button onClick={() => setIsHelpOpen(true)} className="p-2 bg-white/5 rounded-lg text-white/40 hover:text-primary transition-all">
-            <HelpCircle className="h-4 w-4" />
+          <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-white/5 rounded-md text-white/40 hover:text-primary transition-all">
+            <HelpCircle className="h-3 w-3" />
           </button>
 
           <div className="relative">
-            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-all">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-red-600 rounded-full flex items-center justify-center border-2 border-black"><span className="text-[7px] font-black text-white">!</span></div>}
+            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-1.5 bg-white/5 rounded-md text-white/40 hover:text-white transition-all">
+              <Bell className="h-3 w-3" />
+              {unreadCount > 0 && <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-600 rounded-full border border-black" />}
             </button>
             <AnimatePresence>
               {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
@@ -350,36 +321,36 @@ export default function SPAHub() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all overflow-hidden shrink-0">
+              <button className="h-7 w-7 sm:h-7 sm:w-7 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[9px] hover:border-primary/40 transition-all shrink-0">
                 {userProfile?.displayName?.[0] || 'U'}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 text-white rounded-xl shadow-3xl p-1">
-              <DropdownMenuLabel className="p-3">
-                <p className="text-xs font-black uppercase">{userProfile?.displayName}</p>
-                <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role} &bull; {userProfile?.state}</p>
+            <DropdownMenuContent align="end" className="w-44 bg-black border-white/10 text-white rounded-lg shadow-3xl p-1">
+              <DropdownMenuLabel className="p-2">
+                <p className="text-[9px] font-black uppercase">{userProfile?.displayName}</p>
+                <p className="text-[7px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                <SettingsIcon className="mr-2 h-3.5 w-3.5" />
-                <span className="text-[10px] font-black uppercase">Settings</span>
+              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary focus:text-black m-0.5">
+                <SettingsIcon className="mr-2 h-2.5 w-2.5" />
+                <span className="text-[8px] font-black uppercase">Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-lg focus:bg-red-600 focus:text-white m-1 text-red-500">
-                <LogOut className="mr-2 h-3.5 w-3.5" />
-                <span className="text-[10px] font-black uppercase">Sign Out</span>
+              <DropdownMenuItem onClick={logout} className="p-1.5 rounded-md focus:bg-red-600 focus:text-white m-0.5 text-red-500">
+                <LogOut className="mr-2 h-2.5 w-2.5" />
+                <span className="text-[8px] font-black uppercase">Sign Out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      <div className="flex-1 relative flex flex-col p-4 sm:p-6 overflow-hidden bg-black">
-        <div className="flex-1 flex flex-col border border-white/10 rounded-[2.5rem] bg-[#050505]/50 overflow-hidden relative shadow-inner">
+      <div className="flex-1 relative flex flex-col p-2 sm:p-2 overflow-hidden bg-black">
+        <div className="flex-1 flex flex-col border border-white/10 rounded-xl bg-[#050505]/50 overflow-hidden relative">
           <ErrorBoundary module={activeView}>
             <ScrollArea className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
-                <div className="flex-1 p-4 sm:p-8 lg:p-10 max-w-[1600px] mx-auto w-full">
+                <div className="flex-1 p-2 sm:p-4 lg:p-4 max-w-[1600px] mx-auto w-full">
                   {renderWorkstation()}
                 </div>
               </div>
