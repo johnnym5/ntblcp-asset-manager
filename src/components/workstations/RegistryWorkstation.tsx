@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 1020: Implemented Specification-Parity Category Hub cards.
- * Phase 1021: Optimized for high-density amoled visual language.
+ * Phase 302: Enforced RBAC visibility for Add/Edit pulses.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -138,12 +138,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Category Management State
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const canAdd = userProfile?.canAddAssets || isAdmin;
+  const canEdit = userProfile?.canEditAssets || isAdmin;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
@@ -342,7 +343,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const allInViewSelected = processedAssets.length > 0 && processedAssets.every(a => selectedAssetIds.has(a.id));
 
-  // High-Fidelity Category Card matching the user's specification
   const CategoryHubCard = ({ name, stats }: { name: string, stats: { total: number, verified: number } }) => {
     const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
     
@@ -350,12 +350,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <Card className="bg-[#080808] border-2 border-white/5 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6">
         <div className="flex justify-between items-start mb-8">
           <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{name}</h3>
-          <button 
-            onClick={(e) => { e.stopPropagation(); setCategoryToRename(name); setNewCategoryName(name); setIsRenameDialogOpen(true); }}
-            className="text-white/20 hover:text-white transition-colors"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setCategoryToRename(name); setNewCategoryName(name); setIsRenameDialogOpen(true); }}
+              className="text-white/20 hover:text-white transition-colors"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex justify-between items-end mb-8">
@@ -394,10 +396,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
       
-      {/* 
-          Workstation Sticky Header Pulse:
-          Persistent within the windowed cage during scrolling.
-      */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -444,7 +442,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
-              <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
+              {canAdd && (
+                <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
+              )}
               <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
                 <ListFilter className="h-4 w-4" />
                 {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
@@ -457,7 +457,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        {/* Global Toolbar Pulse */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
           {selectedCategories.length > 0 && viewMode === 'grid' && (
             <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded-full border border-white/5 mr-2 shrink-0">
@@ -547,7 +546,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
               </ScrollArea>
 
-              {selectedCategories.length > 0 && (
+              {selectedCategories.length > 0 && canEdit && (
                 <div className="p-4 bg-primary/5 border-t border-white/5 flex gap-2">
                   <Button onClick={() => setIsBatchEditOpen(true)} className="flex-1 h-9 rounded-xl bg-primary text-black font-black uppercase text-[9px] tracking-widest gap-2">
                     <Zap className="h-3.5 w-3.5 fill-current" /> Bulk Modify Groups
@@ -559,7 +558,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
-      {/* Main Surface: Hub View or Drill-down View */}
       <div className="flex-1 min-h-0 px-1 pt-4">
         {selectedCategories.length === 0 ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
@@ -614,7 +612,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
-      {/* Floating Interactive Controls */}
       <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
         {selectedCategories.length > 0 && Math.ceil(processedAssets.length / ITEMS_PER_PAGE) > 1 && (
           <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 scale-90 sm:scale-100">
@@ -638,12 +635,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </div>
               <div className="h-6 w-px bg-white/10 hidden sm:block" />
               <div className="flex items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white">
-                  <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Edit</span>
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Delete</span>
-                </Button>
+                {canEdit && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white">
+                    <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Edit</span>
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Delete</span>
+                  </Button>
+                )}
               </div>
               <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
             </motion.div>
@@ -687,7 +688,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
       
-      {/* Rename Logic Dialog */}
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent className="max-w-md rounded-[2rem] border-primary/10 bg-black text-white p-8">
           <DialogHeader className="space-y-4">

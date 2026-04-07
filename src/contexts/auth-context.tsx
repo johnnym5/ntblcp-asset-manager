@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Phase 270: Expanded profile to include regional scope inheritance for Zonal Admins.
+ * Phase 300: Implemented Initialization Pulse flag for session-based onboarding.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -46,6 +46,8 @@ const superAdmin: AuthorizedUser = {
   states: ['All'],
   isAdmin: true,
   role: 'SUPERADMIN',
+  canAddAssets: true,
+  canEditAssets: true
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -54,12 +56,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded, isHydrated } = useAppState();
+  const { appSettings, settingsLoaded, isHydrated, manualDownload } = useAppState();
 
   useEffect(() => {
-    if (!settingsLoaded || !isHydrated) {
-      return;
-    }
+    if (!settingsLoaded || !isHydrated) return;
 
     try {
       const savedProfile = localStorage.getItem('assetain-user-session');
@@ -70,14 +70,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
-          // Restore full scope info from the latest authorized user pulse
           const mergedProfile: LocalUserProfile = {
             ...profile,
             states: authorizedUser.states,
             isZonalAdmin: authorizedUser.isZonalAdmin,
             assignedZone: authorizedUser.assignedZone,
             role: authorizedUser.role,
-            isAdmin: authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN'
+            isAdmin: authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
+            canAddAssets: authorizedUser.canAddAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
+            canEditAssets: authorizedUser.canEditAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
           };
           setUserProfile(mergedProfile);
           setProfileSetupComplete(true);
@@ -92,7 +93,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfileSetupComplete(false);
       }
     } catch (e) {
-      console.error("Auth: Failed to restore session pulse", e);
       localStorage.removeItem('assetain-user-session');
       setUserProfile(null);
       setProfileSetupComplete(false);
@@ -118,11 +118,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         assignedZone: user.assignedZone,
         isAdmin: user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
         role: user.role,
+        canAddAssets: user.canAddAssets || user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
+        canEditAssets: user.canEditAssets || user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
       };
+      
+      // Set session flag to trigger onboarding tour
+      sessionStorage.setItem('assetain-fresh-login', 'true');
       
       localStorage.setItem('assetain-user-session', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
+
+      // Automated Initial Download Pulse
+      await manualDownload();
+      
     } catch (e) {
       console.error("Auth: Login pulse failed", e);
     } finally {
@@ -133,6 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('assetain-user-session');
+    sessionStorage.removeItem('assetain-fresh-login');
     setUserProfile(null);
     setProfileSetupComplete(false);
     await FirebaseAuthService.terminateSession();

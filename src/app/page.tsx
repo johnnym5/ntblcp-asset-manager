@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Consolidated for production: eliminates sub-pages to reduce build size and memory footprint.
- * Refined for Fixed-Size "Adaptive Cage" layout with sticky headers and enclosed workspace.
+ * Phase 301: Added logic to trigger Welcome Experience ONLY on fresh login sessions.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -107,13 +107,18 @@ export default function SPAHub() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (profileSetupComplete && appSettings && !appSettings.onboardingComplete) {
-      setIsWelcomeOpen(true);
+    if (profileSetupComplete) {
+      // Trigger welcome ONLY if this is a fresh login in the current browser session
+      const isFreshLogin = sessionStorage.getItem('assetain-fresh-login') === 'true';
+      if (isFreshLogin) {
+        setIsWelcomeOpen(true);
+      }
     }
-  }, [profileSetupComplete, appSettings]);
+  }, [profileSetupComplete]);
 
   const handleOnboardingComplete = async () => {
     setIsWelcomeOpen(false);
+    sessionStorage.removeItem('assetain-fresh-login');
     if (appSettings) {
       const nextSettings = { ...appSettings, onboardingComplete: true };
       setAppSettings(nextSettings);
@@ -185,7 +190,6 @@ export default function SPAHub() {
         setMissingFieldFilter={setMissingFieldFilter}
       />
       
-      {/* Persistent Global Header */}
       <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
           <TooltipProvider disableHoverableContent={!showTooltips}>
@@ -334,10 +338,6 @@ export default function SPAHub() {
         </div>
       </header>
 
-      {/* 
-          ADAPTIVE CAGE: 
-          Fixed-size container with enclosed border and scrollable workstation content.
-      */}
       <div className="flex-1 relative flex flex-col p-4 sm:p-6 overflow-hidden bg-black">
         <div className="flex-1 flex flex-col border border-white/10 rounded-[2.5rem] bg-[#050505]/50 overflow-hidden relative shadow-inner">
           <ErrorBoundary module={activeView}>

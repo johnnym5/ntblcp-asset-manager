@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -33,10 +34,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import type { AuthorizedUser } from '@/lib/types';
+import type { AuthorizedUser } from '@/types/domain';
 import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail } from 'lucide-react';
+import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail, PlusCircle, FileEdit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -84,8 +85,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         isGuest: false, 
         password: '', 
         confirmPassword: '', 
-        canAddAssets: true, 
-        canEditAssets: true 
+        canAddAssets: false, // Default false per user request
+        canEditAssets: false  // Default false per user request
     },
   });
   
@@ -114,8 +115,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             isGuest: false, 
             password: '', 
             confirmPassword: '', 
-            canAddAssets: true, 
-            canEditAssets: true 
+            canAddAssets: false, 
+            canEditAssets: false 
         });
       }
     }
@@ -185,6 +186,37 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         )}/>
                         <FormField control={form.control} name="confirmPassword" render={({ field }) => (
                             <FormItem><FormLabel>Confirm Passphrase</FormLabel><FormControl><Input type="password" {...field} className="rounded-xl"/></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Operational Permissions</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField control={form.control} name="canAddAssets" render={({ field }) => (
+                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <PlusCircle className="h-3.5 w-3.5 text-primary" />
+                                        <FormLabel className="font-black text-xs uppercase">Allow Add</FormLabel>
+                                    </div>
+                                    <FormDescription className="text-[8px] font-bold uppercase opacity-60">Permission to create new records.</FormDescription>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                            </FormItem>
+                        )}/>
+
+                        <FormField control={form.control} name="canEditAssets" render={({ field }) => (
+                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <FileEdit className="h-3.5 w-3.5 text-primary" />
+                                        <FormLabel className="font-black text-xs uppercase">Allow Update</FormLabel>
+                                    </div>
+                                    <FormDescription className="text-[8px] font-bold uppercase opacity-60">Permission to modify existing items.</FormDescription>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                            </FormItem>
                         )}/>
                     </div>
                 </div>

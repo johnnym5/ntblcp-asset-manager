@@ -1,4 +1,10 @@
+
 'use client';
+
+/**
+ * @fileOverview Authentication Gateway.
+ * Phase 305: Login button now initiates the "Initialize Pulse" which includes RBAC-aware download.
+ */
 
 import React, { useState } from 'react';
 import {
@@ -19,7 +25,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Loader2, AlertCircle, Package } from 'lucide-react';
+import { Loader2, AlertCircle, Package, Zap } from 'lucide-react';
 import type { AuthorizedUser } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useAuth } from '@/contexts/auth-context';
@@ -33,7 +39,7 @@ const superAdmin: AuthorizedUser = {
   password: 'setup',
   states: ['All'],
   isAdmin: true,
-  isGuest: false,
+  role: 'SUPERADMIN',
   canAddAssets: true,
   canEditAssets: true,
 };
@@ -48,9 +54,9 @@ export default function UserProfileSetup() {
   const [selectedState, setSelectedState] = useState<string>('');
   
   const { login } = useAuth();
-  const { appSettings, settingsLoaded } = useAppState();
+  const { appSettings, settingsLoaded, isSyncing } = useAppState();
 
-  const handleLogin = () => {
+  const handleLoginAttempt = () => {
     setError(null);
     if (!email) {
       setError("Please enter your email or login ID.");
@@ -164,7 +170,7 @@ export default function UserProfileSetup() {
                             placeholder="••••••••"
                             value={password} 
                             onChange={(e) => setPassword(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleLoginAttempt()}
                             className="h-11 rounded-xl"
                             />
                         </div>
@@ -193,7 +199,7 @@ export default function UserProfileSetup() {
                     </>
                 )}
 
-                {error && (
+                {(error) && (
                     <Alert variant="destructive" className="rounded-2xl border-2 bg-destructive/5">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle className="font-bold">Authentication Failed</AlertTitle>
@@ -203,12 +209,22 @@ export default function UserProfileSetup() {
                 </div>
                 <AlertDialogFooter className="mt-2">
                     {isMultiStateUser ? (
-                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirm Scope & Entry'}
+                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || isSyncing || !selectedState}>
+                            {isSaving || isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Initialize Pulse'}
                         </Button>
                     ) : (
-                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={handleLogin} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In to System'}
+                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={handleLoginAttempt} disabled={isSaving || isSyncing}>
+                            {isSaving || isSyncing ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Configuring Workstation...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Zap className="h-4 w-4 fill-current" />
+                                <span>Sign In to System</span>
+                              </div>
+                            )}
                         </Button>
                     )}
                 </AlertDialogFooter>

@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1020: Unified Tabs root to prevent 'TabsList must be used within Tabs' error.
+ * Phase 304: Integrated permission-aware User Management toggles.
  */
 
 import React, { useState, useRef } from 'react';
@@ -67,7 +67,7 @@ import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import AssetForm from '@/components/asset-form';
 import { enqueueMutation } from '@/offline/queue';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
-import type { AppSettings, Grant, SheetDefinition, UXMode, Asset } from '@/types/domain';
+import type { AppSettings, Grant, SheetDefinition, UXMode, Asset, AuthorizedUser } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -227,11 +227,7 @@ export function SettingsWorkstation() {
   return (
     <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative">
       
-      {/* 
-          Workstation Sticky Header:
-          Persistent within the enclosed window shell.
-      */}
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-6 px-1 border-b border-white/5 mb-8 -mx-1 shrink-0">
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col gap-6 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center justify-between">
             <div className="space-y-1">

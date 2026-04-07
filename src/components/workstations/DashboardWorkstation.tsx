@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Dashboard Workstation - Unified Mission Control.
- * Optimized for Responsive Fidelity and Executive Density.
- * Phase 1020: Unified Tabs root to prevent nesting errors.
+ * Phase 303: Enforced permission-aware action pulses.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
@@ -48,9 +49,11 @@ type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
   const { assets, appSettings, setActiveView } = useAppState();
+  const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
   const isAdvanced = appSettings?.uxMode === 'advanced';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const anomalyCount = useMemo(() => {
     return assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
@@ -59,10 +62,6 @@ export function DashboardWorkstation() {
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-8 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
       
-      {/* 
-          Workstation Sticky Header:
-          Persistent within the enclosed window shell.
-      */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 sm:pt-4 pb-6 px-1 border-b border-white/5 mb-8 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-4 self-start">
@@ -95,7 +94,6 @@ export function DashboardWorkstation() {
       <div className="flex-1 min-h-0">
         <TabsContent value="overview" className="m-0 space-y-16 sm:space-y-24 animate-in fade-in slide-in-from-bottom-2 duration-500 outline-none pb-40">
           
-          {/* 1. Quick Start Hub */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8">
               <AssetSummaryDashboard />
@@ -105,24 +103,26 @@ export function DashboardWorkstation() {
               <Card className="bg-[#080808] border-2 border-white/5 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-3xl">
                 <div className="p-5 sm:p-6 border-b border-white/5 bg-white/[0.02]">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
-                    <DatabaseZap className="h-3.5 w-3.5" /> Quick Controls
+                    <DatabaseZap className="h-3.5 w-3.5" /> Workstation Pulse
                   </h4>
                 </div>
                 <CardContent className="p-5 sm:p-6 space-y-3">
                   <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 sm:h-14 rounded-xl sm:rounded-2xl border-white/10 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-3 hover:bg-white/5 transition-all justify-start px-6">
-                    <Settings className="h-4 w-4 text-primary" /> App Settings
+                    <Settings className="h-4 w-4 text-primary" /> System Settings
                   </Button>
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <p className="text-[9px] font-bold text-white/40 uppercase leading-relaxed italic">
-                      Manual add, record imports, and template management have moved to <strong>Settings &gt; Projects</strong>.
-                    </p>
-                  </div>
+                  
+                  {isAdmin && (
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                      <p className="text-[9px] font-bold text-primary uppercase leading-relaxed italic">
+                        Administrative clearance active. Template mapping and user governance tools are accessible in Settings.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </div>
           
-          {/* 2. Collapsible Data Registers */}
           <Accordion type="multiple" className="space-y-12">
             <AccordionItem value="folders" className="border-none">
               <div className="flex items-center justify-between px-1 mb-4">
@@ -166,7 +166,6 @@ export function DashboardWorkstation() {
             </AccordionItem>
           </Accordion>
 
-          {/* 3. Operational Analytics & Sync */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 sm:gap-24 items-start px-1 border-t border-white/5 pt-16 sm:pt-24">
             <div className="space-y-6 sm:space-y-8">
               <div className="flex items-center gap-3 px-1">
