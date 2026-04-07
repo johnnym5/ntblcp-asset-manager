@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { 
