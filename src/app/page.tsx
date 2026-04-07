@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
  * Phase 305: Implemented global workstation scrolling and consistent container padding.
+ * Phase 310: Converted status dot into interactive Online/Offline trigger.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -56,6 +57,7 @@ export default function SPAHub() {
     setActiveView, 
     appSettings, 
     isOnline, 
+    setIsOnline,
     isSyncing, 
     manualDownload, 
     manualUpload,
@@ -220,7 +222,17 @@ export default function SPAHub() {
             </div>
             
             <div className="flex items-center gap-2 md:gap-3 pr-2 md:pr-4 md:border-r border-white/5">
-              <div className={cn("h-2 w-2 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+              <button 
+                onClick={() => setIsOnline(!isOnline)}
+                className="flex items-center gap-2 md:gap-3 group hover:opacity-80 transition-opacity tactile-pulse"
+                title={isOnline ? "Go Offline" : "Go Online"}
+              >
+                <div className={cn("h-2 w-2 rounded-full transition-all", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+                <span className={cn("text-[8px] font-black uppercase tracking-widest hidden lg:inline", isOnline ? "text-green-500" : "text-red-500")}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </span>
+              </button>
+              
               <button 
                 onClick={() => setIsNotificationsOpen(true)}
                 className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"

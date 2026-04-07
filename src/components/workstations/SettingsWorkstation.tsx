@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Real-Time Control Center.
  * Phase 400: Added Management vs Verification Mode toggle.
+ * Phase 410: Converted static pulse badge into interactive Online/Offline trigger.
  */
 
 import React, { useState, useRef } from 'react';
@@ -56,6 +57,7 @@ export function SettingsWorkstation() {
     setAppSettings, 
     refreshRegistry, 
     isOnline, 
+    setIsOnline,
     settingsLoaded,
     setActiveView 
   } = useAppState();
@@ -117,9 +119,19 @@ export function SettingsWorkstation() {
           <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">SYSTEM CONTROL PANEL</p>
         </div>
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="h-10 px-6 border-green-500/20 bg-green-500/5 text-green-500 font-black uppercase text-[10px] tracking-widest gap-2.5 rounded-2xl shadow-sm">
-            <Zap className="h-3.5 w-3.5 fill-current animate-pulse" /> Live Pulse Active
-          </Badge>
+          <button 
+            onClick={() => setIsOnline(!isOnline)}
+            className={cn(
+              "h-10 px-6 border-2 font-black uppercase text-[10px] tracking-widest gap-2.5 rounded-2xl shadow-sm transition-all flex items-center group tactile-pulse",
+              isOnline 
+                ? "border-green-500/20 bg-green-500/5 text-green-500 hover:bg-green-500/10" 
+                : "border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500/10"
+            )}
+            title={isOnline ? "Switch to Offline Mode" : "Switch to Online Mode"}
+          >
+            <Zap className={cn("h-3.5 w-3.5 fill-current", isOnline && "animate-pulse")} /> 
+            {isOnline ? 'Online Heartbeat' : 'Offline Mode'}
+          </button>
           <button 
             onClick={() => setActiveView('DASHBOARD')}
             className="h-12 w-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all tactile-pulse"
