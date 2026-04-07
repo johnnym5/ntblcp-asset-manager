@@ -4,6 +4,7 @@
  * @fileOverview AssetForm - Condition & Audit Workstation.
  * Optimized for mobile fields stacking and touch fidelity.
  * Phase 150: Integrated Discrepancy Highlighting & Review Triggers.
+ * Phase 151: Integrated Smart Suggestion Application Pulse.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -46,7 +47,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   ThumbsUp,
-  Ban
+  Ban,
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -148,15 +150,22 @@ export default function AssetForm({
     }
   };
 
-  const handleResolveDiscrepancy = async (discrepancyId: string, status: DiscrepancyStatus) => {
+  const handleResolveDiscrepancy = async (discrepancyId: string, status: DiscrepancyStatus, newValue?: any) => {
     if (!asset) return;
-    const nextDiscrepancies = (asset.discrepancies || []).map(d => 
+    const discrepancies = form.getValues('discrepancies') || [];
+    const target = discrepancies.find(d => d.id === discrepancyId);
+    if (!target) return;
+
+    if (newValue !== undefined) {
+      form.setValue(target.field as any, newValue);
+    }
+
+    const nextDiscrepancies = discrepancies.map(d => 
       d.id === discrepancyId ? { ...d, status } : d
     );
-    const updated = { ...asset, discrepancies: nextDiscrepancies };
-    await onSave(updated);
+    
     form.setValue('discrepancies', nextDiscrepancies);
-    toast({ title: `Discrepancy ${status === 'RESOLVED' ? 'Applied' : 'Ignored'}` });
+    toast({ title: `Suggestion ${status === 'RESOLVED' ? 'Applied' : 'Ignored'}` });
   };
 
   const isFieldDisabled = (fieldName: string) => {
@@ -221,14 +230,26 @@ export default function AssetForm({
                             <FormItem className="md:col-span-2">
                               <div className="flex items-center justify-between">
                                 <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Description</FormLabel>
-                                {discrepancy && <Badge variant="outline" className="h-5 text-[7px] font-black uppercase text-red-500 border-red-500/20">Anomalous</Badge>}
+                                {discrepancy && (
+                                  <div className="flex items-center gap-2">
+                                    {discrepancy.suggestedValue && <Badge className="bg-blue-600 h-5 text-[7px] font-black uppercase">Smart Suggestion Available</Badge>}
+                                    <Badge variant="outline" className="h-5 text-[7px] font-black uppercase text-red-500 border-red-500/20">Anomalous</Badge>
+                                  </div>
+                                )}
                               </div>
                               <FormControl>
                                 <div className="relative group">
                                   <Input {...field} readOnly={isFieldDisabled('description')} className={cn("h-12 md:h-14 bg-white/[0.03] border-2 rounded-xl font-black text-sm uppercase transition-all", discrepancy ? "border-red-600 animate-pulse ring-4 ring-red-600/10" : "border-white/5")} />
                                   {discrepancy && (
                                     <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex gap-2">
-                                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED')} size="icon" className="h-8 w-8 rounded-lg bg-green-600 shadow-xl"><ThumbsUp className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Accept Suggestion</TooltipContent></Tooltip></TooltipProvider>
+                                      {discrepancy.suggestedValue && (
+                                        <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                                          <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED', discrepancy.suggestedValue)} size="icon" className="h-8 w-8 rounded-lg bg-blue-600 shadow-xl animate-bounce">
+                                            <Zap className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Apply Suggestion: {discrepancy.suggestedValue}</TooltipContent></Tooltip></TooltipProvider>
+                                      )}
+                                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'CORRECTED')} size="icon" className="h-8 w-8 rounded-lg bg-green-600 shadow-xl"><ThumbsUp className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Mark Corrected</TooltipContent></Tooltip></TooltipProvider>
                                       <TooltipProvider><Tooltip><TooltipTrigger asChild><Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-8 w-8 rounded-lg bg-white/10 text-white/40"><Ban className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Ignore Warning</TooltipContent></Tooltip></TooltipProvider>
                                     </div>
                                   )}
@@ -242,8 +263,23 @@ export default function AssetForm({
                           const discrepancy = getDiscrepancyForField('serialNumber');
                           return (
                             <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} /></FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
+                                {discrepancy?.suggestedValue && <Badge className="bg-blue-600 h-4 text-[6px] font-black uppercase">Suggestion Found</Badge>}
+                              </div>
+                              <FormControl>
+                                <div className="relative group">
+                                  <Input {...field} readOnly={isFieldDisabled('serialNumber')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} />
+                                  {discrepancy && (
+                                    <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex gap-2">
+                                      {discrepancy.suggestedValue && (
+                                        <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED', discrepancy.suggestedValue)} size="icon" className="h-8 w-8 rounded-lg bg-blue-600 shadow-xl"><Zap className="h-4 w-4" /></Button>
+                                      )}
+                                      <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-8 w-8 rounded-lg bg-white/10 text-white/40"><Ban className="h-4 w-4" /></Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </FormControl>
                             </FormItem>
                           );
                         }}/>
@@ -252,8 +288,23 @@ export default function AssetForm({
                           const discrepancy = getDiscrepancyForField('assetIdCode');
                           return (
                             <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} /></FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
+                                {discrepancy?.suggestedValue && <Badge className="bg-blue-600 h-4 text-[6px] font-black uppercase">Auto-Seq Suggestion</Badge>}
+                              </div>
+                              <FormControl>
+                                <div className="relative group">
+                                  <Input {...field} readOnly={isFieldDisabled('assetIdCode')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} />
+                                  {discrepancy && (
+                                    <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex gap-2">
+                                      {discrepancy.suggestedValue && (
+                                        <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED', discrepancy.suggestedValue)} size="icon" className="h-8 w-8 rounded-lg bg-blue-600 shadow-xl"><Zap className="h-4 w-4" /></Button>
+                                      )}
+                                      <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-8 w-8 rounded-lg bg-white/10 text-white/40"><Ban className="h-4 w-4" /></Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </FormControl>
                             </FormItem>
                           );
                         }}/>
@@ -322,12 +373,18 @@ export default function AssetForm({
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-red-600">Discrepancy Pulse</h4>
                     <div className="space-y-3">
                       {formValues.discrepancies.map(d => (
-                        <div key={d.id} className={cn("p-4 rounded-2xl border transition-all", d.status === 'RESOLVED' ? "bg-green-600/5 border-green-600/20 opacity-60" : "bg-red-600/5 border-red-600/20")}>
+                        <div key={d.id} className={cn("p-4 rounded-2xl border transition-all", d.status === 'RESOLVED' || d.status === 'CORRECTED' ? "bg-green-600/5 border-green-600/20 opacity-60" : "bg-red-600/5 border-red-600/20")}>
                           <div className="flex items-center gap-2 mb-2">
                             <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase border-white/10">{d.severity}</Badge>
                             <span className="text-[8px] font-black uppercase text-white/20">{d.field}</span>
                           </div>
                           <p className="text-[9px] font-medium text-white/60 leading-relaxed italic">{d.reason}</p>
+                          {d.suggestedValue && d.status === 'PENDING' && (
+                            <div className="mt-3 p-2 bg-blue-600/10 border border-blue-600/20 rounded-lg flex items-center justify-between">
+                              <span className="text-[8px] font-black uppercase text-blue-400">Suggestion: {d.suggestedValue}</span>
+                              <Zap className="h-3 w-3 text-blue-400 animate-pulse" />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -350,7 +407,7 @@ export default function AssetForm({
             {!externalReadOnly && (
               <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 md:h-14 px-10 md:px-12 rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-xl bg-primary text-black">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-                Commit Update
+                Save Changes
               </Button>
             )}
           </div>
