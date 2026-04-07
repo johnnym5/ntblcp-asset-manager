@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 308: Integrated success notifications for governance pulses.
+ * Phase 310: Restored missing Global Admin settings and implemented Sheet Ledger.
  */
 
 import React, { useState, useRef } from 'react';
@@ -37,7 +37,10 @@ import {
   HelpCircle,
   GraduationCap,
   DatabaseZap,
-  Check
+  Check,
+  Columns,
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -102,15 +105,12 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
-
-  const templateInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
@@ -143,27 +143,10 @@ export function SettingsWorkstation() {
     addNotification({ title: "Project Created", description: `Added ${newProjectName} to the registry.`, variant: "success" });
   };
 
-  const handleTemplateImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !appSettings || !activeGrantId) return;
-
-    try {
-      const templates = await parseExcelForTemplate(file);
-      const nextSettings = { ...appSettings };
-      const grantIdx = nextSettings.grants.findIndex(g => g.id === activeGrantId);
-      
-      if (grantIdx > -1) {
-        const currentDefs = { ...nextSettings.grants[grantIdx].sheetDefinitions };
-        templates.forEach(t => { currentDefs[t.name] = t; });
-        nextSettings.grants[grantIdx].sheetDefinitions = currentDefs;
-        await storage.saveSettings(nextSettings);
-        if (isOnline) await FirestoreService.updateSettings(nextSettings);
-        setAppSettings(nextSettings);
-        addNotification({ title: "Templates Discovered", description: `Saved ${templates.length} sheet definitions.`, variant: "success" });
-      }
-    } catch (err) {
-      addNotification({ title: "Template Failure", description: "Could not discover nodes.", variant: "destructive" });
-    }
+  const handleEditSchema = (grantId: string, sheetDef: SheetDefinition) => {
+    setActiveGrantIdForSchema(grantId);
+    setSelectedSheetDef(sheetDef);
+    setIsColumnSheetOpen(true);
   };
 
   const handleCommitAll = async () => {
@@ -210,23 +193,253 @@ export function SettingsWorkstation() {
 
       <div className="flex-1 min-h-0 pt-4 overflow-y-auto custom-scrollbar pb-40">
         <TabsContent value="general" className="space-y-12 m-0 outline-none">
-          <section><SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} /><Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl"><div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center"><div className="space-y-2"><h4 className="text-sm font-black uppercase text-white">Usage Mode</h4><p className="text-[11px] text-white/40 leading-relaxed italic">{appSettings.uxMode === 'beginner' ? "Beginner Mode Active" : "Advanced Mode Active"}</p></div><Select value={appSettings.uxMode} onValueChange={v => handleSettingChange('uxMode', v as UXMode)}><SelectTrigger className="h-14 rounded-xl bg-black border-2 border-white/10 font-black uppercase text-[10px] tracking-widest"><SelectValue /></SelectTrigger><SelectContent className="bg-black border-white/10 rounded-xl"><SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem><SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem></SelectContent></Select></div></Card></section>
-          <section><SectionTitle title="Appearance" description="Visual surface & identity" icon={Palette} /><Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl"><div className="flex flex-wrap gap-4"><Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 shadow-lg"><Sun className="h-4 w-4" /> Light</Button><Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button></div></Card></section>
+          {/* Usage Mode Section */}
+          <section>
+            <SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} />
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-black uppercase text-white">Usage Mode</h4>
+                  <p className="text-[11px] text-white/40 leading-relaxed italic">
+                    {appSettings.uxMode === 'beginner' ? "Beginner Mode Active: Full guidance pulse." : "Advanced Mode Active: High-speed auditor interface."}
+                  </p>
+                </div>
+                <Select value={appSettings.uxMode} onValueChange={v => handleSettingChange('uxMode', v as UXMode)}>
+                  <SelectTrigger className="h-14 rounded-xl bg-black border-2 border-white/10 font-black uppercase text-[10px] tracking-widest">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-black border-white/10 rounded-xl">
+                    <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
+                    <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Card>
+          </section>
+
+          {/* Global Admin Settings Section (Restored) */}
+          {isAdmin && (
+            <section>
+              <SectionTitle title="Global Admin" description="Registry authority & lifecycle" icon={ShieldCheck} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+                <div className="divide-y divide-white/5 space-y-8">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-black uppercase text-white">Application Mode</Label>
+                      <p className="text-[10px] text-white/40 italic max-w-sm">
+                        {appSettings.appMode === 'management'
+                          ? 'Management Pulse: Registry is locked. Only administrators can perform mutations.'
+                          : 'Verification Pulse: Field auditors can update status and remarks.'
+                        }
+                      </p>
+                    </div>
+                    <Select value={appSettings.appMode} onValueChange={(v) => handleSettingChange('appMode', v as any)}>
+                      <SelectTrigger className="w-full sm:w-[200px] h-14 bg-black border-2 border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10">
+                        <SelectItem value="management" className="text-[10px] font-black uppercase">Management</SelectItem>
+                        <SelectItem value="verification" className="text-[10px] font-black uppercase">Verification</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-8">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-black uppercase text-white">Lock Asset List</Label>
+                      <p className="text-[10px] text-white/40 italic max-w-sm">Prevent creation or deletion of records in the main list.</p>
+                    </div>
+                    <Switch 
+                      checked={appSettings.lockAssetList} 
+                      onCheckedChange={(v) => handleSettingChange('lockAssetList', v)}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </div>
+                </div>
+              </Card>
+            </section>
+          )}
+
+          {/* Appearance Section */}
+          <section>
+            <SectionTitle title="Appearance" description="Visual surface & identity" icon={Palette} />
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="flex flex-wrap gap-4">
+                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 shadow-lg">
+                  <Sun className="h-4 w-4 mr-2" /> Light
+                </Button>
+                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 shadow-lg">
+                  <Moon className="h-4 w-4 mr-2" /> Dark
+                </Button>
+              </div>
+            </Card>
+          </section>
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none space-y-10 px-1">
-          <div className="space-y-6"><h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Manage Projects</h3><div className="flex gap-3"><Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white" /><Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"><PlusCircle className="h-4 w-4" /> Add Project</Button></div></div>
-          <Accordion type="single" collapsible className="space-y-4">{appSettings.grants.map((grant) => (<AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-black", activeGrantId === grant.id ? "border-primary/40 shadow-2xl" : "border-white/5")}><div className="flex items-center justify-between bg-black pr-6"><AccordionTrigger className="hover:no-underline p-6 border-none flex-1 justify-start gap-4 [&>svg]:hidden"><ChevronsUpDown className="h-4 w-4 text-white/20" /><div className="flex items-center gap-3"><span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>{activeGrantId === grant.id && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}</div></AccordionTrigger><div className="flex items-center gap-6">{activeGrantId !== grant.id && <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase bg-black/40">Set Active</Button>}</div></div><AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8"><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><Button onClick={() => setIsAssetFormOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3"><PlusCircle className="h-4 w-4" /> Add Manually</Button><Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3"><ScanSearch className="h-4 w-4" /> Scan & Import Data</Button></div></AccordionContent></AccordionItem>))}</Accordion>
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none px-1">Manage Projects</h3>
+            <div className="flex gap-3">
+              <Input 
+                placeholder="New project name..." 
+                value={newProjectName} 
+                onChange={(e) => setNewProjectName(e.target.value)} 
+                className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white" 
+              />
+              <Button 
+                onClick={handleAddProject} 
+                disabled={!newProjectName.trim()} 
+                className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4" /> Add Project
+              </Button>
+            </div>
+          </div>
+
+          <Accordion type="single" collapsible className="space-y-4">
+            {appSettings.grants.map((grant) => (
+              <AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-black", activeGrantId === grant.id ? "border-primary/40 shadow-2xl" : "border-white/5")}>
+                <div className="flex items-center justify-between bg-black pr-6">
+                  <AccordionTrigger className="hover:no-underline p-6 border-none flex-1 justify-start gap-4 [&>svg]:hidden">
+                    <ChevronsUpDown className="h-4 w-4 text-white/20" />
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                      {activeGrantId === grant.id && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
+                    </div>
+                  </AccordionTrigger>
+                  <div className="flex items-center gap-6">
+                    {activeGrantId !== grant.id && (
+                      <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase bg-black/40">
+                        Set Active
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
+                  {/* Sheet List Ledger (Restored) */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
+                      <Columns className="h-3 w-3" /> Indexed Sheets / Categories
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
+                        Object.entries(grant.sheetDefinitions).map(([name, def]) => (
+                          <div key={name} className="flex items-center justify-between p-4 bg-black/40 border border-white/10 rounded-2xl group transition-all hover:border-primary/20">
+                            <span className="text-xs font-black uppercase text-white/80">{name}</span>
+                            <div className="flex items-center gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditSchema(grant.id, def)} className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg"><Wrench className="h-4 w-4" /></button>
+                              <button className="p-2 hover:bg-white/10 rounded-lg"><Eye className="h-4 w-4" /></button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-2 py-12 text-center border-2 border-dashed border-white/5 rounded-3xl opacity-20">
+                          <p className="text-[10px] font-black uppercase tracking-widest">No definitions staged.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-white/5">
+                    <Button onClick={() => setIsAssetFormOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3">
+                      <PlusCircle className="h-4 w-4" /> Add Manual Asset
+                    </Button>
+                    <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3">
+                      <ScanSearch className="h-4 w-4" /> Scan & Import Inbound Workbook
+                    </Button>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </TabsContent>
 
-        <TabsContent value="users" className="m-0 outline-none px-1"><Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl"><UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} /></Card></TabsContent>
-        <TabsContent value="resilience" className="m-0 outline-none px-1"><Accordion type="multiple" className="w-full space-y-4"><AccordionItem value="error-audit" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6"><AccordionTrigger className="hover:no-underline py-6"><div className="flex items-center gap-4"><div className="p-2.5 bg-destructive/10 rounded-xl"><HeartPulse className="h-5 w-5 text-destructive" /></div><div className="text-left"><h4 className="text-sm font-black uppercase text-white">Resilience Audit</h4></div></div></AccordionTrigger><AccordionContent className="pb-8"><ErrorAuditWorkstation isEmbedded={true} /></AccordionContent></AccordionItem><AccordionItem value="db-admin" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6"><AccordionTrigger className="hover:no-underline py-6"><div className="flex items-center gap-4"><div className="p-2.5 bg-primary/10 rounded-xl"><Terminal className="h-5 w-5 text-primary" /></div><div className="text-left"><h4 className="text-sm font-black uppercase text-white">Database Management</h4></div></div></AccordionTrigger><AccordionContent className="pb-8"><DatabaseWorkstation isEmbedded={true} /></AccordionContent></AccordionItem></Accordion></TabsContent>
-        <TabsContent value="history" className="m-0 outline-none px-1"><AuditLogWorkstation isEmbedded={true} /></TabsContent>
+        <TabsContent value="users" className="m-0 outline-none px-1">
+          <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
+            <UserManagement 
+              users={appSettings.authorizedUsers} 
+              onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} 
+              adminProfile={userProfile} 
+            />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resilience" className="m-0 outline-none px-1">
+          <Accordion type="multiple" className="w-full space-y-4">
+            <AccordionItem value="error-audit" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-destructive/10 rounded-xl"><HeartPulse className="h-5 w-5 text-destructive" /></div>
+                  <div className="text-left"><h4 className="text-sm font-black uppercase text-white">Resilience Audit</h4></div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <ErrorAuditWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="db-admin" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-primary/10 rounded-xl"><Terminal className="h-5 w-5 text-primary" /></div>
+                  <div className="text-left"><h4 className="text-sm font-black uppercase text-white">Database Management</h4></div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <DatabaseWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </TabsContent>
+
+        <TabsContent value="history" className="m-0 outline-none px-1">
+          <AuditLogWorkstation isEmbedded={true} />
+        </TabsContent>
       </div>
 
-      <div className="mt-2 pt-10 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10"><Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-[#0A0A0A] text-white/60 font-black uppercase text-[11px] tracking-widest">Cancel</Button><Button onClick={handleCommitAll} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl">Save Changes</Button></div>
-      <AssetForm isOpen={isAssetFormOpen} onOpenChange={setIsAssetFormOpen} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsAssetFormOpen(false); addNotification({ title: "Record Added", description: "Created new identity pulse.", variant: "success" }); }} />
+      <div className="mt-2 pt-10 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-[#0A0A0A] text-white/60 font-black uppercase text-[11px] tracking-widest">Cancel</Button>
+        <Button onClick={handleCommitAll} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl">
+          Commit Environment Pulse
+        </Button>
+      </div>
+
+      <AssetForm 
+        isOpen={isAssetFormOpen} 
+        onOpenChange={setIsAssetFormOpen} 
+        isReadOnly={false} 
+        onSave={async (a) => { 
+          await enqueueMutation('UPDATE', 'assets', a); 
+          await refreshRegistry(); 
+          setIsAssetFormOpen(false); 
+          addNotification({ title: "Record Added", description: "Created new identity pulse.", variant: "success" }); 
+        }} 
+      />
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
+      
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={selectedSheetDef.name}
+          onSave={(orig, newDef, all) => {
+            const updatedGrants = appSettings.grants.map(grant => {
+              if (grant.id === activeGrantForSchema) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }}
+        />
+      )}
     </Tabs>
   );
 }
