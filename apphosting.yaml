@@ -10,7 +10,7 @@ runConfig:
   maxInstances: 10
 
 # Environment variables available at build and runtime.
-# Deployment Reroute: Assetain Production Pulse
+# Deployment Reroute: NTBLCP Production Pulse
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU"

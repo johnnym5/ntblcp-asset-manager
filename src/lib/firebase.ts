@@ -13,7 +13,7 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || staticConfig.storageBucket,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || staticConfig.messagingSenderId,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || staticConfig.appId,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || (staticConfig as any).databaseURL,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || staticConfig.databaseURL,
 };
 
 
