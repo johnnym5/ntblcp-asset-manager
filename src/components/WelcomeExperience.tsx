@@ -3,6 +3,7 @@
 /**
  * @fileOverview WelcomeExperience - High-Fidelity Onboarding Workflow.
  * Guides new users through the app's purpose and superior data structure.
+ * Phase 750: Integrated Initial Download Pulse for new accounts.
  */
 
 import React, { useState } from 'react';
@@ -24,15 +25,21 @@ import {
   Search,
   ShieldCheck,
   Cloud,
-  Settings
+  Settings,
+  Download,
+  Loader2,
+  Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 
 interface Step {
   title: string;
   description: string;
   icon: any;
   benefits: string[];
+  isSyncStep?: boolean;
 }
 
 const STEPS: Step[] = [
@@ -48,50 +55,6 @@ const STEPS: Step[] = [
     ]
   },
   {
-    title: "Bring in your existing files",
-    description: "Upload Excel files and let the app detect records, headings, and grouped sections automatically.",
-    icon: FileUp,
-    benefits: [
-      "Auto-detects technical headers",
-      "Preserves document sections",
-      "Sandbox review before merging",
-      "Identifies duplicated serials"
-    ]
-  },
-  {
-    title: "Find exactly what you need",
-    description: "Use filters and sort options to narrow the list by location, section, condition, sheet, or any available field.",
-    icon: Search,
-    benefits: [
-      "Filter by source sheet or batch",
-      "Multi-column sorting",
-      "Search by ID, S/N, or text",
-      "Save common filter layouts"
-    ]
-  },
-  {
-    title: "Check and update records easily",
-    description: "Open any record to review details, edit values, or mark items for verification in the field.",
-    icon: ShieldCheck,
-    benefits: [
-      "One-tap status updates",
-      "Attach photo evidence",
-      "Record custodian signatures",
-      "Automated field notes"
-    ]
-  },
-  {
-    title: "The Structured Advantage",
-    description: "Unlike a flat spreadsheet, Assetain understands the hierarchy of your data. We preserve the document, section, and subsection context of every record.",
-    icon: LayoutGrid,
-    benefits: [
-      "Segment by State, LGA, or Facility",
-      "Custom table layouts per asset class",
-      "Visual color-coding by source",
-      "Preserved source row metadata"
-    ]
-  },
-  {
     title: "Work anywhere, anytime",
     description: "You can continue working even without internet. Your changes are saved locally and synced when you're back online.",
     icon: Cloud,
@@ -100,6 +63,18 @@ const STEPS: Step[] = [
       "Automatic background syncing",
       "Conflict resolution triggers",
       "Pending sync visibility"
+    ]
+  },
+  {
+    title: "Initialize Your Register",
+    description: "Your account is active. To begin, the system will download the latest assets assigned to your regional scope from the central cloud database.",
+    icon: Download,
+    isSyncStep: true,
+    benefits: [
+      "Fetch latest assigned records",
+      "Sync regional governance rules",
+      "Load project sheet definitions",
+      "Validate local storage parity"
     ]
   },
   {
@@ -121,9 +96,20 @@ interface WelcomeExperienceProps {
 }
 
 export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps) {
+  const { manualDownload, isSyncing, assets } = useAppState();
+  const { userProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    const step = STEPS[currentStep];
+    
+    if (step.isSyncStep && !hasDownloaded) {
+      await manualDownload();
+      setHasDownloaded(true);
+      return;
+    }
+
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -172,8 +158,13 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                 className="space-y-8"
               >
                 <div className="flex flex-col sm:flex-row items-center gap-8 text-center sm:text-left">
-                  <div className="p-8 bg-primary/10 rounded-[2.5rem] shrink-0 shadow-inner">
-                    <step.icon className="h-14 w-14 text-primary" />
+                  <div className="p-8 bg-primary/10 rounded-[2.5rem] shrink-0 shadow-inner relative">
+                    <step.icon className={cn("h-14 w-14 text-primary", isSyncing && "animate-pulse")} />
+                    {isSyncing && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-20 w-20 animate-spin text-primary opacity-20" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black tracking-tight uppercase text-foreground leading-tight">{step.title}</h2>
@@ -184,12 +175,24 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {step.benefits.map((benefit, i) => (
-                    <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-[11px] font-black uppercase tracking-tight opacity-70 leading-tight">{benefit}</span>
+                  {step.isSyncStep && hasDownloaded ? (
+                    <div className="col-span-2 p-6 rounded-3xl bg-green-500/10 border-2 border-green-500/20 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-500">
+                      <div className="p-3 bg-green-500 rounded-2xl shadow-lg shadow-green-500/20">
+                        <CheckCircle2 className="h-8 w-8 text-black" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-black uppercase text-green-600">Register Initialized</p>
+                        <p className="text-[10px] font-bold text-green-600/60 uppercase mt-1">{assets.length} Records Downloaded for {userProfile?.state}</p>
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    step.benefits.map((benefit, i) => (
+                      <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-[11px] font-black uppercase tracking-tight opacity-70 leading-tight">{benefit}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -202,16 +205,33 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
             </Button>
             <div className="flex items-center gap-3">
               {currentStep > 0 && (
-                <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2">
+                <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} disabled={isSyncing} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2">
                   Back
                 </Button>
               )}
               <Button 
                 onClick={handleNext} 
+                disabled={isSyncing}
                 className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3 transition-transform hover:scale-105 active:scale-95"
               >
-                {currentStep === STEPS.length - 1 ? 'Start Working' : 'Next Step'}
-                <ArrowRight className="h-4 w-4" />
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Initializing Pulse...
+                  </>
+                ) : step.isSyncStep && !hasDownloaded ? (
+                  <>
+                    <Database className="h-4 w-4" />
+                    Download Registry
+                  </>
+                ) : currentStep === STEPS.length - 1 ? (
+                  'Start Working'
+                ) : (
+                  <>
+                    Next Step
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
             </div>
           </div>

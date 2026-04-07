@@ -4,6 +4,7 @@
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
  * Phase 900: Integrated LocationEngine for canonical admin mapping.
+ * Phase 901: Fixed 'sn' field mapping pulse.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -107,6 +108,7 @@ export class ParserEngine {
       
       const strVal = String(val).trim();
       switch(key) {
+        case 'sn': asset.sn = strVal; break;
         case 'asset_description': asset.description = strVal; break;
         case 'asset_id_code': asset.assetIdCode = strVal; break;
         case 'serial_number': asset.serialNumber = strVal; break;
