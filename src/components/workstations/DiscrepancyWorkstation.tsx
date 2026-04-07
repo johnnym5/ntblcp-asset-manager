@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Anomaly Dashboard - Intelligent Discrepancy Review Center.
- * Optimized with pagination for high-fidelity auditing of large anomaly sets.
+ * Phase 1001: Implemented Expanding Search bar and input sanitization.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
   AlertTriangle, 
@@ -25,7 +25,8 @@ import {
   Zap,
   Info,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeSearch } from '@/lib/utils';
 import type { Asset, AssetDiscrepancy } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -44,6 +45,8 @@ const ITEMS_PER_PAGE = 24;
 export function DiscrepancyWorkstation() {
   const { assets, settingsLoaded, headers, appSettings } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,6 +81,16 @@ export function DiscrepancyWorkstation() {
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(sanitizeSearch(val));
+    setCurrentPage(1);
+  };
+
+  const handleExpandSearch = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
   };
 
   const selectedRecord = useMemo(() => {
@@ -163,14 +176,37 @@ export function DiscrepancyWorkstation() {
       {/* Review Queue */}
       <div className="space-y-6 px-2">
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
-            <Input 
-              placeholder="Search by ID, Reason or Description..." 
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="pl-12 h-14 rounded-2xl bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 font-medium"
-            />
+          <div className="flex items-center justify-start flex-1 min-w-0">
+            <AnimatePresence mode="wait">
+              {!isSearchExpanded ? (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleExpandSearch}
+                  className="h-14 w-14 rounded-2xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+              ) : (
+                <motion.div 
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "100%", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="relative group"
+                >
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Input 
+                    ref={searchInputRef}
+                    placeholder="Search by ID, Reason or Description..." 
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onBlur={() => !searchTerm && setIsSearchExpanded(false)}
+                    className="pl-12 h-14 rounded-2xl bg-white/[0.03] border-2 border-primary/20 text-white placeholder:text-white/20 focus:border-primary font-medium"
+                  />
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <Button variant="outline" className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2 gap-2 text-white/60 hover:bg-white/5">
             <Filter className="h-4 w-4" /> Filter Severity
@@ -231,7 +267,7 @@ export function DiscrepancyWorkstation() {
           <div className="flex justify-center mt-12 gap-6 items-center">
             <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-6 w-6" /></button>
             <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Page {currentPage} of {totalPages}</span>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-6 w-6" /></button>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-6 w-6" /></button>
           </div>
         )}
 

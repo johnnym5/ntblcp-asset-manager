@@ -1,11 +1,11 @@
-
 'use client';
 
 /**
  * @fileOverview Records to Review - Field Verification Hub.
+ * Phase 26: Added Expandable Search pulse and input sanitization.
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   ClipboardCheck, 
   Search, 
@@ -16,7 +16,8 @@ import {
   XCircle,
   Database,
   Clock,
-  Info
+  Info,
+  X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { sanitizeSearch } from '@/lib/utils';
 
 export function VerifyWorkstation() {
   const { assets, refreshRegistry, settingsLoaded, appSettings } = useAppState();
@@ -41,6 +43,8 @@ export function VerifyWorkstation() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
@@ -81,6 +85,15 @@ export function VerifyWorkstation() {
     toast({ title: "Verification Completed", description: `Asset marked as ${newStatus}.` });
   };
 
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(sanitizeSearch(val));
+  };
+
+  const handleExpandSearch = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
   return (
     <div className="space-y-8 pb-32">
       {/* Header */}
@@ -96,14 +109,43 @@ export function VerifyWorkstation() {
             Confirm that physical items match the digital record.
           </p>
         </div>
-        <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-          <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items remaining
-        </Badge>
-      </div>
+        
+        <div className="flex items-center gap-4">
+          <AnimatePresence mode="wait">
+            {!isSearchExpanded ? (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleExpandSearch}
+                className="h-12 w-12 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+            ) : (
+              <motion.div 
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "300px", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                className="relative"
+              >
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                <Input 
+                  ref={searchInputRef}
+                  placeholder="Scan tag or ID..." 
+                  className="h-12 pl-11 pr-10 rounded-xl bg-white/[0.05] border-2 border-primary/20 text-white" 
+                  value={searchTerm} 
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onBlur={() => !searchTerm && setIsSearchExpanded(false)}
+                />
+                <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      <div className="relative group px-2">
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
-        <Input placeholder="Search records by ID or tag..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
+            <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items
+          </Badge>
+        </div>
       </div>
 
       <div className="px-2">

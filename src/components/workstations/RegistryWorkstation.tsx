@@ -4,9 +4,10 @@
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Optimized for high-performance with strict pagination and memoization.
  * Phase 1000: Integrated full Sort & Filter Logic drawers.
+ * Phase 1001: Implemented Expanding Search bar (Start Closed).
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
@@ -45,7 +46,7 @@ import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { transformAssetToRecord } from '@/lib/registry-utils';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { enqueueMutation } from '@/offline/queue';
@@ -120,6 +121,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Category Hub state
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -270,6 +273,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSelectedAssetIds(next);
   };
 
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(sanitizeSearch(val));
+    setCurrentPage(1);
+  };
+
+  const handleExpandSearch = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
   const handleDeleteSelected = async () => {
     if (selectedAssetIds.size === 0) return;
     setIsProcessing(true);
@@ -306,14 +319,38 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
 
         <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="relative group flex-1 lg:min-w-[320px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
-            <Input 
-              placeholder="Search active scope..." 
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="h-12 md:h-14 pl-11 rounded-xl bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 text-sm"
-            />
+          {/* Expanding Search Bar */}
+          <div className="flex items-center justify-end flex-1 min-w-0">
+            <AnimatePresence mode="wait">
+              {!isSearchExpanded ? (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={handleExpandSearch}
+                  className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+              ) : (
+                <motion.div 
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: isMobile ? "100%" : "320px", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="relative group"
+                >
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Input 
+                    ref={searchInputRef}
+                    placeholder="Search active scope..." 
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onBlur={() => !searchTerm && setIsSearchExpanded(false)}
+                    className="h-12 md:h-14 pl-11 pr-10 rounded-xl bg-white/[0.05] border-2 border-primary/20 text-white placeholder:text-white/20 text-sm focus:border-primary"
+                  />
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           
           <div className="flex items-center gap-2">

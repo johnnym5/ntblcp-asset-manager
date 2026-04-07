@@ -1,8 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Reports Workstation - Executive Reporting & Data Quality.
+ * Phase 58: Refined for Dashboard embedding. Hides exception PDF pulse from overview.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -147,25 +147,27 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
                 </CardContent>
               </Card>
 
-              {/* Exception List */}
-              <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-4 text-xl font-black uppercase text-destructive"><FileWarning className="text-destructive h-6 w-6" /> Exception List</CardTitle>
-                  <Badge variant="outline" className="text-destructive border-destructive/20 font-black text-[9px]">{stats.exceptions} Issues</Badge>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-16 rounded-2xl font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4 transition-transform hover:scale-105 active:scale-95">
-                          {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Download Issues PDF <ArrowRight className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Download a PDF summary of all stolen, damaged, or out-of-sync assets.</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardContent>
-              </Card>
+              {/* Exception List - Hidden from Dashboard per user request */}
+              {!isEmbedded && (
+                <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
+                  <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">
+                    <CardTitle className="flex items-center gap-4 text-xl font-black uppercase text-destructive"><FileWarning className="text-destructive h-6 w-6" /> Exception List</CardTitle>
+                    <Badge variant="outline" className="text-destructive border-destructive/20 font-black text-[9px]">{stats.exceptions} Issues</Badge>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-16 rounded-2xl font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4 transition-transform hover:scale-105 active:scale-95">
+                            {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Download Issues PDF <ArrowRight className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Download a PDF summary of all stolen, damaged, or out-of-sync assets.</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </TabsContent>

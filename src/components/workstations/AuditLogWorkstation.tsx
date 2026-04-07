@@ -1,11 +1,11 @@
-
 'use client';
 
 /**
  * @fileOverview Activity History - User friendly trace of all registry changes.
+ * Phase 12: Added Expanding Search bar and input sanitization.
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   History as HistoryIcon, 
   Search, 
@@ -22,7 +22,8 @@ import {
   Activity,
   FileJson,
   Zap,
-  ArrowRightLeft
+  ArrowRightLeft,
+  X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { ActivityLogEntry } from '@/types/domain';
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { saveAs } from 'file-saver';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { isOnline, refreshRegistry, appSettings } = useAppState();
@@ -56,6 +58,8 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
   const [log, setLog] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [entryToRestore, setEntryToRestore] = useState<ActivityLogEntry | null>(null);
 
@@ -87,6 +91,15 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
       setIsProcessing(false);
       setEntryToRestore(null);
     }
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(sanitizeSearch(val));
+  };
+
+  const handleExpandSearch = () => {
+    setIsSearchExpanded(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
   };
 
   const filteredLog = useMemo(() => {
@@ -121,35 +134,58 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
               Review what changed, when, and by whom.
             </p>
           </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          <div className="flex items-center gap-4">
+            <AnimatePresence mode="wait">
+              {!isSearchExpanded ? (
                 <Button 
                   variant="outline" 
-                  onClick={() => { 
-                    const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
-                    saveAs(blob, `Activity-History-${new Date().toISOString().split('T')[0]}.json`); 
-                  }} 
-                  className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-white/5 hover:bg-white/5 transition-all text-white"
+                  size="icon" 
+                  onClick={handleExpandSearch}
+                  className="h-12 w-12 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
                 >
-                  <FileJson className="h-4 w-4 text-primary" /> Export History
+                  <Search className="h-5 w-5" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download the full list of changes to a file.</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              ) : (
+                <motion.div 
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "300px", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="relative"
+                >
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Input 
+                    ref={searchInputRef}
+                    placeholder="Search history..." 
+                    className="h-12 pl-11 pr-10 rounded-xl bg-white/[0.05] border-2 border-primary/20 text-white" 
+                    value={searchTerm} 
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onBlur={() => !searchTerm && setIsSearchExpanded(false)}
+                  />
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => { 
+                      const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
+                      saveAs(blob, `Activity-History-${new Date().toISOString().split('T')[0]}.json`); 
+                    }} 
+                    className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-white/5 hover:bg-white/5 transition-all text-white"
+                  >
+                    <FileJson className="h-4 w-4 text-primary" /> Export History
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download the full list of changes to a file.</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       )}
-
-      <div className="relative group px-2">
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
-        <Input 
-          placeholder="Search by user or description..." 
-          className="h-16 pl-14 rounded-[1.5rem] bg-black/40 border-white/5 shadow-xl font-bold text-sm focus-visible:ring-primary/20 transition-all placeholder:opacity-20 text-white" 
-          value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-        />
-      </div>
 
       <div className={cn("space-y-6 px-2", isEmbedded ? "pb-10" : "pb-32")}>
         {loading ? (
@@ -207,7 +243,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                                     {String(val.old || 'None')}
                                   </div>
                                   <ArrowRightLeft className="h-3 w-3 text-white/10 shrink-0" />
-                                  <div className="flex items-center gap-2 bg-green-500/5 border border-white/5 px-2 py-1 rounded-lg text-green-500 font-black truncate max-w-[120px]">
+                                  <div className="flex items-center gap-2 bg-green-500/5 border border-white/5 px-2 py-1 rounded-lg text-green-600 font-black truncate max-w-[120px]">
                                     {String(val.new)}
                                   </div>
                                 </div>

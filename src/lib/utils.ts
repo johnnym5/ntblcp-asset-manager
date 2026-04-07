@@ -9,6 +9,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Sanitizes search input to prevent regex breaks and ensure clean data pulse.
+ */
+export function sanitizeSearch(query: string): string {
+  return query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+}
+
+/**
  * Recursively removes undefined fields and converts Date objects to Firestore Timestamps.
  * Essential for nested objects like 'recovery' in error logs or 'metadata' in assets.
  * Performance Optimized: Uses non-recursive flat path for primitive objects where possible.
