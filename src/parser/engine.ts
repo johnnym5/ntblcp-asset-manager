@@ -3,7 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
- * Phase 1000: Deployment Stability Pulse. Added infinite-loop protection and forensic log refinement.
+ * Phase 1001: Deployment Stability Pulse. Added proactive key sanitization for Firebase metadata.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -135,7 +135,10 @@ export class ParserEngine {
         case 'assignee_location': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'model_number': asset.modelNumber = strVal; break;
-        default: asset.metadata[tpl.rawHeaders[idx] || `Column ${idx + 1}`] = val;
+        default: 
+          // Deterministic key sanitization for Firebase compatibility
+          const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]]/g, '_');
+          asset.metadata[safeKey] = val;
       }
     });
 

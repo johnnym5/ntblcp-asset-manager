@@ -5,27 +5,15 @@ import { HEADER_ALIASES } from './constants';
 import { Timestamp } from 'firebase/firestore';
 import { ParserEngine } from '@/parser/engine';
 import { normalizeHeaderName } from './registry-utils';
+import { sanitizeForFirestore } from './utils';
 
 /**
  * @fileOverview Excel Ingestion Layer.
  * Hardened for deployment: unified domain models and positional group mapping.
+ * Optimized: Uses centralized sanitization utility.
  */
 
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj: { [key: string]: any } = {};
-    for (const key in obj) {
-        const value = (obj as any)[key];
-        if (key === 'previousState') continue;
-        if (value !== undefined) {
-            if (value instanceof Date) {
-                sanitizedObj[key] = Timestamp.fromDate(value);
-            } else {
-                sanitizedObj[key] = value;
-            }
-        }
-    }
-    return sanitizedObj as T;
-};
+export { sanitizeForFirestore };
 
 export interface ScannedSheetInfo {
   sheetName: string;

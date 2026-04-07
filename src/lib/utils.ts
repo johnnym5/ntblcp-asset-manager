@@ -16,8 +16,8 @@ export function sanitizeSearch(query: string): string {
 }
 
 /**
- * Recursively removes undefined fields and converts Date objects to Firestore Timestamps.
- * Essential for nested objects like 'recovery' in error logs or 'metadata' in assets.
+ * Recursively removes undefined fields, converts Date objects to Firestore Timestamps,
+ * and sanitizes keys for Firebase compatibility (RTDB/Firestore).
  * Performance Optimized: Uses non-recursive flat path for primitive objects where possible.
  */
 export function sanitizeForFirestore<T>(obj: T): T {
@@ -39,14 +39,19 @@ export function sanitizeForFirestore<T>(obj: T): T {
       if (key === 'previousState') continue; // Skip undo buffer for Firestore
       
       const value = (obj as any)[key];
+      
+      // Sanitize the key for Firebase compatibility (RTDB/Firestore)
+      // Restricted characters: . $ # [ ] /
+      const safeKey = key.replace(/[.#$/[\]]/g, '_');
+      
       if (value !== undefined) {
         // Only recurse if value is an object or array
         if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Timestamp)) {
-          sanitizedObj[key] = sanitizeForFirestore(value);
+          sanitizedObj[safeKey] = sanitizeForFirestore(value);
         } else if (value instanceof Date) {
-          sanitizedObj[key] = Timestamp.fromDate(value);
+          sanitizedObj[safeKey] = Timestamp.fromDate(value);
         } else {
-          sanitizedObj[key] = value;
+          sanitizedObj[safeKey] = value;
         }
       }
     }
