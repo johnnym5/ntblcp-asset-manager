@@ -2,10 +2,8 @@
 
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
- * Optimized for mobile fields stacking and touch fidelity.
- * Phase 150: Integrated Discrepancy Highlighting & Review Triggers.
- * Phase 151: Integrated Smart Suggestion Application Pulse.
- * Phase 152: Integrated Category-Aware Field Visibility & Validation.
+ * Optimized for mobile stacking and full-screen touch fidelity.
+ * Phase 650: Refined Responsive Layout & Safe Area Support.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -186,10 +184,7 @@ export default function AssetForm({
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
-    
-    // Check category specific forbidden state
     if ((fieldRules as any)[fieldName] === 'forbidden') return true;
-
     if (isManagementMode && ['status', 'condition', 'remarks'].includes(fieldName)) return true;
     return false;
   };
@@ -208,64 +203,64 @@ export default function AssetForm({
       <DialogContent className="max-w-[1100px] w-[100vw] h-[100vh] sm:w-[95vw] sm:h-[85vh] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 rounded-none sm:rounded-[2.5rem] shadow-3xl">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 md:p-8 flex items-center justify-between border-b border-white/5 bg-white/[0.02] shrink-0">
+          <div className="p-6 sm:p-8 flex items-center justify-between border-b border-white/5 bg-white/[0.02] shrink-0">
             <div className="space-y-1">
-              <DialogTitle className="text-xl md:text-3xl font-black uppercase text-white leading-none">
+              <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
                 {asset ? 'Registry Profile' : 'New Identity Pulse'}
               </DialogTitle>
               <div className="flex items-center gap-2 mt-1.5">
-                <DialogDescription className="text-[10px] md:text-xs font-bold text-white/40 uppercase tracking-widest">
+                <DialogDescription className="text-[9px] sm:text-xs font-bold text-white/40 uppercase tracking-widest">
                   {asset ? `ID: ${asset.id.split('-')[0]}` : 'System Ingestion'}
                 </DialogDescription>
                 {activeClassification && (
-                  <Badge variant="outline" className="h-5 px-2 border-primary/20 text-primary text-[8px] font-black uppercase">
+                  <Badge variant="outline" className="h-5 px-2 border-primary/20 text-primary text-[7px] sm:text-[8px] font-black uppercase">
                     {activeClassification.validationGroup}
                   </Badge>
                 )}
               </div>
             </div>
-            <button onClick={() => onOpenChange(false)} className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40"><X className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+            <button onClick={() => onOpenChange(false)} className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 rounded-xl sm:rounded-2xl text-white/40 hover:text-white border border-white/5 transition-colors">
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
+            </button>
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             <ScrollArea className="flex-1 border-r border-white/5">
-              <div className="p-6 md:p-8 space-y-10 md:space-y-12 pb-32">
+              <div className="p-6 sm:p-8 space-y-10 sm:space-y-12 pb-32">
                 
-                {/* 1. Anomaly Banner */}
+                {/* Anomaly Banner */}
                 {formValues.discrepancies?.some(d => d.status === 'PENDING' || d.status === 'SUSPICIOUS') && (
-                  <div className="p-6 rounded-[2rem] bg-red-600/10 border-2 border-dashed border-red-600/20 flex flex-col sm:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-5">
-                      <div className="p-3 bg-red-600/20 rounded-2xl shadow-inner"><AlertTriangle className="h-6 w-6 text-red-600" /></div>
+                  <div className="p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] bg-red-600/10 border-2 border-dashed border-red-600/20 flex flex-col sm:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-4 sm:gap-5">
+                      <div className="p-2.5 sm:p-3 bg-red-600/20 rounded-xl sm:rounded-2xl shadow-inner shrink-0"><AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" /></div>
                       <div className="space-y-1">
-                        <h4 className="text-sm font-black uppercase tracking-tight text-white">Heuristic Pattern Alert</h4>
-                        <p className="text-[10px] font-medium text-white/40 italic">This record contains data that deviates from the registry norm or category rules.</p>
+                        <h4 className="text-xs sm:text-sm font-black uppercase tracking-tight text-white">Heuristic Alert</h4>
+                        <p className="text-[9px] sm:text-[10px] font-medium text-white/40 italic">Data deviates from category rules or registry patterns.</p>
                       </div>
                     </div>
-                    <Badge className="bg-red-600 h-8 px-4 font-black uppercase text-[9px] tracking-widest">Awaiting Review</Badge>
+                    <Badge className="bg-red-600 h-7 sm:h-8 px-4 font-black uppercase text-[8px] sm:text-[9px] tracking-widest whitespace-nowrap">Review Required</Badge>
                   </div>
                 )}
 
                 <Form {...form}>
-                  <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 md:space-y-12">
+                  <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 sm:space-y-12">
                     
-                    {/* Identification */}
+                    {/* Identity Group */}
                     <div className="space-y-6">
-                      <h4 className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
+                      <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                         <Tag className="h-3 w-3" /> Identity Markers
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="description" render={({ field }) => {
                           const discrepancy = getDiscrepancyForField('description');
                           return (
-                            <FormItem className="md:col-span-2">
+                            <FormItem className="sm:col-span-2">
                               <div className="flex items-center justify-between">
                                 <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Description</FormLabel>
-                                {discrepancy && <Badge variant="outline" className="h-5 text-[7px] font-black uppercase text-red-500 border-red-500/20">Anomalous</Badge>}
+                                {discrepancy && <Badge variant="outline" className="h-4 px-1.5 text-[6px] font-black uppercase text-red-500 border-red-500/20">Anomalous</Badge>}
                               </div>
                               <FormControl>
-                                <div className="relative group">
-                                  <Input {...field} readOnly={isFieldDisabled('description')} className={cn("h-12 md:h-14 bg-white/[0.03] border-2 rounded-xl font-black text-sm uppercase transition-all", discrepancy ? "border-red-600 animate-field-pulse" : "border-white/5")} />
-                                </div>
+                                <Input {...field} readOnly={isFieldDisabled('description')} className={cn("h-12 sm:h-14 bg-white/[0.03] border-2 rounded-xl font-black text-sm uppercase transition-all", discrepancy ? "border-red-600 animate-field-pulse" : "border-white/5")} />
                               </FormControl>
                             </FormItem>
                           );
@@ -274,24 +269,16 @@ export default function AssetForm({
                         {isFieldVisible('serialNumber') && (
                           <FormField control={form.control} name="serialNumber" render={({ field }) => {
                             const discrepancy = getDiscrepancyForField('serialNumber');
-                            const rule = fieldRules.serialNumber;
                             return (
                               <FormItem>
-                                <div className="flex items-center justify-between">
-                                  <FormLabel className="text-[9px] font-black uppercase text-white/40">
-                                    Serial Number {rule === 'required' && <span className="text-red-500">*</span>}
-                                  </FormLabel>
-                                  {discrepancy?.suggestedValue && <Badge className="bg-blue-600 h-4 text-[6px] font-black uppercase">Suggestion Found</Badge>}
-                                </div>
+                                <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
                                 <FormControl>
-                                  <div className="relative group">
+                                  <div className="relative">
                                     <Input {...field} readOnly={isFieldDisabled('serialNumber')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-field-pulse" : "border-white/5")} />
                                     {discrepancy && (
-                                      <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex gap-2">
-                                        {discrepancy.suggestedValue && (
-                                          <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED', discrepancy.suggestedValue)} size="icon" className="h-8 w-8 rounded-lg bg-blue-600 shadow-xl"><Zap className="h-4 w-4" /></Button>
-                                        )}
-                                        <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-8 w-8 rounded-lg bg-white/10 text-white/40"><Ban className="h-4 w-4" /></Button>
+                                      <div className="absolute top-1/2 -right-10 -translate-y-1/2 flex gap-1">
+                                        {discrepancy.suggestedValue && <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED', discrepancy.suggestedValue)} size="icon" className="h-7 w-7 rounded-lg bg-blue-600"><Zap className="h-3.5 w-3.5" /></Button>}
+                                        <Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-7 w-7 rounded-lg bg-white/10 text-white/40"><X className="h-3.5 w-3.5" /></Button>
                                       </div>
                                     )}
                                   </div>
@@ -301,64 +288,17 @@ export default function AssetForm({
                           }}/>
                         )}
 
-                        {isFieldVisible('assetIdCode') && (
-                          <FormField control={form.control} name="assetIdCode" render={({ field }) => {
-                            const discrepancy = getDiscrepancyForField('assetIdCode');
-                            return (
-                              <FormItem>
-                                <div className="flex items-center justify-between">
-                                  <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
-                                </div>
-                                <FormControl>
-                                  <div className="relative group">
-                                    <Input {...field} readOnly={isFieldDisabled('assetIdCode')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-field-pulse" : "border-white/5")} />
-                                  </div>
-                                </FormControl>
-                              </FormItem>
-                            );
-                          }}/>
-                        )}
-
-                        {isFieldVisible('manufacturer') && (
-                          <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Manufacturer</FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('manufacturer')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
-                            </FormItem>
-                          )}/>
-                        )}
-
-                        {isFieldVisible('modelNumber') && (
-                          <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Model Number</FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('modelNumber')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
-                            </FormItem>
-                          )}/>
-                        )}
-
-                        {isFieldVisible('chassisNo') && (
-                          <FormField control={form.control} name="chassisNo" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Chassis Number <span className="text-red-500">*</span></FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('chassisNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
-                            </FormItem>
-                          )}/>
-                        )}
-
-                        {isFieldVisible('engineNo') && (
-                          <FormField control={form.control} name="engineNo" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Engine Number <span className="text-red-500">*</span></FormLabel>
-                              <FormControl><Input {...field} readOnly={isFieldDisabled('engineNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
-                            </FormItem>
-                          )}/>
-                        )}
+                        <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
+                          </FormItem>
+                        )}/>
                       </div>
                     </div>
 
-                    {/* Condition Audit */}
-                    <div className="p-6 md:p-8 rounded-[2rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
+                    {/* Audit Group */}
+                    <div className="p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
                       <div className="flex items-center justify-between">
                         <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                           <Activity className="h-3 w-3" /> Audit Pulse
@@ -368,12 +308,12 @@ export default function AssetForm({
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="condition" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[9px] font-black uppercase text-white/40">Physical State</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('condition')}>
-                              <FormControl><SelectTrigger className="h-12 md:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
+                              <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
                                 {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs uppercase">{c}</SelectItem>)}
                               </SelectContent>
@@ -383,9 +323,9 @@ export default function AssetForm({
 
                         <FormField control={form.control} name="status" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Verification Pulse</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Verification Status</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
-                              <FormControl><SelectTrigger className="h-12 md:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
+                              <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
                                 <SelectItem value="VERIFIED" className="text-green-500 font-black">VERIFIED</SelectItem>
                                 <SelectItem value="UNVERIFIED" className="font-black">UNVERIFIED</SelectItem>
@@ -396,9 +336,9 @@ export default function AssetForm({
                         )}/>
 
                         <FormField control={form.control} name="remarks" render={({ field }) => (
-                          <FormItem className="md:col-span-2">
+                          <FormItem className="sm:col-span-2">
                             <FormLabel className="text-[9px] font-black uppercase text-white/40">Auditor Remarks</FormLabel>
-                            <FormControl><Textarea {...field} readOnly={isFieldDisabled('remarks')} className="min-h-[100px] bg-black border-2 border-white/10 rounded-2xl p-4 text-sm italic" placeholder="Document findings..." /></FormControl>
+                            <FormControl><Textarea {...field} readOnly={isFieldDisabled('remarks')} className="min-h-[100px] bg-black border-2 border-white/10 rounded-2xl p-4 text-xs sm:text-sm italic" placeholder="Document findings..." /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
@@ -408,29 +348,10 @@ export default function AssetForm({
               </div>
             </ScrollArea>
 
-            {/* Fidelity Sidebar */}
-            <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 md:p-8 shrink-0 border-t md:border-t-0 border-white/5">
+            {/* Sidebar Stacking */}
+            <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 sm:p-8 shrink-0 border-t md:border-t-0 border-white/5">
               <div className="space-y-10">
                 <AssetChecklist values={formValues as any} />
-                
-                {/* Heuristic History */}
-                {formValues.discrepancies?.length > 0 && (
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-red-600">Discrepancy Pulse</h4>
-                    <div className="space-y-3">
-                      {formValues.discrepancies.map(d => (
-                        <div key={d.id} className={cn("p-4 rounded-2xl border transition-all", d.status === 'RESOLVED' || d.status === 'CORRECTED' ? "bg-green-600/5 border-green-600/20 opacity-60" : "bg-red-600/5 border-red-600/20")}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase border-white/10">{d.severity}</Badge>
-                            <span className="text-[8px] font-black uppercase text-white/20">{d.field}</span>
-                          </div>
-                          <p className="text-[9px] font-medium text-white/60 leading-relaxed italic">{d.reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="p-6 rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10 space-y-4">
                   <div className="flex items-center gap-2 opacity-40 text-[9px] font-black uppercase tracking-widest"><Info className="h-3 w-3" /> Source Pulse</div>
                   <div className="space-y-2 text-[8px] uppercase">
@@ -442,10 +363,10 @@ export default function AssetForm({
             </ScrollArea>
           </div>
 
-          <div className="p-6 md:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 md:h-14 px-8 md:px-10 rounded-2xl font-black uppercase text-[10px] md:text-xs">Discard</Button>
+          <div className="p-6 sm:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 px-6 sm:px-10 rounded-2xl font-black uppercase text-[9px] sm:text-xs text-white/40 hover:text-white">Discard</Button>
             {!externalReadOnly && (
-              <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 md:h-14 px-10 md:px-12 rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-xl bg-primary text-black">
+              <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-[9px] sm:text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
                 Save Changes
               </Button>

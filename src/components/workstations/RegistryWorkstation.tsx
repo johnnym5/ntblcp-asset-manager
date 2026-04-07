@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 1005: Respects active data source for filtering and value discovery.
- * Phase 1006: Added Manual Add trigger to header.
+ * Optimized for Responsive Fidelity & Dense Data Navigation.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -39,6 +38,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RegistryCard } from '@/components/registry/RegistryCard';
+import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
@@ -109,15 +109,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
-  // Determine active data source
   const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
 
-  // Discovery engine for filter options
   const optionsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
     headers.forEach(h => {
@@ -239,6 +238,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
+      {/* Responsive Header Pulse */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-1 shrink-0">
         <div className="flex items-center gap-3 self-start">
           <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
@@ -248,18 +248,27 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-          <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-2">
+        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
+            >
+              {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
+            </Button>
+            <div className="w-px h-4 bg-white/10 mx-1" />
             <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
-            <div className="w-px h-4 bg-white/10" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
+            <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
           </div>
 
           <div className="flex items-center justify-end flex-1 min-w-0">
             <AnimatePresence mode="wait">
               {!isSearchExpanded ? (
-                <Button variant="outline" size="icon" onClick={handleExpandSearch} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary"><Search className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={handleExpandSearch} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
               ) : (
-                <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
+                <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group min-w-[120px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
                   <Input ref={searchInputRef} placeholder="Search..." value={searchTerm} onChange={(e) => handleSearchChange(e.target.value)} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
                   <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
@@ -268,23 +277,30 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </AnimatePresence>
           </div>
           
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
               <ListFilter className="h-4 w-4" />
               {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
             </Button>
             <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><Settings2 className="h-4 w-4" /></Button>
+            {!isMobile && (
+              <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><Settings2 className="h-4 w-4" /></Button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="px-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-        <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap">{processedAssets.length} Records</Badge>
+      {/* Sub-navigation & Pill Indicators */}
+      <div className="px-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 pb-2">
+        <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all"><FolderOpen className="h-3 w-3 text-primary opacity-60" />Group: {selectedCategory || 'Overall'}<ChevronDown className="h-2.5 w-2.5 opacity-40" /></Button>
+            <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all shrink-0">
+              <FolderOpen className="h-3 w-3 text-primary opacity-60" />
+              Group: {selectedCategory || 'Overall'}
+              <ChevronDown className="h-2.5 w-2.5 opacity-40" />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56 bg-black border-white/10 rounded-xl p-1 shadow-3xl text-white">
             <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-lg p-2 focus:bg-primary/10 gap-2"><Database className="h-3.5 w-3.5 opacity-40" /><span className="text-[10px] font-black uppercase">Overall Registry</span></DropdownMenuItem>
@@ -294,27 +310,109 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </DropdownMenu>
       </div>
 
+      {/* Primary Registry Grid / Table */}
       <div className="flex-1 min-h-0 px-1">
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
-          <AnimatePresence mode="popLayout">{paginatedAssets.map(asset => <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout><RegistryCard record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} onInspect={handleInspect} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} /></motion.div>)}</AnimatePresence>
-        </div>
-        {processedAssets.length === 0 && <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4"><Database className="h-12 w-12 text-white" /><h3 className="text-lg font-black uppercase tracking-widest text-white">Registry Silent</h3></div>}
+        {viewMode === 'grid' ? (
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
+            <AnimatePresence mode="popLayout">
+              {paginatedAssets.map(asset => (
+                <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout>
+                  <RegistryCard 
+                    record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                    onInspect={handleInspect} 
+                    selected={selectedAssetIds.has(asset.id)} 
+                    onToggleSelect={handleToggleSelect} 
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <RegistryTable 
+            records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))}
+            onInspect={handleInspect}
+            selectedIds={selectedAssetIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={(checked) => setSelectedAssetIds(checked ? new Set(paginatedAssets.map(a => a.id)) : new Set())}
+          />
+        )}
+        
+        {processedAssets.length === 0 && (
+          <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4">
+            <Database className="h-12 w-12 text-white" />
+            <h3 className="text-lg font-black uppercase tracking-widest text-white">Registry Silent</h3>
+          </div>
+        )}
       </div>
 
-      <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
+      {/* Floating Interactive Controls */}
+      <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
         {Math.ceil(processedAssets.length / ITEMS_PER_PAGE) > 1 && (
-          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4">
+          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 scale-90 sm:scale-100">
             <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
             <span className="text-[9px] font-black uppercase tracking-widest text-white/60">P.{currentPage} / {Math.ceil(processedAssets.length / ITEMS_PER_PAGE)}</span>
             <button disabled={currentPage === Math.ceil(processedAssets.length / ITEMS_PER_PAGE)} onClick={() => setCurrentPage(p + 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
           </div>
         )}
-        <AnimatePresence>{selectedAssetIds.size > 0 && <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2 flex items-center gap-4 shadow-3xl backdrop-blur-3xl"><div className="flex items-center gap-2 pl-2"><div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div><span className="text-[9px] font-black uppercase text-white hidden sm:inline">Selected</span></div><div className="h-6 w-px bg-white/10" /><div className="flex items-center gap-1.5"><Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><Edit3 className="h-3.5 w-3.5" /> Edit</Button><Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</Button></div><button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button></motion.div>}</AnimatePresence>
+        
+        <AnimatePresence>
+          {selectedAssetIds.size > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: 30 }} 
+              className="w-full sm:w-auto bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2 flex items-center justify-between sm:justify-start gap-4 shadow-3xl backdrop-blur-3xl"
+            >
+              <div className="flex items-center gap-2 pl-2">
+                <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
+                <span className="text-[9px] font-black uppercase text-white hidden sm:inline">Selected</span>
+              </div>
+              <div className="h-6 w-px bg-white/10 hidden sm:block" />
+              <div className="flex items-center gap-1.5">
+                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white">
+                  <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Edit</span>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Delete</span>
+                </Button>
+              </div>
+              <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} onNext={handleNext} onPrevious={handlePrevious} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = activeAssets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); setSelectedAssetIds(new Set()); }} />
+      <AssetDetailSheet 
+        isOpen={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+        record={selectedRecord} 
+        onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
+        onNext={handleNext} 
+        onPrevious={handlePrevious} 
+      />
+      
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        asset={activeAssets.find(a => a.id === selectedAssetId)} 
+        isReadOnly={false} 
+        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
+      />
+      
+      <AssetBatchEditForm 
+        isOpen={isBatchEditOpen} 
+        onOpenChange={setIsBatchEditOpen} 
+        selectedAssetCount={selectedAssetIds.size} 
+        onSave={async (data) => { 
+          for (const id of Array.from(selectedAssetIds)) { 
+            const asset = activeAssets.find(a => a.id === id); 
+            if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); 
+          } 
+          await refreshRegistry(); 
+          setSelectedAssetIds(new Set()); 
+        }} 
+      />
+      
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />

@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Consolidated for production: eliminates sub-pages to reduce build size and memory footprint.
+ * Refined for Responsive Fidelity.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -54,7 +55,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { WorkstationView } from '@/types/domain';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -72,6 +73,7 @@ export default function SPAHub() {
     filters
   } = useAppState();
   
+  const isMobile = useIsMobile();
   const { unreadCount } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -117,18 +119,18 @@ export default function SPAHub() {
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/80 backdrop-blur-3xl z-50 shrink-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-2 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary group tactile-pulse">
+        <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-50 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2.5 p-1.5 sm:p-2 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary group tactile-pulse">
               <Boxes className="h-5 w-5" />
               <div className="flex flex-col text-left">
-                <h1 className="text-sm font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
-                <span className="text-[7px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control Hub</span>
+                <h1 className="text-xs sm:text-sm font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
+                <span className="text-[6px] sm:text-[7px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control Hub</span>
               </div>
             </button>
           </div>
 
-          <div className="hidden lg:flex items-center flex-1 justify-center mx-12">
+          <div className="flex-1 flex items-center justify-center mx-2 sm:mx-12">
             <AnimatePresence mode="wait">
               {!isSearchExpanded ? (
                 <motion.button
@@ -137,14 +139,16 @@ export default function SPAHub() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   onClick={() => setIsSearchExpanded(true)}
-                  className="flex items-center gap-3 px-5 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
+                  className="flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
                 >
                   <Search className="h-3.5 w-3.5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Global Spotlight Search</span>
-                  <div className="flex items-center gap-1 ml-4 px-1 py-0.5 rounded-md bg-white/5 border border-white/5 text-[7px] font-black opacity-40">
-                    <span>⌘</span>
-                    <span>K</span>
-                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Global Spotlight Search</span>
+                  {!isMobile && (
+                    <div className="flex items-center gap-1 ml-4 px-1 py-0.5 rounded-md bg-white/5 border border-white/5 text-[7px] font-black opacity-40">
+                      <span>⌘</span>
+                      <span>K</span>
+                    </div>
+                  )}
                 </motion.button>
               ) : (
                 <motion.div
@@ -159,22 +163,24 @@ export default function SPAHub() {
                     ref={searchInputRef}
                     autoFocus
                     type="text"
-                    placeholder="Registry Search..."
-                    className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-24 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
+                    placeholder={isMobile ? "Search..." : "Registry Search..."}
+                    className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-12 sm:pr-24 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                     onBlur={() => !searchTerm && setIsSearchExpanded(false)}
                   />
                   <div className="absolute right-2 flex items-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setIsFilterOpen(true)}
-                      className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", filters.length > 0 && "text-primary")}
-                    >
-                      <Filter className="h-3.5 w-3.5" />
-                      {filters.length > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full flex items-center justify-center border border-black"><span className="text-[6px] font-black text-black">{filters.length}</span></span>}
-                    </Button>
+                    {!isMobile && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setIsFilterOpen(true)}
+                        className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", filters.length > 0 && "text-primary")}
+                      >
+                        <Filter className="h-3.5 w-3.5" />
+                        {filters.length > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full flex items-center justify-center border border-black"><span className="text-[6px] font-black text-black">{filters.length}</span></span>}
+                      </Button>
+                    )}
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-lg text-white/20 hover:text-white">
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -184,8 +190,8 @@ export default function SPAHub() {
             </AnimatePresence>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -208,9 +214,9 @@ export default function SPAHub() {
               </TooltipProvider>
             </div>
 
-            <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
+            <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 sm:gap-2 group tactile-pulse px-1 sm:px-2">
               <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-              <span className={cn("text-[8px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'Online' : 'Offline'}</span>
+              <span className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? (isMobile ? 'ON' : 'Online') : (isMobile ? 'OFF' : 'Offline')}</span>
             </button>
             
             <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-all">
@@ -220,7 +226,7 @@ export default function SPAHub() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-9 w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all overflow-hidden shrink-0">
+                <button className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all overflow-hidden shrink-0">
                   {userProfile.displayName[0]}
                 </button>
               </DropdownMenuTrigger>
@@ -256,7 +262,7 @@ export default function SPAHub() {
         <div className="flex-1 relative overflow-hidden">
           <ErrorBoundary module={activeView}>
             <ScrollArea className="h-full no-scrollbar">
-              <div className="p-4 md:p-6 lg:p-8">{renderWorkstation()}</div>
+              <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">{renderWorkstation()}</div>
             </ScrollArea>
           </ErrorBoundary>
         </div>
