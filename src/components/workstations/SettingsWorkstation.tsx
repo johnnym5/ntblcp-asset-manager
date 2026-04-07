@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Phase 320: Fixed functional logic for Project actions and resolved ReferenceErrors.
+ * Phase 321: Updated Scan button to navigate to Import workstation.
  */
 
 import React, { useState, useRef } from 'react';
@@ -102,8 +103,7 @@ export function SettingsWorkstation() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-
+  
   const [isPassphraseDialogOpen, setIsPassphraseDialogOpen] = useState(false);
   const [newPassphrase, setNewPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
@@ -339,7 +339,7 @@ export function SettingsWorkstation() {
                 <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest gap-2">
                   <PlusCircle className="h-3 w-3" /> Add Project
                 </Button>
-                <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-9 px-4 rounded-lg border-white/10 text-white font-black uppercase text-[8px] tracking-widest gap-2">
+                <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-9 px-4 rounded-lg border-white/10 text-white font-black uppercase text-[8px] tracking-widest gap-2">
                   <ScanSearch className="h-3.5 w-3.5 text-primary" /> Scan Pulse
                 </Button>
               </div>
@@ -391,7 +391,7 @@ export function SettingsWorkstation() {
                     <Button variant="outline" onClick={handleImportTemplate} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <FileUp className="h-3 w-3" /> Import Template
                     </Button>
-                    <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
+                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <ScanSearch className="h-3.5 w-3.5 text-primary" /> Scan & Import Data
                     </Button>
                   </div>
@@ -458,7 +458,6 @@ export function SettingsWorkstation() {
       </Dialog>
 
       <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".xlsx,.xls" />
-      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
       
       {selectedSheetDef && (
         <ColumnCustomizationSheet 

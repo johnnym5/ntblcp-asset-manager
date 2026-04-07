@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsSheet - High-Fidelity Project & Sheet Orchestrator.
  * Phase 157: Finalized functional wiring for project action pulse.
+ * Phase 158: Updated Scan button to navigate to Import workstation.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -54,7 +55,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { appSettings, setAppSettings, refreshRegistry, isOnline, setActiveGrantId, activeGrantId } = useAppState();
+  const { appSettings, setAppSettings, refreshRegistry, isOnline, setActiveGrantId, activeGrantId, setActiveView } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -62,7 +63,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
 
   // Schema Editor State
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
@@ -303,7 +303,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             </Button>
                             <Button 
                               variant="outline" 
-                              onClick={() => setIsImportScanOpen(true)}
+                              onClick={() => { setActiveView('IMPORT'); onOpenChange(false); }}
                               className="flex-1 h-11 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5 text-white/80 transition-all active:scale-95"
                             >
                               <ScanSearch className="h-3.5 w-3.5" /> Scan & Import Data
@@ -332,8 +332,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
 
       <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".xlsx,.xls" />
       
-      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
-
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
           isOpen={isColumnSheetOpen}
