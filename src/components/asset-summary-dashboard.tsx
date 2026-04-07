@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
- * Phase 1100: Reorganized Quick Start tiles to match Folders and Anomalies.
- * Phase 1101: Renamed 'Drill-down' to 'ACTIONS' per user request.
+ * Phase 1200: Implemented Operational Readiness & Granular Metric Pulses.
+ * Replaced static "Field Verify" with 10 intelligent registry health trackers.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -30,7 +30,10 @@ import {
     SearchCode,
     ClipboardCheck,
     FileUp,
-    ArrowRight
+    ArrowRight,
+    Fingerprint,
+    TrendingUp,
+    History
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -56,7 +59,7 @@ const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count,
     <button 
         onClick={onClick}
         className={cn(
-            "p-6 rounded-[2rem] border-2 bg-white/[0.02] border-white/5 text-left transition-all group relative overflow-hidden active:scale-95",
+            "p-6 rounded-[2rem] border-2 bg-white/[0.02] border-white/5 text-left transition-all group relative overflow-hidden active:scale-95 h-full",
             isDestructive ? "hover:border-destructive/40 hover:bg-destructive/[0.02]" : "hover:border-primary/40 hover:bg-primary/[0.02]"
         )}
     >
@@ -83,6 +86,29 @@ const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count,
     </button>
 );
 
+const ReadinessPulse = ({ label, count, subLabel, onClick, color, isDestructive }: any) => (
+    <div className={cn(
+        "flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl border-2 transition-all group gap-4",
+        isDestructive ? "bg-red-600/5 border-red-600/10 hover:border-red-600/40" : "bg-white/[0.02] border-white/5 hover:border-primary/20"
+    )}>
+        <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-3">
+                <span className={cn("text-2xl font-black tracking-tighter", isDestructive ? "text-red-600" : "text-white")}>{count}</span>
+                <span className={cn("text-[10px] font-black uppercase tracking-widest", isDestructive ? "text-red-500" : "text-primary")}>{label}</span>
+            </div>
+            <p className="text-[9px] font-medium text-white/40 leading-relaxed italic pr-4 line-clamp-2">{subLabel}</p>
+        </div>
+        <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClick} 
+            className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5 hover:bg-white/5 text-white/40 hover:text-white"
+        >
+            View Details
+        </Button>
+    </div>
+);
+
 export function AssetSummaryDashboard() {
     const { 
         assets, 
@@ -93,7 +119,9 @@ export function AssetSummaryDashboard() {
         setSearchTerm,
         setSelectedStatuses,
         setSelectedCategory,
-        setSelectedLocations
+        setSelectedLocations,
+        setFilters,
+        setMissingFieldFilter
     } = useAppState();
     
     const [view, setView] = useState<DashboardView>('stats');
@@ -102,15 +130,26 @@ export function AssetSummaryDashboard() {
         const total = assets.length;
         const verified = assets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
-        const anomalyCount = assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
+        
+        const now = Date.now();
+        const oneDay = 24 * 60 * 60 * 1000;
+        const oneWeek = 7 * oneDay;
 
         return {
             coverage,
             total,
             verified,
-            pending: total - verified,
-            anomalies: anomalyCount,
-            folders: new Set(assets.map(a => a.category)).size
+            pending: assets.filter(a => a.status === 'UNVERIFIED').length,
+            missingId: assets.filter(a => !a.assetIdCode).length,
+            missingSerials: assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length,
+            critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length,
+            maintenance: assets.filter(a => ['Bad condition', 'Used but in poor condition'].includes(a.condition || '')).length,
+            exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
+            feedback: assets.filter(a => !!a.remarks && a.remarks.trim() !== '').length,
+            modifiedToday: assets.filter(a => now - new Date(a.lastModified).getTime() < oneDay).length,
+            newInFlow: assets.filter(a => now - new Date(a.importMetadata?.importedAt || 0).getTime() < oneWeek).length,
+            folders: new Set(assets.map(a => a.category)).size,
+            anomalies: assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length
         };
     }, [assets]);
 
@@ -175,41 +214,108 @@ export function AssetSummaryDashboard() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+                        className="space-y-10"
                     >
-                        <QuickStartTile 
-                            label="Browse Registry" 
-                            description="Full Category Inventory" 
-                            icon={Boxes} 
-                            color="bg-primary shadow-primary/20"
-                            count={metrics.total}
-                            onClick={() => setActiveView('REGISTRY')}
-                        />
-                        <QuickStartTile 
-                            label="Registry Folders" 
-                            description="Structural Data Tree" 
-                            icon={FolderOpen} 
-                            color="bg-blue-600 shadow-blue-600/20"
-                            count={metrics.folders}
-                            onClick={() => scrollTo('folders-section')}
-                        />
-                        <QuickStartTile 
-                            label="Resolve Anomalies" 
-                            description="Pattern Fidelity Review" 
-                            icon={SearchCode} 
-                            color="bg-red-600 shadow-red-600/20"
-                            count={metrics.anomalies}
-                            isDestructive={metrics.anomalies > 0}
-                            onClick={() => scrollTo('anomalies-section')}
-                        />
-                        <QuickStartTile 
-                            label="Field Verify" 
-                            description="Start Physical Audit" 
-                            icon={ClipboardCheck} 
-                            color="bg-green-600 shadow-green-600/20"
-                            count={`${metrics.coverage}%`}
-                            onClick={() => setActiveView('VERIFY')}
-                        />
+                        {/* Primary Pulse Row */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <QuickStartTile 
+                                label="Browse Registry" 
+                                description="Full Category Inventory" 
+                                icon={Boxes} 
+                                color="bg-primary shadow-primary/20"
+                                count={metrics.total}
+                                onClick={() => setActiveView('REGISTRY')}
+                            />
+                            <QuickStartTile 
+                                label="Registry Folders" 
+                                description="Structural Data Tree" 
+                                icon={FolderOpen} 
+                                color="bg-blue-600 shadow-blue-600/20"
+                                count={metrics.folders}
+                                onClick={() => scrollTo('folders-section')}
+                            />
+                            <QuickStartTile 
+                                label="Resolve Anomalies" 
+                                description="Pattern Fidelity Review" 
+                                icon={SearchCode} 
+                                color="bg-red-600 shadow-red-600/20"
+                                count={metrics.anomalies}
+                                isDestructive={metrics.anomalies > 0}
+                                onClick={() => scrollTo('anomalies-section')}
+                            />
+                        </div>
+
+                        {/* Readiness Metric Hub - Replaced Field Verify */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3 px-1">
+                                <ShieldCheck className="h-4 w-4 text-primary" />
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Operational Readiness Hub</h4>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <ReadinessPulse 
+                                    label="Verification Coverage" 
+                                    count={`${metrics.coverage}%`} 
+                                    subLabel={`Showing ${metrics.verified} verified items out of ${metrics.total} assets in this scope.`}
+                                    onClick={() => { setSelectedStatuses(['VERIFIED']); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Pending Action" 
+                                    count={metrics.pending} 
+                                    subLabel="Assets currently marked as unverified and requiring field inspection."
+                                    onClick={() => setActiveView('VERIFY')}
+                                />
+                                <ReadinessPulse 
+                                    label="Missing Asset ID" 
+                                    count={metrics.missingId} 
+                                    subLabel="Assets lacking a unique tag or system ID code. Crucial for audits."
+                                    onClick={() => { setMissingFieldFilter('assetIdCode'); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Missing Serials" 
+                                    count={metrics.missingSerials} 
+                                    subLabel="Items missing manufacturer serial numbers. Risk for identification."
+                                    onClick={() => { setMissingFieldFilter('serialNumber'); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Critical Condition" 
+                                    count={metrics.critical} 
+                                    isDestructive={metrics.critical > 0}
+                                    subLabel="Assets reported as stolen, burnt, or unsalvageable."
+                                    onClick={() => setActiveView('ALERTS')}
+                                />
+                                <ReadinessPulse 
+                                    label="Maintenance Alert" 
+                                    count={metrics.maintenance} 
+                                    subLabel="Assets in poor or bad condition requiring technical assessment."
+                                    onClick={() => { setSearchTerm('bad'); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Audit Exceptions" 
+                                    count={metrics.exceptions} 
+                                    isDestructive={metrics.exceptions > 0}
+                                    subLabel="Records where field data conflicts with previous system information."
+                                    onClick={() => { setSelectedStatuses(['DISCREPANCY']); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Field Feedback" 
+                                    count={metrics.feedback} 
+                                    subLabel="Assets containing specific comments or remarks from field officers."
+                                    onClick={() => { setSearchTerm('remark'); setActiveView('REGISTRY'); }}
+                                />
+                                <ReadinessPulse 
+                                    label="Modified Today" 
+                                    count={metrics.modifiedToday} 
+                                    subLabel="Updates or creations performed in the last 24 hours."
+                                    onClick={() => setActiveView('AUDIT_LOG')}
+                                />
+                                <ReadinessPulse 
+                                    label="New In-Flow" 
+                                    count={metrics.newInFlow} 
+                                    subLabel="Fresh records newly registered in the system this week."
+                                    onClick={() => { setActiveView('REGISTRY'); setSearchTerm('2025'); }}
+                                />
+                            </div>
+                        </div>
                     </motion.div>
                 ) : (
                     <motion.div 
