@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * @fileOverview NotificationsCenter - High-Fidelity System Alerts.
- * Phase 170: Amoled-Gold aesthetic with real-time notification telemetry.
+ * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
+ * Phase 200: Implemented Group-aware notifications with surgical asset navigation.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Sheet, 
   SheetContent, 
@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotifications, removeNotification, clearAll } from '@/hooks/use-notifications';
 import { 
   Bell, 
   X, 
@@ -26,11 +25,18 @@ import {
   Clock, 
   Trash2,
   Database,
-  Cloud
+  Cloud,
+  ArrowRight,
+  User,
+  Zap,
+  ArrowRightLeft
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
+import { useNotifications, removeNotification, clearAll, markAllAsRead } from '@/hooks/use-notifications';
 
 interface NotificationsCenterProps {
   isOpen: boolean;
@@ -39,6 +45,20 @@ interface NotificationsCenterProps {
 
 export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCenterProps) {
   const { notifications, unreadCount } = useNotifications();
+  const { assets, setActiveView, setSearchTerm } = useAppState();
+  const { userProfile } = useAuth();
+
+  const handleNotificationClick = (n: any) => {
+    if (n.assetId) {
+      // 1. Mark as read
+      markAllAsRead(); // For simplicity in MVP, but can be targeted
+      
+      // 2. Drill down into the specific asset
+      setSearchTerm(n.assetId.split('-')[0]); // Search by short ID to find it
+      setActiveView('REGISTRY');
+      onOpenChange(false);
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -50,16 +70,16 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
                 <div className="p-2.5 bg-primary/10 rounded-xl">
                   <Bell className="text-primary h-6 w-6" />
                 </div>
-                <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white leading-none">System Alerts</SheetTitle>
+                <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white leading-none">Audit Alerts</SheetTitle>
               </div>
               {unreadCount > 0 && (
                 <Badge className="bg-primary text-black font-black uppercase text-[10px] h-6 px-3 rounded-full">
-                  {unreadCount} NEW
+                  {unreadCount} UNSEEN
                 </Badge>
               )}
             </div>
             <SheetDescription className="text-sm font-medium text-white/40 italic">
-              Registry activity and connection heartbeat logs.
+              Trace registry modifications and field audit pulses.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -70,9 +90,10 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
               notifications.map((n) => (
                 <div 
                   key={n.id} 
+                  onClick={() => handleNotificationClick(n)}
                   className={cn(
-                    "p-5 rounded-2xl border transition-all group relative",
-                    n.read ? "bg-transparent border-white/5 opacity-60" : "bg-white/[0.03] border-white/10 shadow-lg"
+                    "p-5 rounded-2xl border transition-all group relative cursor-pointer",
+                    n.read ? "bg-transparent border-white/5 opacity-60" : "bg-white/[0.03] border-white/10 shadow-lg hover:border-primary/40"
                   )}
                 >
                   <div className="flex items-start gap-4">
@@ -82,22 +103,32 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
                     )}>
                       {n.variant === 'destructive' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                     </div>
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <h4 className="text-sm font-black uppercase tracking-tight leading-tight pr-6">{n.title}</h4>
+                    <div className="space-y-2 min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-black uppercase tracking-tight leading-tight pr-6">{n.title}</h4>
+                        <ArrowRight className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                      </div>
+                      
                       {n.description && (
                         <p className="text-[11px] font-medium text-white/60 leading-relaxed italic line-clamp-2">
                           {n.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 pt-2 text-[9px] font-bold text-white/20 uppercase tracking-widest">
-                        <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(n.date, { addSuffix: true })}
+
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                          <Clock className="h-3 w-3" />
+                          {formatDistanceToNow(n.date, { addSuffix: true })}
+                        </div>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black border-white/10 text-white/40">
+                          ID: {n.assetId?.split('-')[0] || 'SYS'}
+                        </Badge>
                       </div>
                     </div>
                   </div>
                   
                   <button 
-                    onClick={() => removeNotification(n.id)}
+                    onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}
                     className="absolute top-4 right-4 p-1 rounded-lg text-white/10 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -110,8 +141,8 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
                   <Cloud className="h-16 w-16 text-white" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-xl font-black uppercase tracking-widest">Logs Clear</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest">No recent system pulses detected.</p>
+                  <h3 className="text-xl font-black uppercase tracking-widest">Audit Ledger Clear</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest">No recent registry modifications.</p>
                 </div>
               </div>
             )}
@@ -129,7 +160,7 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
           </Button>
           <SheetClose asChild>
             <Button className="h-14 px-12 rounded-2xl bg-white/[0.05] text-white font-black uppercase text-[10px] tracking-[0.25em] hover:bg-white/10 transition-all active:scale-95">
-              Dismiss
+              Dismiss Panel
             </Button>
           </SheetClose>
         </div>

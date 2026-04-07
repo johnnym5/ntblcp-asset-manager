@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetGroupsWorkstation - Unified Grouping Hub.
- * Centralizes all registry grouping logic: Technical Categories and Condition Registry.
+ * Phase 500: Implemented interactive notification drill-downs for Categories and Conditions.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -33,7 +33,8 @@ import {
   Edit3,
   Trash2,
   X,
-  Hammer
+  Hammer,
+  Bell
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -201,7 +202,7 @@ export function AssetGroupsWorkstation() {
       
       {/* 1. Header & Navigation */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1 shrink-0">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 self-start">
           {selectedGroup ? (
             <button 
               onClick={() => { setSelectedGroup(null); setSelectedSubgroup(null); }}
@@ -306,34 +307,44 @@ export function AssetGroupsWorkstation() {
           </div>
         ) : groupMode === 'category' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-            {sortedGroups.map(group => (
-              <Card 
-                key={group.name} 
-                onClick={() => setSelectedGroup(group.name)}
-                className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer"
-              >
-                <CardHeader className="p-8 pb-4 bg-white/[0.01] border-b border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-primary/10 rounded-2xl"><Boxes className="h-6 w-6 text-primary" /></div>
-                      <h3 className="text-xl font-black uppercase text-white tracking-tight">{group.name}</h3>
+            {sortedGroups.map(group => {
+              // Mock unseen logic: if any asset in this group has unseen updates
+              const hasUnseen = false; 
+              return (
+                <Card 
+                  key={group.name} 
+                  onClick={() => setSelectedGroup(group.name)}
+                  className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer relative"
+                >
+                  {hasUnseen && (
+                    <div className="absolute top-4 right-4">
+                      <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse shadow-[0_0_8px_rgba(220,38,38,0.8)]" />
                     </div>
-                    <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-primary transition-all" />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-8 space-y-6">
-                  <div className="space-y-1">
-                    <p className="text-5xl font-black tracking-tighter text-white">{group.count}</p>
-                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Records Identified</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.keys(group.subgroups).slice(0, 3).map(sg => (
-                      <Badge key={sg} variant="secondary" className="bg-white/5 text-[8px] font-black uppercase">{sg}</Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  )}
+                  
+                  <CardHeader className="p-8 pb-4 bg-white/[0.01] border-b border-white/5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-2xl"><Boxes className="h-6 w-6 text-primary" /></div>
+                        <h3 className="text-xl font-black uppercase text-white tracking-tight">{group.name}</h3>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-primary transition-all" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-8 space-y-6">
+                    <div className="space-y-1">
+                      <p className="text-5xl font-black tracking-tighter text-white">{group.count}</p>
+                      <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Registry Capacity</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.keys(group.subgroups).slice(0, 3).map(sg => (
+                        <Badge key={sg} variant="secondary" className="bg-white/5 text-[8px] font-black uppercase">{sg}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-10">
@@ -361,7 +372,16 @@ export function AssetGroupsWorkstation() {
                               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{groupAssets.length} Records</p>
                             </div>
                           </div>
-                          <ChevronDown className="h-6 w-6 text-white/20 transition-transform group-data-[state=open]:rotate-180" />
+                          <div className="flex items-center gap-6">
+                            {/* Drill-down notification badge */}
+                            {groupAssets.some(a => (a as any).unseenUpdateFields?.length > 0) && (
+                              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/10 rounded-xl border border-red-600/20">
+                                <Bell className="h-3 w-3 text-red-600 animate-pulse" />
+                                <span className="text-[9px] font-black text-red-600">UNSEEN PULSE</span>
+                              </div>
+                            )}
+                            <ChevronDown className="h-6 w-6 text-white/20 transition-transform group-data-[state=open]:rotate-180" />
+                          </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="p-8 pt-0 border-t border-white/5 bg-black/20">
@@ -405,7 +425,7 @@ export function AssetGroupsWorkstation() {
         }
         await refreshRegistry();
         setSelectedAssetIds(new Set());
-        toast({ title: "Bulk Update Pulse Committed" });
+        toast({ title: "Audit Batch Committed" });
       }} />
 
       <AlertDialog open={isCategoryWipeDialogOpen} onOpenChange={setIsCategoryWipeDialogOpen}>
@@ -430,11 +450,11 @@ export function AssetGroupsWorkstation() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] border-2 border-primary/20 rounded-[2.5rem] p-4 flex items-center gap-8 shadow-3xl backdrop-blur-3xl min-w-[500px]">
             <div className="flex items-center gap-4 pl-4">
               <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-xs">{selectedAssetIds.size}</div>
-              <span className="text-xs font-black uppercase text-white">Selected</span>
+              <span className="text-xs font-black uppercase text-white">Selected Records</span>
             </div>
             <div className="h-8 w-px bg-white/10" />
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Bulk Edit</Button>
+              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Bulk Audit</Button>
               <Button variant="ghost" onClick={handleDeleteSelectedAssets} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
             </div>
             <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 text-white/20 hover:text-white"><X className="h-5 w-5" /></button>

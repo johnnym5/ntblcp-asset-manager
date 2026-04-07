@@ -123,6 +123,10 @@ export interface Asset {
   lastModifiedBy: string;
   lastModifiedByState?: string;
 
+  // Notification & Drill-down layer
+  updateCount: number;
+  unseenUpdateFields: string[];
+  
   // Restoration Buffer
   previousState?: Partial<Asset> | null;
   
@@ -195,6 +199,9 @@ export interface ActivityLogEntry {
   performedBy: string;
   userState: string;
   changes?: Record<string, { old: any; new: any }>;
+  seenByUids?: string[];
+  groupContext?: string;
+  conditionContext?: string;
 }
 
 export type ErrorSeverity = 'CRITICAL' | 'WARNING' | 'INFO';

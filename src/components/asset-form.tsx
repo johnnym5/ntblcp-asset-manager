@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
- * Phase 2: Enhanced with Condition Grouping, History, and Mandatory Audit Remarks.
+ * Phase 300: Implemented Pulsing Field Highlights & Change History Revert.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -43,7 +43,11 @@ import {
   Activity,
   AlertTriangle,
   Tag,
-  ChevronRight
+  ChevronRight,
+  RotateCcw,
+  User,
+  Clock,
+  ArrowRightLeft
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -53,8 +57,19 @@ import { ASSET_CONDITIONS } from "@/lib/constants";
 import { AssetSchema } from "@/core/registry/validation";
 import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
-import { getCanonicalGroup, CONDITION_GROUPS, GROUP_COLORS } from "@/lib/condition-logic";
+import { getCanonicalGroup, GROUP_COLORS } from "@/lib/condition-logic";
 import type { Asset, ConditionAuditEntry } from "@/types/domain";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AssetFormProps {
   isOpen: boolean;
@@ -72,8 +87,12 @@ export default function AssetForm({
     isReadOnly: externalReadOnly,
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const [revertTarget, setRevertTarget] = useState<ConditionAuditEntry | null>(null);
+  
   const { userProfile } = useAuth();
-  const { activeGrantId, appSettings } = useAppState();
+  const { activeGrantId, appSettings, refreshRegistry } = useAppState();
+  const { toast } = useToast();
   
   const form = useForm<Asset>({
     resolver: zodResolver(AssetSchema),
@@ -83,18 +102,17 @@ export default function AssetForm({
   const isAdmin = userProfile?.isAdmin || false;
   const isManagementMode = appSettings?.appMode === 'management';
 
-  const isFieldDisabled = (fieldName: string) => {
-    if (externalReadOnly) return true;
-    if (isAdmin) return false;
-    if (isManagementMode && ['status', 'condition', 'remarks', 'conditionGroup'].includes(fieldName)) return true;
-    if (appSettings?.appMode === 'verification' && !['status', 'condition', 'remarks', 'conditionGroup'].includes(fieldName)) return true;
-    return false;
-  };
+  // State for pulsing fields - tracks which fields the user has "seen"
+  const [pulsingFields, setPulsingFields] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
       if (asset) {
         form.reset(asset);
+        // Identify unseen fields to trigger pulse
+        if (asset.unseenUpdateFields) {
+          setPulsingFields(new Set(asset.unseenUpdateFields));
+        }
       } else {
         form.reset({
           id: crypto.randomUUID(),
@@ -112,11 +130,26 @@ export default function AssetForm({
           hierarchy: { document: 'Manual', section: 'General', subsection: 'Base Register', assetFamily: 'Uncategorized' },
           importMetadata: { sourceFile: 'MANUAL', sheetName: 'MANUAL', rowNumber: 0, importedAt: new Date().toISOString() },
           metadata: {},
-          conditionHistory: []
+          conditionHistory: [],
+          unseenUpdateFields: [],
+          updateCount: 0
         } as Asset);
       }
     }
   }, [isOpen, asset, form, userProfile, activeGrantId]);
+
+  const handleFieldInteraction = (fieldName: string) => {
+    if (pulsingFields.has(fieldName)) {
+      const next = new Set(pulsingFields);
+      next.delete(fieldName);
+      setPulsingFields(next);
+      
+      // Update asset status locally if all seen
+      if (next.size === 0 && asset) {
+        // In a real app, we'd fire a "mark as seen" pulse to the DB here
+      }
+    }
+  };
 
   const onSubmit = async (data: Asset) => {
     setIsSaving(true);
@@ -126,10 +159,11 @@ export default function AssetForm({
             ...data,
             conditionGroup: nextGroup,
             lastModified: new Date().toISOString(),
-            lastModifiedBy: userProfile?.displayName || 'Unknown'
+            lastModifiedBy: userProfile?.displayName || 'Unknown',
+            unseenUpdateFields: [], // Mark all as seen on save
+            updateCount: (asset?.updateCount || 0) + 1
         };
 
-        // If condition changed, log history
         if (asset && asset.condition !== data.condition) {
           const audit: ConditionAuditEntry = {
             oldCondition: asset.condition,
@@ -148,6 +182,38 @@ export default function AssetForm({
     }
   };
 
+  const handleRevertPulse = async () => {
+    if (!revertTarget || !asset) return;
+    setIsReverting(true);
+    
+    try {
+      const restoredAsset = {
+        ...asset,
+        condition: revertTarget.oldCondition,
+        conditionGroup: getCanonicalGroup(revertTarget.oldCondition),
+        remarks: `FORENSIC REVERT: Restored to state from ${new Date(revertTarget.timestamp).toLocaleDateString()} by ${userProfile?.displayName}`,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'System'
+      };
+
+      await onSave(restoredAsset);
+      toast({ title: "Forensic Revert Complete", description: `Asset restored to ${revertTarget.oldCondition}.` });
+      setRevertTarget(null);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Restoration Failed" });
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
+  const isFieldDisabled = (fieldName: string) => {
+    if (externalReadOnly) return true;
+    if (isAdmin) return false;
+    if (isManagementMode && ['status', 'condition', 'remarks', 'conditionGroup'].includes(fieldName)) return true;
+    if (appSettings?.appMode === 'verification' && !['status', 'condition', 'remarks', 'conditionGroup'].includes(fieldName)) return true;
+    return false;
+  };
+
   const formValues = form.watch();
 
   return (
@@ -164,7 +230,11 @@ export default function AssetForm({
                 <DialogDescription className="text-xs font-bold text-white/40 uppercase tracking-widest">
                   {asset ? `ID: ${asset.id.split('-')[0]}` : 'Initializing deterministic record.'}
                 </DialogDescription>
-                {isAdmin && <Badge className="bg-primary text-black font-black uppercase text-[8px] tracking-widest px-2 h-5">ADMIN_OVERRIDE</Badge>}
+                {asset?.updateCount ? (
+                  <Badge className="bg-primary/10 text-primary border-primary/20 font-black h-5 px-2 text-[8px] uppercase tracking-widest">
+                    {asset.updateCount} MODIFICATIONS
+                  </Badge>
+                ) : null}
               </div>
             </div>
             <button onClick={() => onOpenChange(false)} className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white hover:bg-white/10 transition-all shadow-xl">
@@ -187,25 +257,52 @@ export default function AssetForm({
                         <FormField control={form.control} name="description" render={({ field }) => (
                           <FormItem className="md:col-span-2">
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Asset Description</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-14 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-black text-sm uppercase tracking-tight" /></FormControl>
+                            <FormControl>
+                              <div className={cn("relative", pulsingFields.has('description') && "animate-field-pulse rounded-xl")}>
+                                <Input 
+                                  {...field} 
+                                  readOnly={isFieldDisabled('description')} 
+                                  onFocus={() => handleFieldInteraction('description')}
+                                  className="h-14 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-black text-sm uppercase tracking-tight" 
+                                />
+                              </div>
+                            </FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Manufacturer Serial</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-bold text-sm" /></FormControl>
+                            <FormControl>
+                              <div className={cn("relative", pulsingFields.has('serialNumber') && "animate-field-pulse rounded-xl")}>
+                                <Input 
+                                  {...field} 
+                                  readOnly={isFieldDisabled('serialNumber')} 
+                                  onFocus={() => handleFieldInteraction('serialNumber')}
+                                  className="h-12 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-bold text-sm" 
+                                />
+                              </div>
+                            </FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Internal Tag ID</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-bold text-sm" /></FormControl>
+                            <FormControl>
+                              <div className={cn("relative", pulsingFields.has('assetIdCode') && "animate-field-pulse rounded-xl")}>
+                                <Input 
+                                  {...field} 
+                                  readOnly={isFieldDisabled('assetIdCode')} 
+                                  onFocus={() => handleFieldInteraction('assetIdCode')}
+                                  className="h-12 bg-white/[0.03] border-2 border-white/5 focus:border-primary/40 rounded-xl font-bold text-sm" 
+                                />
+                              </div>
+                            </FormControl>
                           </FormItem>
                         )}/>
                       </div>
                     </div>
 
-                    {/* Condition Audit - Deterministic Grouping */}
+                    {/* Condition Audit */}
                     <div className="p-8 rounded-[2rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
                       <div className="flex items-center justify-between">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
@@ -220,49 +317,56 @@ export default function AssetForm({
                         <FormField control={form.control} name="condition" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Physical State Assessment</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('condition')}>
-                              <FormControl>
-                                <SelectTrigger className="h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase tracking-tight">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent className="bg-black border-white/10">
-                                {ASSET_CONDITIONS.map(c => (
-                                  <SelectItem key={c} value={c} className="text-xs font-black uppercase py-3">{c}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className={cn("relative", pulsingFields.has('condition') && "animate-field-pulse rounded-xl")}>
+                              <Select onValueChange={(v) => { field.onChange(v); handleFieldInteraction('condition'); }} value={field.value} disabled={isFieldDisabled('condition')}>
+                                <FormControl>
+                                  <SelectTrigger className="h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase tracking-tight">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-black border-white/10">
+                                  {ASSET_CONDITIONS.map(c => (
+                                    <SelectItem key={c} value={c} className="text-xs font-black uppercase py-3">{c}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </FormItem>
                         )}/>
 
                         <FormField control={form.control} name="status" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Verification Pulse</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
-                              <FormControl>
-                                <SelectTrigger className="h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase tracking-tight">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent className="bg-black border-white/10">
-                                <SelectItem value="VERIFIED" className="text-[10px] font-black uppercase py-3 text-green-500">VERIFIED</SelectItem>
-                                <SelectItem value="UNVERIFIED" className="text-[10px] font-black uppercase py-3">UNVERIFIED</SelectItem>
-                                <SelectItem value="DISCREPANCY" className="text-[10px] font-black uppercase py-3 text-destructive">DISCREPANCY</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className={cn("relative", pulsingFields.has('status') && "animate-field-pulse rounded-xl")}>
+                              <Select onValueChange={(v) => { field.onChange(v); handleFieldInteraction('status'); }} value={field.value} disabled={isFieldDisabled('status')}>
+                                <FormControl>
+                                  <SelectTrigger className="h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase tracking-tight">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-black border-white/10">
+                                  <SelectItem value="VERIFIED" className="text-[10px] font-black uppercase py-3 text-green-500">VERIFIED</SelectItem>
+                                  <SelectItem value="UNVERIFIED" className="text-[10px] font-black uppercase py-3">UNVERIFIED</SelectItem>
+                                  <SelectItem value="DISCREPANCY" className="text-[10px] font-black uppercase py-3 text-destructive">DISCREPANCY</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </FormItem>
                         )}/>
 
                         <FormField control={form.control} name="remarks" render={({ field }) => (
                           <FormItem className="md:col-span-2">
-                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Auditor Remarks / Audit Trail Reason</FormLabel>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-white/40">Auditor Remarks</FormLabel>
                             <FormControl>
-                              <Textarea 
-                                {...field} 
-                                readOnly={isFieldDisabled('remarks')}
-                                className="min-h-[120px] bg-black border-2 border-white/10 rounded-2xl p-4 text-sm font-medium italic resize-none shadow-inner"
-                                placeholder="Explain any condition changes or discrepancies identified during the field pulse..."
-                              />
+                              <div className={cn("relative", pulsingFields.has('remarks') && "animate-field-pulse rounded-2xl")}>
+                                <Textarea 
+                                  {...field} 
+                                  readOnly={isFieldDisabled('remarks')}
+                                  onFocus={() => handleFieldInteraction('remarks')}
+                                  className="min-h-[120px] bg-black border-2 border-white/10 rounded-2xl p-4 text-sm font-medium italic resize-none shadow-inner"
+                                  placeholder="Explain any condition changes Identified during the field pulse..."
+                                />
+                              </div>
                             </FormControl>
                           </FormItem>
                         )}/>
@@ -272,9 +376,12 @@ export default function AssetForm({
                     {/* Hierarchy & History */}
                     {asset?.conditionHistory && asset.conditionHistory.length > 0 && (
                       <div className="space-y-6 pt-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-3">
-                          <History className="h-3 w-3" /> Forensic State History
-                        </h4>
+                        <div className="flex items-center justify-between px-1">
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-3">
+                            <History className="h-3 w-3" /> Forensic State History
+                          </h4>
+                          <span className="text-[8px] font-bold text-white/20 uppercase">Click to Revert</span>
+                        </div>
                         <div className="space-y-3">
                           {asset.conditionHistory.map((h, idx) => (
                             <div key={idx} className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-start justify-between group hover:bg-white/[0.04] transition-all">
@@ -284,11 +391,23 @@ export default function AssetForm({
                                   <ChevronRight className="h-3 w-3 text-white/20" />
                                   <span className="text-[10px] font-black uppercase text-primary">{h.newCondition}</span>
                                 </div>
-                                <p className="text-11px] font-medium text-white/60 italic leading-relaxed">"{h.reason}"</p>
+                                <p className="text-[11px] font-medium text-white/60 italic leading-relaxed">"{h.reason}"</p>
                               </div>
-                              <div className="text-right flex flex-col items-end">
-                                <span className="text-[8px] font-black uppercase tracking-widest text-white/20">{new Date(h.timestamp).toLocaleDateString()}</span>
-                                <span className="text-[9px] font-bold text-primary/40 uppercase">{h.changedBy}</span>
+                              <div className="text-right flex flex-col items-end gap-3">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[8px] font-black uppercase tracking-widest text-white/20">{new Date(h.timestamp).toLocaleDateString()}</span>
+                                  <span className="text-[9px] font-bold text-primary/40 uppercase">{h.changedBy}</span>
+                                </div>
+                                {isAdmin && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => setRevertTarget(h)}
+                                    className="h-7 px-3 rounded-lg text-[8px] font-black uppercase tracking-widest gap-2 bg-white/5 hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                                  >
+                                    <RotateCcw className="h-2.5 w-2.5" /> Revert Pulse
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -339,6 +458,30 @@ export default function AssetForm({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog open={!!revertTarget} onOpenChange={(o) => !o && setRevertTarget(null)}>
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-3xl bg-black text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-primary/10 rounded-2xl w-fit">
+              <RotateCcw className="h-12 w-12 text-primary" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight">Execute Forensic Revert?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/60">
+              You are about to restore the condition from <strong>{revertTarget?.newCondition}</strong> back to <strong>{revertTarget?.oldCondition}</strong>. This will create a new entry in the audit trail.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 text-white">Abort Revert</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRevertPulse} 
+              disabled={isReverting}
+              className="h-14 px-12 rounded-2xl font-black uppercase bg-primary text-black m-0"
+            >
+              {isReverting ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-5 w-5 mr-3" />} Confirm Reversion
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

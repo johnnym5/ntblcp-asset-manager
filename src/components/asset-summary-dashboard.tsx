@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
- * Phase 400: Implemented 10-point metric grid with real-time telemetry.
- * Phase 410: Applied user-friendly terminology (Audit Progress, Need Verification).
+ * Phase 500: Implemented interactive drill-down pulses for all metric nodes.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -39,16 +38,23 @@ interface StatCardProps {
     iconColor: string;
     onClick: () => void;
     isCritical?: boolean;
+    unseenCount?: number;
 }
 
-const StatCard = ({ label, value, description, icon: Icon, iconColor, onClick, isCritical }: StatCardProps) => (
+const StatCard = ({ label, value, description, icon: Icon, iconColor, onClick, isCritical, unseenCount }: StatCardProps) => (
     <Card 
         onClick={onClick}
         className={cn(
-            "bg-white/[0.02] border-white/5 rounded-2xl p-6 transition-all group cursor-pointer hover:bg-white/[0.04]",
+            "bg-white/[0.02] border-white/5 rounded-2xl p-6 transition-all group cursor-pointer hover:bg-white/[0.04] relative overflow-hidden",
             isCritical ? "hover:border-destructive/40" : "hover:border-primary/40"
         )}
     >
+        {unseenCount && unseenCount > 0 ? (
+          <div className="absolute top-0 right-0 p-2">
+            <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+          </div>
+        ) : null}
+        
         <div className="flex justify-between items-start mb-4">
             <span className={cn(
                 "text-[10px] font-black uppercase tracking-[0.2em]",
@@ -69,7 +75,7 @@ const StatCard = ({ label, value, description, icon: Icon, iconColor, onClick, i
             </p>
         </div>
         <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary">View Details</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Explore Drill-down</span>
             <MousePointer2 className="h-3 w-3 text-primary opacity-40" />
         </div>
     </Card>
@@ -100,40 +106,40 @@ export function AssetSummaryDashboard() {
 
         return {
             coverage: `${coverage}%`,
-            coverageDesc: `Verified ${verified} of ${total} assets in current scope.`,
+            coverageDesc: `Verified ${verified} of ${total} assets in scope.`,
             
             pending: assets.filter(a => a.status === 'UNVERIFIED').length,
-            pendingDesc: "Assets awaiting mandatory physical field assessment.",
+            pendingDesc: "Assets awaiting physical field assessment.",
             
             missingId: assets.filter(a => !a.assetIdCode).length,
-            missingIdDesc: "Records missing unique Tag IDs or System Codes.",
+            missingIdDesc: "Records missing unique Tag IDs.",
             
             missingSerial: assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length,
-            missingSerialDesc: "Items missing manufacturer serial numbers.",
+            missingSerialDesc: "Items missing manufacturer serials.",
             
             critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length,
-            criticalDesc: "Assets reported as stolen, burnt, or destroyed.",
+            criticalDesc: "Assets reported as stolen or destroyed.",
             
             maintenance: assets.filter(a => ['Bad condition', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
-            maintenanceDesc: "Assets in poor condition requiring technical attention.",
+            maintenanceDesc: "Assets requiring technical attention.",
             
             exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
-            exceptionsDesc: "Records with verified discrepancies from field audits.",
+            exceptionsDesc: "Records with verified audit discrepancies.",
             
             feedback: assets.filter(a => a.remarks && a.remarks.trim().length > 0).length,
-            feedbackDesc: "Assets containing specific officer comments or field notes.",
+            feedbackDesc: "Assets containing officer field notes.",
             
             modified: assets.filter(a => {
                 const d = new Date(a.lastModified).getTime();
                 return now - d < oneDay;
             }).length,
-            modifiedDesc: "Inventory records updated in the last 24 hours.",
+            modifiedDesc: "Records updated in the last 24 hours.",
             
             newInFlow: assets.filter(a => {
                 const d = new Date(a.importMetadata?.importedAt || 0).getTime();
                 return now - d < oneWeek;
             }).length,
-            newInFlowDesc: "New asset records added to the system this week."
+            newInFlowDesc: "New records added to the system this week."
         };
     }, [assets]);
 
@@ -144,16 +150,15 @@ export function AssetSummaryDashboard() {
 
     return (
         <div className="space-y-6">
-            {/* 1. Header Navigation */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-3xl bg-white/[0.03] border border-white/5 shadow-2xl backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-2xl shadow-inner">
                         <BarChart2 className="h-5 w-5 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-none">Inventory Dashboard</h3>
+                        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-none">Intelligence Dashboard</h3>
                         <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
-                            Real-time inventory statistics
+                            Real-time interactive registry telemetry
                         </p>
                     </div>
                 </div>
@@ -176,7 +181,7 @@ export function AssetSummaryDashboard() {
                                 view === 'insights' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
-                            Category Insights
+                            Drill-down
                         </button>
                     </div>
                     <Button variant="ghost" size="icon" onClick={refreshRegistry} className="rounded-xl bg-white/5 border border-white/5 text-white/40 hover:text-primary">
@@ -185,10 +190,9 @@ export function AssetSummaryDashboard() {
                 </div>
             </div>
 
-            {/* 2. Metric Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard 
-                    label="Audit Progress" 
+                    label="Audit Coverage" 
                     value={metrics.coverage} 
                     description={metrics.coverageDesc} 
                     icon={ShieldCheck} 
@@ -196,7 +200,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSelectedStatuses(['VERIFIED']))}
                 />
                 <StatCard 
-                    label="Need Verification" 
+                    label="Assessments" 
                     value={metrics.pending} 
                     description={metrics.pendingDesc} 
                     icon={Zap} 
@@ -204,7 +208,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSelectedStatuses(['UNVERIFIED']))}
                 />
                 <StatCard 
-                    label="Missing Tag ID" 
+                    label="Missing Tags" 
                     value={metrics.missingId} 
                     description={metrics.missingIdDesc} 
                     icon={Tag} 
@@ -212,7 +216,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setMissingFieldFilter('assetIdCode'))}
                 />
                 <StatCard 
-                    label="Missing Serials" 
+                    label="Serial Gaps" 
                     value={metrics.missingSerial} 
                     description={metrics.missingSerialDesc} 
                     icon={Hash} 
@@ -220,7 +224,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setMissingFieldFilter('serialNumber'))}
                 />
                 <StatCard 
-                    label="Critical Issues" 
+                    label="Loss Pulses" 
                     value={metrics.critical} 
                     description={metrics.criticalDesc} 
                     icon={AlertCircle} 
@@ -229,7 +233,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSelectedConditions(['Stolen', 'Burnt', 'Unsalvageable']))}
                 />
                 <StatCard 
-                    label="Need Repairs" 
+                    label="Maintenance" 
                     value={metrics.maintenance} 
                     description={metrics.maintenanceDesc} 
                     icon={Wrench} 
@@ -246,7 +250,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSelectedStatuses(['DISCREPANCY']))}
                 />
                 <StatCard 
-                    label="Field Notes" 
+                    label="Field Logs" 
                     value={metrics.feedback} 
                     description={metrics.feedbackDesc} 
                     icon={MessageSquare} 
@@ -254,7 +258,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSearchTerm('remark'))}
                 />
                 <StatCard 
-                    label="Updated Today" 
+                    label="Daily Pulse" 
                     value={metrics.modified} 
                     description={metrics.modifiedDesc} 
                     icon={Clock} 
@@ -262,7 +266,7 @@ export function AssetSummaryDashboard() {
                     onClick={() => navigateTo(() => setSearchTerm('today'))}
                 />
                 <StatCard 
-                    label="Recently Added" 
+                    label="New Arrivals" 
                     value={metrics.newInFlow} 
                     description={metrics.newInFlowDesc} 
                     icon={PlusCircle} 

@@ -1,12 +1,11 @@
-
 /**
  * @fileOverview RegistryCard - High-Fidelity "Quick View" Renderer.
- * Phase 900: Achieved 100% parity with screenshot context menu and selection pulse.
+ * Phase 1000: Integrated Notification Badges & Interactive Drill-down Pulse.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreVertical, LayoutGrid, Edit3, Trash2, ChevronDown, Check } from 'lucide-react';
+import { MoreVertical, LayoutGrid, Edit3, Trash2, ChevronDown, Check, Bell } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -15,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
+import { Badge } from '../ui/badge';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -40,6 +40,8 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
   };
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
+  const updateCount = (record.rawRow as any).updateCount || 0;
+  const hasUnseen = ((record.rawRow as any).unseenUpdateFields?.length || 0) > 0;
 
   return (
     <Card 
@@ -50,7 +52,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
       onClick={() => onInspect(record.id)}
     >
       <CardContent className="p-0">
-        {/* Top Slot: Circular Selection & Metadata */}
+        {/* Selection & Notification Pulse */}
         <div className="p-5 flex flex-col gap-1.5 relative border-b border-border/40">
           <div className="flex items-center justify-between">
             <div 
@@ -63,7 +65,14 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
               {selected && <Check className="h-3.5 w-3.5 text-black stroke-[4]" />}
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {updateCount > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/5 rounded-lg border border-primary/10">
+                  <Bell className={cn("h-3 w-3", hasUnseen ? "text-red-600 animate-pulse" : "text-primary/40")} />
+                  <span className="text-[9px] font-black text-primary">{updateCount}</span>
+                </div>
+              )}
+              
               <div onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -78,7 +87,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onInspect(record.id)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                       <Edit3 className="h-4 w-4 text-white/40" />
-                      <span className="text-[11px] font-black uppercase tracking-tight">Fast Edit</span>
+                      <span className="text-[11px] font-black uppercase tracking-tight">Audit Profile</span>
                     </DropdownMenuItem>
                     <div className="h-px bg-white/5 my-2" />
                     <DropdownMenuItem className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
@@ -111,7 +120,13 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
 
         {/* Footer: Status Pill */}
         <div className="p-5 bg-white/[0.02] flex items-center justify-between">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{status}</span>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-white/20"
+            )} />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{status}</span>
+          </div>
           <ChevronDown className="h-4 w-4 text-white/20" />
         </div>
       </CardContent>
