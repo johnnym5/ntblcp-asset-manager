@@ -1,20 +1,19 @@
 "use client";
 
 /**
- * @fileOverview High-Fidelity Filter Engine - Advanced AMOLED UI.
- * Phase 230: Synchronized with professional screenshot parity.
- * Features circular checkboxes, real-time counts, and missing-field radio logic.
+ * @fileOverview High-Fidelity Filter Engine - Centered Pop-up UI.
+ * Converted from Sheet to Dialog for focused workstation parity.
  * Phase 231: Added Condition scope and refined gold-on-black visual language.
  */
 
 import React from 'react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -74,7 +73,7 @@ const FilterSection = ({ title, options, selected, onChange }: {
     <div className="space-y-3">
       <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">{title}</Label>
       <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] overflow-hidden">
-        <ScrollArea className="max-h-[200px]">
+        <ScrollArea className="max-h-[180px]">
           <div className="p-2 space-y-1">
             {options.length > 0 ? (
               options.map((option) => {
@@ -84,12 +83,11 @@ const FilterSection = ({ title, options, selected, onChange }: {
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
                     className={cn(
-                      "flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all group",
+                      "flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all group",
                       isSelected ? "bg-primary text-black" : "hover:bg-white/[0.02]"
                     )}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Circular Checkbox */}
                       <div className={cn(
                         "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
                         isSelected ? "bg-black border-black" : "border-white/10 group-hover:border-white/20"
@@ -118,8 +116,8 @@ const FilterSection = ({ title, options, selected, onChange }: {
                 );
               })
             ) : (
-              <div className="py-12 text-center flex flex-col items-center gap-2 opacity-20">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white">No options available.</span>
+              <div className="py-8 text-center opacity-20">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Empty</span>
               </div>
             )}
           </div>
@@ -158,86 +156,70 @@ export function AssetFilterSheet({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-l-[2.5rem]">
-        {/* Header Section */}
-        <div className="p-10 pb-6 border-b border-white/5 space-y-4">
-          <SheetHeader>
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Assets</SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl text-white/40 hover:text-white hover:bg-white/5 h-10 w-10">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
-              Refine the asset list by selecting criteria below.
-            </SheetDescription>
-          </SheetHeader>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
+        <div className="p-10 pb-6 border-b border-white/5 bg-white/[0.02]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Engine</DialogTitle>
+            <DialogDescription className="text-[10px] font-black uppercase text-white/40 tracking-widest mt-1">
+              Deterministic asset selection pulse
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
-        {/* Scrollable Pulse Surface */}
-        <ScrollArea className="flex-1 bg-black">
-          <div className="p-10 space-y-10">
-            {isAdmin && (
-              <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
-            )}
+        <ScrollArea className="flex-1 bg-black max-h-[70vh]">
+          <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="space-y-10">
+              {isAdmin && (
+                <FilterSection title="Regional Scope" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+              )}
+              <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
+            </div>
             
-            <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
-            <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
-            <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
+            <div className="space-y-10">
+              <FilterSection title="Asset Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+              <FilterSection title="Pulse Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
-            {/* Missing Fields Logic Section */}
-            <div className="space-y-4">
-              <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Find Assets with Missing Fields</Label>
-              <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2">
-                {MISSING_FIELD_OPTS.map((opt) => {
-                  const isSelected = missingFieldFilter === opt.value;
-                  return (
-                    <div 
-                      key={`missing-${opt.label}`}
-                      onClick={() => setMissingFieldFilter(opt.value)}
-                      className={cn(
-                        "flex items-center gap-4 p-3.5 rounded-xl cursor-pointer transition-all group",
-                        isSelected ? "bg-white/5" : "hover:bg-white/[0.02]"
-                      )}
-                    >
-                      <div className={cn(
-                        "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
-                        isSelected ? "bg-primary border-primary shadow-[0_0_10px_rgba(var(--primary),0.3)]" : "border-white/10 group-hover:border-white/20"
-                      )}>
-                        {isSelected && <div className="h-2 w-2 rounded-full bg-black" />}
-                      </div>
-                      <span className={cn(
-                        "text-[11px] font-black uppercase tracking-tight",
-                        isSelected ? "text-white" : "text-white/40 group-hover:text-white/60"
-                      )}>
-                        {opt.label}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className="space-y-4">
+                <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Gaps</Label>
+                <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2 flex flex-wrap gap-2">
+                  {MISSING_FIELD_OPTS.map((opt) => {
+                    const isSelected = missingFieldFilter === opt.value;
+                    return (
+                      <button 
+                        key={`missing-${opt.label}`}
+                        onClick={() => setMissingFieldFilter(opt.value)}
+                        className={cn(
+                          "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 transition-all",
+                          isSelected ? "bg-primary border-primary text-black" : "bg-white/5 border-transparent text-white/40 hover:border-white/10"
+                        )}
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-tight">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
         </ScrollArea>
 
-        {/* Footer Actions */}
-        <div className="p-10 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4">
+        <div className="p-8 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4">
           <Button 
             variant="ghost" 
             onClick={handleClearAll}
-            className="h-14 px-8 rounded-2xl text-white font-black uppercase text-[10px] tracking-[0.2em] border-2 border-white/5 hover:bg-white/5"
+            className="h-14 px-8 rounded-2xl text-white/40 font-black uppercase text-[10px] tracking-[0.2em] hover:text-white"
           >
-            Clear All Filters
+            Purge Filters
           </Button>
           <Button 
             onClick={() => onOpenChange(false)}
-            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
+            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20"
           >
-            Done
+            Apply Logic Pulse
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,18 +1,24 @@
-
 'use client';
 
 /**
- * @fileOverview Governance Inbox - Request & Approval Management.
- * Phase 48: Integrated Batch Adjudication & Selection Logic.
+ * @fileOverview Governance Inbox - Request & Approval Pop-up Window.
+ * Converted from Sheet to Dialog for focused workstation parity.
  */
 
 import React, { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Inbox, User, Clock, GitPullRequest, Check, X, RefreshCw, Loader2, ArrowRight, CheckSquare, Square, ShieldCheck } from 'lucide-react';
+import { Inbox, User, Clock, GitPullRequest, Check, X, RefreshCw, Loader2, ArrowRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
@@ -81,165 +87,131 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 border-primary/10 rounded-l-3xl overflow-hidden shadow-2xl bg-background/95 backdrop-blur-xl">
-        <div className="p-8 border-b bg-muted/20">
-            <SheetHeader>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] overflow-hidden shadow-3xl bg-background/95 backdrop-blur-xl">
+        <div className="p-10 border-b bg-white/[0.02]">
+            <DialogHeader>
                 <div className="flex items-center justify-between">
-                    <SheetTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
-                        <div className="p-2 bg-primary/10 rounded-xl">
-                            <Inbox className="text-primary h-6 w-6" />
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-2xl">
+                            <Inbox className="text-primary h-8 w-8" />
                         </div>
-                        Approval Queue
-                    </SheetTitle>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-9 font-black text-[10px] uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/5 rounded-xl"
-                          onClick={refreshRegistry}
-                          disabled={isSyncing}
-                      >
-                          {isSyncing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
-                          Sync Pulse
-                      </Button>
+                        <div className="space-y-1">
+                          <DialogTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Approval Queue</DialogTitle>
+                          <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-white/40">
+                              Adjudicate field modifications
+                          </DialogDescription>
+                        </div>
                     </div>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-10 px-6 font-black text-[9px] uppercase tracking-widest border-white/10 bg-white/5 hover:bg-primary/5 rounded-xl"
+                        onClick={refreshRegistry}
+                        disabled={isSyncing}
+                    >
+                        {isSyncing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
+                        Reconcile Cloud
+                    </Button>
                 </div>
-                <SheetDescription className="mt-2 font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                    Registry modifications proposed by field auditors.
-                </SheetDescription>
-            </SheetHeader>
+            </DialogHeader>
         </div>
 
         {pendingAssets.length > 0 && (
-          <div className="px-8 py-4 bg-muted/5 border-b flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="px-10 py-4 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
               <Checkbox 
                 id="select-all-inbox" 
                 checked={selectedIds.size === pendingAssets.length && pendingAssets.length > 0} 
                 onCheckedChange={toggleAll}
-                className="h-5 w-5 rounded-lg border-2"
+                className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
               />
-              <label htmlFor="select-all-inbox" className="text-[10px] font-black uppercase tracking-widest opacity-60 cursor-pointer">
-                {selectedIds.size > 0 ? `${selectedIds.size} Pulses Selected` : `Select All Pending`}
+              <label htmlFor="select-all-inbox" className="text-[11px] font-black uppercase tracking-widest text-primary/80 cursor-pointer">
+                {selectedIds.size > 0 ? `${selectedIds.size} Records Selected` : `Select All Pending`}
               </label>
             </div>
             {selectedIds.size > 0 && (
-              <div className="flex gap-2 animate-in fade-in slide-in-from-right-2">
-                <Button variant="ghost" size="sm" onClick={() => handleAction(Array.from(selectedIds), 'REJECT')} className="h-8 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Discard Selection</Button>
-                <Button size="sm" onClick={() => handleAction(Array.from(selectedIds), 'APPROVE')} className="h-8 text-[9px] font-black uppercase bg-primary text-white shadow-lg shadow-primary/20">Approve Batch</Button>
+              <div className="flex gap-3">
+                <Button variant="ghost" size="sm" onClick={() => handleAction(Array.from(selectedIds), 'REJECT')} className="h-10 text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Reject Selection</Button>
+                <Button size="sm" onClick={() => handleAction(Array.from(selectedIds), 'APPROVE')} className="h-10 text-[10px] font-black uppercase bg-primary text-black shadow-xl shadow-primary/20">Approve Batch</Button>
               </div>
             )}
           </div>
         )}
         
-        <ScrollArea className="flex-1 px-8 py-6 bg-background">
+        <ScrollArea className="flex-1 px-10 py-8 bg-black">
           {pendingAssets.length > 0 ? (
-            <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
               {pendingAssets.map((asset) => (
-                <div key={asset.id} className="relative group">
-                  <div className="absolute top-6 left-[-2rem] z-20 transition-opacity">
-                    <Checkbox 
-                      checked={selectedIds.has(asset.id)} 
-                      onCheckedChange={() => toggleSelect(asset.id)}
-                      className="h-5 w-5 rounded-lg border-2 shadow-sm bg-background"
-                    />
-                  </div>
-                  <Card className={cn(
-                    "border-2 border-border/50 shadow-none hover:border-primary/20 transition-all rounded-3xl overflow-hidden bg-card",
-                    selectedIds.has(asset.id) && "border-primary bg-primary/[0.02]"
-                  )}>
-                    <CardHeader className="bg-muted/10 p-6 pb-4 border-b">
-                      <div className="flex justify-between items-start gap-4">
-                          <div>
-                              <CardTitle className="text-lg font-black tracking-tight">{asset.description || asset.name}</CardTitle>
-                              <CardDescription className="flex items-center gap-2 mt-1.5">
-                                  <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary rounded-lg">{asset.category}</Badge>
-                                  <span className="text-[10px] font-mono text-muted-foreground font-bold">SN: {asset.serialNumber || 'UNSET'}</span>
-                              </CardDescription>
+                <Card key={asset.id} className={cn(
+                  "border-2 transition-all rounded-[2rem] overflow-hidden bg-white/[0.02] shadow-xl",
+                  selectedIds.has(asset.id) ? "border-primary bg-primary/[0.02]" : "border-white/5 hover:border-white/10"
+                )}>
+                  <div className="p-6 space-y-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <Checkbox 
+                          checked={selectedIds.has(asset.id)} 
+                          onCheckedChange={() => toggleSelect(asset.id)}
+                          className="h-5 w-5 rounded-full border-2 border-white/10"
+                        />
+                        <div className="space-y-1">
+                          <h4 className="text-base font-black uppercase text-white tracking-tight truncate max-w-[200px]">{asset.description}</h4>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-white/10 text-white/40">{asset.category}</Badge>
                           </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                       <div className="grid grid-cols-2 gap-4">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                              <div className="p-1.5 bg-muted rounded-lg"><User className="h-3.5 w-3.5" /></div>
-                              <div className="flex flex-col">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Submitted By</span>
-                                  <span className="text-xs font-bold">{asset.changeSubmittedBy?.displayName || 'Unknown'}</span>
-                              </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground justify-end text-right">
-                              <div className="flex flex-col">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Wait Time</span>
-                                  <span className="text-xs font-bold">{formatDistanceToNow(new Date(asset.lastModified!), { addSuffix: true })}</span>
-                              </div>
-                              <div className="p-1.5 bg-muted rounded-lg"><Clock className="h-3.5 w-3.5" /></div>
-                          </div>
-                       </div>
-
-                        <div className="space-y-3 rounded-2xl border-2 border-dashed p-5 bg-muted/5">
-                           <h4 className="font-black text-[10px] uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
-                              <GitPullRequest className="h-3.5 w-3.5"/> Proposed Modification Pulse
-                           </h4>
-                           <div className="space-y-0.5">
-                              {asset.pendingChanges && Object.keys(asset.pendingChanges).length > 0 ? (
-                                  Object.keys(asset.pendingChanges).map(key => (
-                                      <ChangeDetail 
-                                          key={key}
-                                          label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                                          oldValue={(asset as any)[key]}
-                                          newValue={(asset.pendingChanges as any)[key]}
-                                      />
-                                  ))
-                              ) : (
-                                  <div className="text-[10px] font-bold text-muted-foreground/60 uppercase p-4 text-center border-2 border-dashed rounded-xl">No structural field changes (Audit Status Only)</div>
-                              )}
-                           </div>
                         </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/10 gap-3 border-t p-6">
-                      <Button 
-                          variant="outline" 
-                          size="sm" 
-                          disabled={isProcessing}
-                          className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest text-destructive border-destructive/20 hover:bg-destructive/10 rounded-2xl transition-all" 
-                          onClick={() => handleAction([asset.id], 'REJECT')}
-                      >
-                          <X className="mr-2 h-4 w-4" /> Reject Request
-                      </Button>
-                       <Button 
-                          size="sm" 
-                          disabled={isProcessing}
-                          className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 rounded-2xl transition-all" 
-                          onClick={() => handleAction([asset.id], 'APPROVE')}
-                      >
-                          <Check className="mr-2 h-4 w-4" /> Apply Changes
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border-2 border-dashed border-white/5 p-5 bg-black/40">
+                       <h4 className="font-black text-[9px] uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
+                          <GitPullRequest className="h-3.5 w-3.5"/> Modifications
+                       </h4>
+                       <div className="space-y-0.5">
+                          {asset.pendingChanges && Object.keys(asset.pendingChanges).length > 0 ? (
+                              Object.keys(asset.pendingChanges).map(key => (
+                                  <ChangeDetail 
+                                      key={key}
+                                      label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                      oldValue={(asset as any)[key]}
+                                      newValue={(asset.pendingChanges as any)[key]}
+                                  />
+                              ))
+                          ) : (
+                              <div className="text-[9px] font-bold text-white/20 uppercase p-4 text-center">Status Update Only</div>
+                          )}
+                       </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[9px] font-black uppercase text-white/30 pt-2 border-t border-white/5">
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3" /> <span>{asset.changeSubmittedBy?.displayName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3" /> <span>{formatDistanceToNow(new Date(asset.lastModified!), { addSuffix: true })}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-white/[0.02] flex gap-2 border-t border-white/5">
+                    <Button variant="ghost" onClick={() => handleAction([asset.id], 'REJECT')} className="flex-1 h-10 text-[9px] font-black uppercase text-red-500 hover:bg-red-500/10">Reject</Button>
+                    <Button onClick={() => handleAction([asset.id], 'APPROVE')} className="flex-1 h-10 text-[9px] font-black uppercase bg-primary text-black">Approve</Button>
+                  </div>
+                </Card>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground/40 py-20">
-              <div className="p-8 bg-muted/20 rounded-full mb-6">
-                <Inbox className="h-16 w-16 opacity-20" />
-              </div>
-              <h3 className="text-xl font-black uppercase tracking-widest">Queue Status: Clear</h3>
-              <p className="text-sm font-medium max-w-[280px] mt-2 opacity-60 leading-relaxed">All proposed registry modifications have been adjudicated.</p>
+            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
+              <Inbox className="h-20 w-20 mb-6 text-white" />
+              <h3 className="text-2xl font-black uppercase tracking-widest text-white">Queue Clear</h3>
             </div>
           )}
         </ScrollArea>
         
-        <div className="p-8 border-t bg-muted/20">
-            <SheetFooter>
-                <SheetClose asChild>
-                    <Button variant="ghost" className="w-full font-black uppercase text-xs tracking-widest h-14 rounded-2xl">Exit Approval Mode</Button>
-                </SheetClose>
-            </SheetFooter>
+        <div className="p-8 bg-[#050505] border-t border-white/5 text-center">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-black uppercase text-xs tracking-widest text-white/40 hover:text-white">Dismiss Workspace</Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

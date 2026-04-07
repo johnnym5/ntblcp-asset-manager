@@ -58,13 +58,14 @@ export const FirestoreService = {
     let q;
     const hasStates = stateScopes && stateScopes.length > 0 && !stateScopes.includes('All');
 
+    // Deterministic RBAC Query: We use 'location' as the primary filter for legacy data resilience
     if (grantId === 'ALL_PROJECTS') {
       q = hasStates 
-        ? query(assetsRef, where('normalizedState', 'in', stateScopes), orderBy('normalizedZone'), orderBy('normalizedState'))
-        : query(assetsRef, orderBy('normalizedZone'), orderBy('normalizedState'));
+        ? query(assetsRef, where('location', 'in', stateScopes))
+        : query(assetsRef, orderBy('location'));
     } else {
       q = hasStates
-        ? query(assetsRef, where('grantId', '==', grantId), where('normalizedState', 'in', stateScopes))
+        ? query(assetsRef, where('grantId', '==', grantId), where('location', 'in', stateScopes))
         : query(assetsRef, where('grantId', '==', grantId));
     }
 
