@@ -4,7 +4,7 @@
  * @fileOverview High-Fidelity Filter Engine - Advanced AMOLED UI.
  * Phase 230: Synchronized with professional screenshot parity.
  * Features circular checkboxes, real-time counts, and missing-field radio logic.
- * Phase 231: Added isAdmin pulse to conditionally hide Location scope for normal users.
+ * Phase 231: Added Condition scope and refined gold-on-black visual language.
  */
 
 import React from 'react';
@@ -25,7 +25,7 @@ import type { OptionType } from '@/contexts/app-state-context';
 
 interface AssetFilterSheetProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   isAdmin: boolean;
   
   locationOptions: OptionType[];
@@ -40,13 +40,17 @@ interface AssetFilterSheetProps {
   selectedConditions: string[];
   setSelectedConditions: (val: string[]) => void;
 
+  statusOptions: OptionType[];
+  selectedStatuses: string[];
+  setSelectedStatuses: (val: string[]) => void;
+
   missingFieldFilter: string;
   setMissingFieldFilter: (val: string) => void;
 }
 
 const MISSING_FIELD_OPTS = [
   { label: 'None', value: '' },
-  { label: 'S/N', value: 'serialNumber' },
+  { label: 'S/N', value: 'sn' },
   { label: 'Serial Number', value: 'serialNumber' },
   { label: 'Asset ID Code', value: 'assetIdCode' },
   { label: 'Description', value: 'description' },
@@ -81,27 +85,33 @@ const FilterSection = ({ title, options, selected, onChange }: {
                     onClick={() => handleSelect(option.value)}
                     className={cn(
                       "flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all group",
-                      isSelected ? "bg-white/5" : "hover:bg-white/[0.02]"
+                      isSelected ? "bg-primary text-black" : "hover:bg-white/[0.02]"
                     )}
                   >
                     <div className="flex items-center gap-4">
                       {/* Circular Checkbox */}
                       <div className={cn(
                         "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
-                        isSelected ? "bg-primary border-primary shadow-[0_0_10px_rgba(var(--primary),0.3)]" : "border-white/10 group-hover:border-white/20"
+                        isSelected ? "bg-black border-black" : "border-white/10 group-hover:border-white/20"
                       )}>
-                        {isSelected && <Check className="h-3.5 w-3.5 text-black font-black" />}
+                        {isSelected && <Check className="h-3.5 w-3.5 text-primary font-black" />}
                       </div>
                       <span className={cn(
                         "text-[11px] font-black uppercase tracking-tight",
-                        isSelected ? "text-white" : "text-white/40 group-hover:text-white/60"
+                        isSelected ? "text-black" : "text-white/40 group-hover:text-white/60"
                       )}>
                         {option.label}
                       </span>
                     </div>
                     {option.count !== undefined && (
-                      <div className="bg-black/40 px-2 py-0.5 rounded-lg border border-white/5">
-                        <span className="text-[9px] font-mono font-bold text-white/20">{option.count}</span>
+                      <div className={cn(
+                        "px-2 py-0.5 rounded-lg border",
+                        isSelected ? "bg-black/20 border-black/10" : "bg-black/40 border-white/5"
+                      )}>
+                        <span className={cn(
+                          "text-[9px] font-mono font-bold",
+                          isSelected ? "text-black/60" : "text-white/20"
+                        )}>{option.count}</span>
                       </div>
                     )}
                   </div>
@@ -132,6 +142,9 @@ export function AssetFilterSheet({
   conditionOptions,
   selectedConditions,
   setSelectedConditions,
+  statusOptions,
+  selectedStatuses,
+  setSelectedStatuses,
   missingFieldFilter,
   setMissingFieldFilter,
 }: AssetFilterSheetProps) {
@@ -140,6 +153,7 @@ export function AssetFilterSheet({
     setSelectedLocations([]);
     setSelectedAssignees([]);
     setSelectedConditions([]);
+    setSelectedStatuses([]);
     setMissingFieldFilter('');
   };
 
@@ -165,14 +179,12 @@ export function AssetFilterSheet({
         <ScrollArea className="flex-1 bg-black">
           <div className="p-10 space-y-10">
             {isAdmin && (
-              <>
-                <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
-                <Separator className="bg-white/5" />
-              </>
+              <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
             )}
             
             <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
             <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+            <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
             {/* Missing Fields Logic Section */}
             <div className="space-y-4">

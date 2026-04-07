@@ -61,6 +61,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useIsMobile } from '@/hooks/use-mobile';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
+import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { storage } from '@/offline/storage';
 
 export default function SPAHub() {
@@ -72,13 +73,28 @@ export default function SPAHub() {
     setIsOnline,
     searchTerm,
     setSearchTerm,
+    isFilterOpen,
     setIsFilterOpen,
     manualDownload,
     manualUpload,
     isSyncing,
     filters,
     appSettings,
-    setAppSettings
+    setAppSettings,
+    locationOptions,
+    selectedLocations,
+    setSelectedLocations,
+    assigneeOptions,
+    selectedAssignees,
+    setSelectedAssignees,
+    conditionOptions,
+    selectedConditions,
+    setSelectedConditions,
+    statusOptions,
+    selectedStatuses,
+    setSelectedStatuses,
+    missingFieldFilter,
+    setMissingFieldFilter
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -139,6 +155,7 @@ export default function SPAHub() {
   };
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   return (
     <div className="app-container bg-black font-sans text-white">
@@ -146,6 +163,26 @@ export default function SPAHub() {
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={handleOnboardingComplete} />
+      
+      <AssetFilterSheet 
+        isOpen={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        isAdmin={isAdmin}
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        conditionOptions={conditionOptions}
+        selectedConditions={selectedConditions}
+        setSelectedConditions={setSelectedConditions}
+        statusOptions={statusOptions}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
+      />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-50 shrink-0">
@@ -211,10 +248,9 @@ export default function SPAHub() {
                         variant="ghost" 
                         size="icon" 
                         onClick={() => setIsFilterOpen(true)}
-                        className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", filters.length > 0 && "text-primary")}
+                        className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", isFilterOpen && "text-primary")}
                       >
                         <Filter className="h-3.5 w-3.5" />
-                        {filters.length > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full flex items-center justify-center border border-black"><span className="text-[6px] font-black text-black">{filters.length}</span></span>}
                       </Button>
                     )}
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-lg text-white/20 hover:text-white">
