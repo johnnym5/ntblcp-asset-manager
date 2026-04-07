@@ -3,6 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Phase 1005: Respects active data source for filtering and value discovery.
+ * Phase 1006: Added Manual Add trigger to header.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -30,7 +31,8 @@ import {
   ListFilter,
   Download,
   Upload,
-  Zap
+  Zap,
+  Plus
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -267,6 +269,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
           
           <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
               <ListFilter className="h-4 w-4" />
               {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}

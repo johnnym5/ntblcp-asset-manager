@@ -3,7 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1010: Implemented Project Switch Isolation Pulse.
- * Optimized for performance with high-speed computational caching and debouncing.
+ * Phase 1012: Integrated Drill-down pulses for Categories and Search.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -84,7 +84,7 @@ interface AppStateContextType {
 
   // Category Hub State
   selectedCategory: string | null;
-  setSelectedCategory: Dispatch<SetStateAction<string | null>>;
+  setSelectedCategory: (cat: string | null) => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -142,7 +142,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
 
   // Category Hub state
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategoryStatus] = useState<string | null>(null);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
@@ -195,6 +195,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       router.push(`/?${params.toString()}`, { scroll: false });
     }
   }, [router]);
+
+  const setSelectedCategory = useCallback((cat: string | null) => {
+    setSelectedCategoryStatus(cat);
+    if (cat) {
+      setActiveView('REGISTRY');
+    }
+  }, [setActiveView]);
 
   const refreshRegistry = useCallback(async () => {
     try {

@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
- * Phase 200: Implemented Group-aware notifications with surgical asset navigation.
+ * Phase 205: Integrated direct drill-down to Registry with ID search.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { 
   Sheet, 
   SheetContent, 
@@ -45,16 +45,16 @@ interface NotificationsCenterProps {
 
 export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCenterProps) {
   const { notifications, unreadCount } = useNotifications();
-  const { assets, setActiveView, setSearchTerm } = useAppState();
-  const { userProfile } = useAuth();
+  const { setActiveView, setSearchTerm } = useAppState();
 
   const handleNotificationClick = (n: any) => {
     if (n.assetId) {
       // 1. Mark as read
-      markAllAsRead(); // For simplicity in MVP, but can be targeted
+      markAllAsRead(); 
       
-      // 2. Drill down into the specific asset
-      setSearchTerm(n.assetId.split('-')[0]); // Search by short ID to find it
+      // 2. Drill down into the specific asset ID
+      const shortId = n.assetId.split('-')[0];
+      setSearchTerm(shortId); 
       setActiveView('REGISTRY');
       onOpenChange(false);
     }

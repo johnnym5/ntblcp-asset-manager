@@ -3,6 +3,7 @@
 /**
  * @fileOverview Dashboard Workstation - Unified Mission Control.
  * Phase 1100: Consolidated Folders and Anomalies into the Overview pulse.
+ * Phase 1105: Restored Ingestion triggers and action hub.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -16,7 +17,11 @@ import {
   FolderOpen,
   SearchCode,
   Zap,
-  ArrowRight
+  ArrowRight,
+  FileUp,
+  PlusCircle,
+  ScanSearch,
+  DatabaseZap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -27,14 +32,22 @@ import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
 import { DiscrepancyWorkstation } from './DiscrepancyWorkstation';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import AssetForm from '@/components/asset-form';
+import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
+import { enqueueMutation } from '@/offline/queue';
 
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { assets, appSettings } = useAppState();
+  const { assets, appSettings, setActiveView, refreshRegistry } = useAppState();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
+
   const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const anomalyCount = useMemo(() => {
@@ -62,7 +75,7 @@ export function DashboardWorkstation() {
 
         <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
+            <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-max-content">
               <TabsTrigger value="overview" className="px-10 md:px-12 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
                 Overview
               </TabsTrigger>
@@ -78,10 +91,35 @@ export function DashboardWorkstation() {
         <Tabs value={activeTab} className="w-full">
           <TabsContent value="overview" className="m-0 space-y-16 md:space-y-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
             
-            {/* 1. Stats & Quick Start */}
-            <AssetSummaryDashboard />
+            {/* 1. Quick Start & Action Hub */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-8">
+                <AssetSummaryDashboard />
+              </div>
+              
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-3xl">
+                  <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
+                      <DatabaseZap className="h-3.5 w-3.5" /> Data Orchestration
+                    </h4>
+                  </div>
+                  <CardContent className="p-6 space-y-3">
+                    <Button onClick={() => setIsFormOpen(true)} className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all justify-start px-6">
+                      <PlusCircle className="h-4 w-4 text-primary" /> Manual Add Record
+                    </Button>
+                    <Button onClick={() => setIsImportScanOpen(true)} className="w-full h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all justify-start px-6">
+                      <ScanSearch className="h-4 w-4 text-primary" /> Import Workbook
+                    </Button>
+                    <Button variant="ghost" onClick={() => setActiveView('IMPORT')} className="w-full h-14 rounded-2xl text-white/40 font-black uppercase text-[9px] tracking-widest gap-3 hover:text-white transition-all">
+                      <FileUp className="h-3.5 w-3.5" /> Manual Mapping Flow
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
             
-            {/* 2. Folders Workstation (Moved to Overview) */}
+            {/* 2. Folders Workstation */}
             <div id="folders-section" className="space-y-8">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-4">
@@ -93,7 +131,7 @@ export function DashboardWorkstation() {
               <AssetGroupsWorkstation isEmbedded={true} />
             </div>
 
-            {/* 3. Anomalies Workstation (Moved to Overview) */}
+            {/* 3. Anomalies Workstation */}
             <div id="anomalies-section" className="space-y-8">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-4">
@@ -134,6 +172,23 @@ export function DashboardWorkstation() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        isReadOnly={false} 
+        onSave={async (a) => {
+          await enqueueMutation('CREATE', 'assets', a);
+          await refreshRegistry();
+          setIsFormOpen(false);
+          toast({ title: "Asset Added Locally" });
+        }}
+      />
+
+      <ImportScannerDialog 
+        isOpen={isImportScanOpen} 
+        onOpenChange={setIsImportScanOpen} 
+      />
     </div>
   );
 }
