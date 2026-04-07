@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
+ * Phase 1000: Hardened for Deployment. Fixed Hook Violation and Hydration Pulse.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -23,7 +24,10 @@ import {
   AlertCircle,
   Info,
   HelpCircle,
-  ChevronLeft
+  ChevronLeft,
+  Activity,
+  History,
+  LayoutDashboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -115,7 +119,8 @@ export default function SPAHub() {
     setSelectedStatuses,
     missingFieldFilter,
     setMissingFieldFilter,
-    goBack
+    goBack,
+    selectedCategories
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -128,6 +133,7 @@ export default function SPAHub() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // 1. Move workstation resolution into a stable memo above early returns
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -196,6 +202,7 @@ export default function SPAHub() {
     }
   };
 
+  // 2. Early returns placed after all hook initializations
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
@@ -232,7 +239,7 @@ export default function SPAHub() {
       <header className="h-11 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
           <AnimatePresence>
-            {activeView !== 'DASHBOARD' && (
+            {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.button
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}

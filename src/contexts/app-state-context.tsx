@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
+ * Phase 1000: Hardened for deployment. Optimized initial download and settings pulse.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -117,11 +118,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
-  const [isOnline, setIsOnlineStatus] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('assetain-online-status');
-    return saved ? JSON.parse(saved) : true;
-  });
+  const [isOnline, setIsOnlineStatus] = useState(true);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -148,7 +146,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  useEffect(() => { setIsHydrated(true); }, []);
+  useEffect(() => { 
+    setIsHydrated(true);
+    const savedStatus = localStorage.getItem('assetain-online-status');
+    if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
+  }, []);
 
   useEffect(() => {
     if (!isHydrated) return;

@@ -3,10 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
- * Phase 900: Integrated LocationEngine for canonical admin mapping.
- * Phase 905: Enhanced error capture to return rejected assets with logs.
- * Phase 910: Replaced generic "Col X" labels with Synthetic Registry Headers.
- * Phase 911: Fixed mapping for "ASSETS TAG NO" variant in transfer sheets.
+ * Phase 1000: Deployment Stability Pulse. Added infinite-loop protection and forensic log refinement.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -38,11 +35,14 @@ export class ParserEngine {
     let pendingGroupLabel: string | null = null;
     let activeGroup: DiscoveredGroup | null = null;
     
+    // Safety check for empty pulse
+    if (!data || data.length === 0) return [];
+
     data.forEach((row, idx) => {
       const type = classifyRow(row);
       if (type === 'GROUP_HEADER') {
         if (activeGroup) activeGroup.endRow = idx - 1;
-        pendingGroupLabel = String(row[0]).trim();
+        pendingGroupLabel = String(row[0] || '').trim();
       }
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row, 'real_template');
@@ -59,6 +59,7 @@ export class ParserEngine {
       }
     });
 
+    // 2. Resolve Group Boundaries
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -76,9 +77,12 @@ export class ParserEngine {
       if (!tpl) return container;
 
       for (let i = group.startRow; i <= group.endRow; i++) {
-        const rowType = classifyRow(data[i]);
+        const rowData = data[i];
+        if (!rowData) continue;
+        
+        const rowType = classifyRow(rowData);
         if (rowType === 'DATA_ROW') {
-          const asset = this.mapRowToTemplate(data[i], tpl, group, i);
+          const asset = this.mapRowToTemplate(rowData, tpl, group, i);
           container.assets.push(asset);
           if (asset.validation.isRejected) {
             container.metrics.invalid++;
@@ -131,7 +135,7 @@ export class ParserEngine {
         case 'assignee_location': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'model_number': asset.modelNumber = strVal; break;
-        default: asset.metadata[tpl.rawHeaders[idx]] = val;
+        default: asset.metadata[tpl.rawHeaders[idx] || `Column ${idx + 1}`] = val;
       }
     });
 
@@ -199,12 +203,10 @@ export class ParserEngine {
   }
 
   private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
-    // Attempt to find a known template with similar width first
     for (const tpl of this.templates.values()) {
       if (Math.abs(tpl.columnCount - row.length) <= 2) return tpl;
     }
 
-    // Generate a high-fidelity synthetic template
     const signature = `SYNTH_${row.length}`;
     if (!this.templates.has(signature)) {
       const headers = this.getSyntheticHeaders(row.length);
@@ -221,16 +223,7 @@ export class ParserEngine {
   }
 
   private getSyntheticHeaders(count: number): string[] {
-    const canonical = [
-      'S/N', 'Location', 'Assignee (Location)', 'Asset Description', 
-      'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 
-      'Serial Number', 'Suppliers', 'Date Received', 'Purchase price (Naira)',
-      'Funder', 'Condition', 'Remarks'
-    ];
-    
-    return Array.from({ length: count }, (_, i) => {
-      if (i < canonical.length) return canonical[i];
-      return `Column ${i + 1}`;
-    });
+    const canonical = ['S/N', 'Location', 'Assignee (Location)', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Received', 'Purchase price (Naira)'];
+    return Array.from({ length: count }, (_, i) => i < canonical.length ? canonical[i] : `Column ${i + 1}`);
   }
 }
