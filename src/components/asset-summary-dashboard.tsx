@@ -3,6 +3,7 @@
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
  * Phase 500: Implemented interactive drill-down pulses for all metric nodes.
+ * Phase 501: Fixed Drill-down toggle bug and implemented Category/Regional health pulses.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -20,12 +21,17 @@ import {
     PlusCircle,
     ChevronDown,
     RefreshCw,
-    MousePointer2
+    MousePointer2,
+    MapPin,
+    Boxes,
+    ChevronRight,
+    Activity
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type DashboardView = 'stats' | 'insights';
@@ -90,7 +96,9 @@ export function AssetSummaryDashboard() {
         setSearchTerm,
         setMissingFieldFilter,
         setSelectedStatuses,
-        setSelectedConditions
+        setSelectedConditions,
+        setSelectedCategory,
+        setSelectedLocations
     } = useAppState();
     
     const [view, setView] = useState<DashboardView>('stats');
@@ -143,6 +151,28 @@ export function AssetSummaryDashboard() {
         };
     }, [assets]);
 
+    const categoryInsights = useMemo(() => {
+        const groups: Record<string, { total: number, verified: number }> = {};
+        assets.forEach(a => {
+            const cat = a.category || 'Uncategorized';
+            if (!groups[cat]) groups[cat] = { total: 0, verified: 0 };
+            groups[cat].total++;
+            if (a.status === 'VERIFIED') groups[cat].verified++;
+        });
+        return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+    }, [assets]);
+
+    const regionalInsights = useMemo(() => {
+        const regions: Record<string, { total: number, verified: number }> = {};
+        assets.forEach(a => {
+            const loc = a.location || 'Unknown';
+            if (!regions[loc]) regions[loc] = { total: 0, verified: 0 };
+            regions[loc].total++;
+            if (a.status === 'VERIFIED') regions[loc].verified++;
+        });
+        return Object.entries(regions).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+    }, [assets]);
+
     const navigateTo = (filter: () => void) => {
         filter();
         setActiveView('REGISTRY');
@@ -190,90 +220,178 @@ export function AssetSummaryDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                <StatCard 
-                    label="Audit Coverage" 
-                    value={metrics.coverage} 
-                    description={metrics.coverageDesc} 
-                    icon={ShieldCheck} 
-                    iconColor="text-green-500"
-                    onClick={() => navigateTo(() => setSelectedStatuses(['VERIFIED']))}
-                />
-                <StatCard 
-                    label="Assessments" 
-                    value={metrics.pending} 
-                    description={metrics.pendingDesc} 
-                    icon={Zap} 
-                    iconColor="text-primary"
-                    onClick={() => navigateTo(() => setSelectedStatuses(['UNVERIFIED']))}
-                />
-                <StatCard 
-                    label="Missing Tags" 
-                    value={metrics.missingId} 
-                    description={metrics.missingIdDesc} 
-                    icon={Tag} 
-                    iconColor="text-orange-500"
-                    onClick={() => navigateTo(() => setMissingFieldFilter('assetIdCode'))}
-                />
-                <StatCard 
-                    label="Serial Gaps" 
-                    value={metrics.missingSerial} 
-                    description={metrics.missingSerialDesc} 
-                    icon={Hash} 
-                    iconColor="text-blue-500"
-                    onClick={() => navigateTo(() => setMissingFieldFilter('serialNumber'))}
-                />
-                <StatCard 
-                    label="Loss Pulses" 
-                    value={metrics.critical} 
-                    description={metrics.criticalDesc} 
-                    icon={AlertCircle} 
-                    iconColor="text-destructive"
-                    isCritical
-                    onClick={() => navigateTo(() => setSelectedConditions(['Stolen', 'Burnt', 'Unsalvageable']))}
-                />
-                <StatCard 
-                    label="Maintenance" 
-                    value={metrics.maintenance} 
-                    description={metrics.maintenanceDesc} 
-                    icon={Wrench} 
-                    iconColor="text-orange-600"
-                    onClick={() => navigateTo(() => setSelectedConditions(['Bad condition']))}
-                />
-                <StatCard 
-                    label="Discrepancies" 
-                    value={metrics.exceptions} 
-                    description={metrics.exceptionsDesc} 
-                    icon={FileWarning} 
-                    iconColor="text-destructive"
-                    isCritical
-                    onClick={() => navigateTo(() => setSelectedStatuses(['DISCREPANCY']))}
-                />
-                <StatCard 
-                    label="Field Logs" 
-                    value={metrics.feedback} 
-                    description={metrics.feedbackDesc} 
-                    icon={MessageSquare} 
-                    iconColor="text-teal-500"
-                    onClick={() => navigateTo(() => setSearchTerm('remark'))}
-                />
-                <StatCard 
-                    label="Daily Pulse" 
-                    value={metrics.modified} 
-                    description={metrics.modifiedDesc} 
-                    icon={Clock} 
-                    iconColor="text-primary"
-                    onClick={() => navigateTo(() => setSearchTerm('today'))}
-                />
-                <StatCard 
-                    label="New Arrivals" 
-                    value={metrics.newInFlow} 
-                    description={metrics.newInFlowDesc} 
-                    icon={PlusCircle} 
-                    iconColor="text-green-600"
-                    onClick={() => navigateTo(() => setSearchTerm('new'))}
-                />
-            </div>
+            <AnimatePresence mode="wait">
+                {view === 'stats' ? (
+                    <motion.div 
+                        key="stats"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+                    >
+                        <StatCard 
+                            label="Audit Coverage" 
+                            value={metrics.coverage} 
+                            description={metrics.coverageDesc} 
+                            icon={ShieldCheck} 
+                            iconColor="text-green-500"
+                            onClick={() => navigateTo(() => setSelectedStatuses(['VERIFIED']))}
+                        />
+                        <StatCard 
+                            label="Assessments" 
+                            value={metrics.pending} 
+                            description={metrics.pendingDesc} 
+                            icon={Zap} 
+                            iconColor="text-primary"
+                            onClick={() => navigateTo(() => setSelectedStatuses(['UNVERIFIED']))}
+                        />
+                        <StatCard 
+                            label="Missing Tags" 
+                            value={metrics.missingId} 
+                            description={metrics.missingIdDesc} 
+                            icon={Tag} 
+                            iconColor="text-orange-500"
+                            onClick={() => navigateTo(() => setMissingFieldFilter('assetIdCode'))}
+                        />
+                        <StatCard 
+                            label="Serial Gaps" 
+                            value={metrics.missingSerial} 
+                            description={metrics.missingSerialDesc} 
+                            icon={Hash} 
+                            iconColor="text-blue-500"
+                            onClick={() => navigateTo(() => setMissingFieldFilter('serialNumber'))}
+                        />
+                        <StatCard 
+                            label="Loss Pulses" 
+                            value={metrics.critical} 
+                            description={metrics.criticalDesc} 
+                            icon={AlertCircle} 
+                            iconColor="text-destructive"
+                            isCritical
+                            onClick={() => navigateTo(() => setSelectedConditions(['Stolen', 'Burnt', 'Unsalvageable']))}
+                        />
+                        <StatCard 
+                            label="Maintenance" 
+                            value={metrics.maintenance} 
+                            description={metrics.maintenanceDesc} 
+                            icon={Wrench} 
+                            iconColor="text-orange-600"
+                            onClick={() => navigateTo(() => setSelectedConditions(['Bad condition']))}
+                        />
+                        <StatCard 
+                            label="Discrepancies" 
+                            value={metrics.exceptions} 
+                            description={metrics.exceptionsDesc} 
+                            icon={FileWarning} 
+                            iconColor="text-destructive"
+                            isCritical
+                            onClick={() => navigateTo(() => setSelectedStatuses(['DISCREPANCY']))}
+                        />
+                        <StatCard 
+                            label="Field Logs" 
+                            value={metrics.feedback} 
+                            description={metrics.feedbackDesc} 
+                            icon={MessageSquare} 
+                            iconColor="text-teal-500"
+                            onClick={() => navigateTo(() => setSearchTerm('remark'))}
+                        />
+                        <StatCard 
+                            label="Daily Pulse" 
+                            value={metrics.modified} 
+                            description={metrics.modifiedDesc} 
+                            icon={Clock} 
+                            iconColor="text-primary"
+                            onClick={() => navigateTo(() => setSearchTerm('today'))}
+                        />
+                        <StatCard 
+                            label="New Arrivals" 
+                            value={metrics.newInFlow} 
+                            description={metrics.newInFlowDesc} 
+                            icon={PlusCircle} 
+                            iconColor="text-green-600"
+                            onClick={() => navigateTo(() => setSearchTerm('new'))}
+                        />
+                    </motion.div>
+                ) : (
+                    <motion.div 
+                        key="insights"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+                    >
+                        <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="p-2 bg-primary/10 rounded-xl"><Boxes className="h-4 w-4 text-primary" /></div>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Category Integrity Pulse</h4>
+                            </div>
+                            <ScrollArea className="h-[400px] pr-4">
+                                <div className="space-y-2">
+                                    {categoryInsights.map(([cat, data]) => {
+                                        const percent = Math.round((data.verified / data.total) * 100);
+                                        return (
+                                            <div 
+                                                key={cat} 
+                                                onClick={() => { setSelectedCategory(cat); setActiveView('REGISTRY'); }}
+                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:bg-primary/[0.02] transition-all cursor-pointer flex items-center justify-between"
+                                            >
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="flex items-center justify-between pr-4">
+                                                        <span className="text-[11px] font-black uppercase text-white/80">{cat}</span>
+                                                        <span className="text-[9px] font-mono font-bold text-primary">{data.verified} / {data.total}</span>
+                                                    </div>
+                                                    <Progress value={percent} className="h-1 bg-white/5" />
+                                                </div>
+                                                <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-primary transition-all ml-4" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </Card>
+
+                        <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="p-2 bg-primary/10 rounded-xl"><MapPin className="h-4 w-4 text-primary" /></div>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Top Regional Activity</h4>
+                            </div>
+                            <ScrollArea className="h-[400px] pr-4">
+                                <div className="space-y-2">
+                                    {regionalInsights.map(([loc, data]) => {
+                                        const percent = Math.round((data.verified / data.total) * 100);
+                                        return (
+                                            <div 
+                                                key={loc} 
+                                                onClick={() => { setSelectedLocations([loc]); setActiveView('REGISTRY'); }}
+                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:bg-primary/[0.02] transition-all cursor-pointer flex items-center justify-between"
+                                            >
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-[10px] text-white/20 group-hover:text-primary transition-colors">
+                                                        {loc.substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[11px] font-black uppercase text-white/80">{loc}</span>
+                                                            <span className={cn("text-[9px] font-black uppercase", percent === 100 ? "text-green-500" : "text-white/40")}>{percent}% COMPLETE</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Activity className="h-2.5 w-2.5 text-primary opacity-40" />
+                                                            <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{data.total} Registered Nodes</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-primary transition-all ml-4" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </Card>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

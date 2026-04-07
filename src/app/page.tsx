@@ -5,6 +5,7 @@
  * Optimized for RBAC and Location-Aware Pulse filtering.
  * Phase 400: Integrated Discrepancy Review Workstation.
  * Phase 401: Replaced navigation toggle with Global Spotlight Search Pulse.
+ * Phase 402: Refined Search Bar UI for high-fidelity Spotlight-style interaction.
  */
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
@@ -67,10 +68,6 @@ export default function SPAHub() {
   const { unreadCount } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  const anomalyCount = useMemo(() => {
-    return assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
-  }, [assets]);
-
   const scopedAssets = useMemo(() => {
     if (!userProfile) return [];
     if (userProfile.isAdmin || userProfile.states.includes('All')) return assets;
@@ -104,7 +101,7 @@ export default function SPAHub() {
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40 shrink-0">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-50 shrink-0">
           <div className="flex items-center gap-6">
             {activeView !== 'DASHBOARD' ? (
               <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse">
@@ -128,7 +125,7 @@ export default function SPAHub() {
             <input 
               type="text"
               placeholder="Search Registry, Folders or Anomalies... (⌘K)"
-              className="w-full h-12 bg-white/[0.03] border border-white/5 rounded-2xl pl-12 pr-32 text-sm font-medium focus:outline-none focus:border-primary/20 focus:bg-white/[0.05] transition-all placeholder:text-white/10"
+              className="w-full h-12 bg-white/[0.03] border border-white/5 rounded-2xl pl-12 pr-32 text-sm font-medium focus:outline-none focus:border-primary/20 focus:bg-white/[0.05] transition-all placeholder:text-white/10 shadow-2xl focus:shadow-primary/5"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
