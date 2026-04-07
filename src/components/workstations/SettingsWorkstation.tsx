@@ -3,10 +3,10 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 310: Restored missing Global Admin settings and implemented Sheet Ledger.
+ * Phase 311: Restored Help Tooltips and Onboarding Reset pulses.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -40,7 +40,9 @@ import {
   Check,
   Columns,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Info,
+  Smartphone
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,11 +60,9 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
-import { TravelReportDialog } from '@/components/travel-report-dialog';
 import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import AssetForm from '@/components/asset-form';
 import { enqueueMutation } from '@/offline/queue';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { addNotification } from '@/hooks/use-notifications';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
@@ -74,16 +74,6 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
   const { 
@@ -104,7 +94,6 @@ export function SettingsWorkstation() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
 
@@ -217,7 +206,7 @@ export function SettingsWorkstation() {
             </Card>
           </section>
 
-          {/* Global Admin Settings Section (Restored) */}
+          {/* Global Admin Settings Section */}
           {isAdmin && (
             <section>
               <SectionTitle title="Global Admin" description="Registry authority & lifecycle" icon={ShieldCheck} />
@@ -259,6 +248,36 @@ export function SettingsWorkstation() {
               </Card>
             </section>
           )}
+
+          {/* Interface Toggles */}
+          <section>
+            <SectionTitle title="Interface Logic" description="Help & Guidance preferences" icon={Info} />
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="divide-y divide-white/5 space-y-8">
+                <div className="flex items-center justify-between pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-black uppercase text-white">Help Tooltips</Label>
+                    <p className="text-[10px] text-white/40 italic">Show descriptive popups when hovering over technical controls.</p>
+                  </div>
+                  <Switch 
+                    checked={appSettings.showHelpTooltips} 
+                    onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)}
+                    className="data-[state=checked]:bg-primary"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-8">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-black uppercase text-white">Reset Onboarding</Label>
+                    <p className="text-[10px] text-white/40 italic">Show the Welcome Experience tour again on next login.</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => handleSettingChange('onboardingComplete', false)} className="h-9 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest border border-white/10 hover:bg-white/5 text-white/60">
+                    Reset Pulse
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </section>
 
           {/* Appearance Section */}
           <section>
@@ -316,23 +335,21 @@ export function SettingsWorkstation() {
                   </div>
                 </div>
                 <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
-                  {/* Sheet List Ledger (Restored) */}
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
                       <Columns className="h-3 w-3" /> Indexed Sheets / Categories
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
-                        Object.entries(grant.sheetDefinitions).map(([name, def]) => (
-                          <div key={name} className="flex items-center justify-between p-4 bg-black/40 border border-white/10 rounded-2xl group transition-all hover:border-primary/20">
-                            <span className="text-xs font-black uppercase text-white/80">{name}</span>
-                            <div className="flex items-center gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => handleEditSchema(grant.id, def)} className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg"><Wrench className="h-4 w-4" /></button>
-                              <button className="p-2 hover:bg-white/10 rounded-lg"><Eye className="h-4 w-4" /></button>
-                            </div>
+                      {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
+                        <div key={name} className="flex items-center justify-between p-4 bg-black/40 border border-white/10 rounded-2xl group transition-all hover:border-primary/20">
+                          <span className="text-xs font-black uppercase text-white/80">{name}</span>
+                          <div className="flex items-center gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleEditSchema(grant.id, def)} className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg"><Wrench className="h-4 w-4" /></button>
+                            <button className="p-2 hover:bg-white/10 rounded-lg"><Eye className="h-4 w-4" /></button>
                           </div>
-                        ))
-                      ) : (
+                        </div>
+                      ))}
+                      {Object.keys(grant.sheetDefinitions || {}).length === 0 && (
                         <div className="col-span-2 py-12 text-center border-2 border-dashed border-white/5 rounded-3xl opacity-20">
                           <p className="text-[10px] font-black uppercase tracking-widest">No definitions staged.</p>
                         </div>
