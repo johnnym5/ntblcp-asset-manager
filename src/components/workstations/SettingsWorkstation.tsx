@@ -80,7 +80,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 
 export function SettingsWorkstation() {
@@ -108,6 +107,7 @@ export function SettingsWorkstation() {
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +155,7 @@ export function SettingsWorkstation() {
   const handleEditSchema = (grantId: string, sheetDef: SheetDefinition) => {
     setActiveGrantIdForSchema(grantId);
     setSelectedSheetDef(sheetDef);
+    setOriginalSheetName(sheetDef.name);
     setIsColumnSheetOpen(true);
   };
 
@@ -326,7 +327,7 @@ export function SettingsWorkstation() {
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          originalSheetName={selectedSheetDef.name}
+          originalSheetName={originalSheetName}
           onSave={(orig, newDef, all) => {
             if (!appSettings) return;
             const updatedGrants = appSettings.grants.map(grant => {

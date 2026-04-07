@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 1000: Deployment Stability Pulse. Fixed Purge logic and Selection Parity.
+ * Phase 1000: Deployment Stability Pulse. Resolved Card ReferenceError and Selection Parity.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Card } from '@/components/ui/card';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
@@ -76,8 +77,6 @@ import {
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { Asset } from '@/types/domain';
 
-const ITEMS_PER_PAGE_OPTIONS = [25, 50, 100];
-
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     assets, 
@@ -103,9 +102,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsFilterOpen,
     isSortOpen,
     setIsSortOpen,
-    manualDownload,
-    manualUpload,
-    isSyncing,
     itemsPerPage,
     setItemsPerPage
   } = useAppState();
