@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -122,7 +121,7 @@ const TOPICS: HelpTopic[] = [
     whatItDoes: "Show only the records you need by narrowing the list.",
     whenToUse: "Use filters when the list is too long or you want to focus on a specific group.",
     howToUse: [
-      "Open the Logic Engine panel.",
+      "Open the filter panel.",
       "Choose one or more fields (like State or Condition).",
       "Apply the filter to update the view.",
       "Clear individual chips or 'Purge' to see all records again."

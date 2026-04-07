@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -61,7 +60,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Find exactly what you need",
-    description: "Use filters and sort options to narrow the list by location, section, condition, or any technical field.",
+    description: "Use filters and sort options to narrow the list by location, section, condition, sheet, or any available field.",
     icon: Search,
     benefits: [
       "Filter by source sheet or batch",

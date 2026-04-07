@@ -1,8 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Pending Sync - Waiting Cloud Updates.
+ * Phase 45: Integrated Retry pulse for failed sync operations.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -76,6 +76,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
+  const [isRetryingId, setIsRetryingId] = useState<string | null>(null);
 
   const isAdvanced = appSettings?.uxMode === 'advanced';
 
@@ -109,15 +110,6 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
     setSelectedIds(next);
   };
 
-  const handleSelectGroup = (items: OfflineQueueEntry[], checked: boolean) => {
-    const next = new Set(selectedIds);
-    items.forEach(item => {
-      if (checked) next.add(item.id);
-      else next.delete(item.id);
-    });
-    setSelectedIds(next);
-  };
-
   const handlePushSelected = async () => {
     if (!isOnline) {
       toast({ variant: "destructive", title: "No Connection", description: "Internet required to sync changes." });
@@ -147,9 +139,29 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   };
 
   const handleRetry = async (entry: OfflineQueueEntry) => {
-    await storage.updateQueueEntry({ ...entry, status: 'PENDING', error: undefined });
-    toast({ title: "Retrying..." });
-    loadQueue();
+    if (!isOnline) {
+      toast({ variant: "destructive", title: "Offline", description: "Cannot retry while disconnected." });
+      return;
+    }
+    
+    setIsRetryingId(entry.id);
+    try {
+      // 1. Reset status to pending to allow processor to take it
+      const resetEntry: OfflineQueueEntry = { ...entry, status: 'PENDING', error: undefined };
+      await storage.updateQueueEntry(resetEntry);
+      
+      // 2. Immediate execution attempt
+      await processSelectedSyncQueue([entry.id]);
+      
+      await refreshRegistry();
+      await loadQueue();
+      
+      toast({ title: "Retry Pulse Applied", description: "Operation successfully broadcast to Cloud." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Retry Failed", description: "The anomaly persists in the cloud link." });
+    } finally {
+      setIsRetryingId(null);
+    }
   };
 
   const pendingCount = queue.filter(q => q.status === 'PENDING').length;
@@ -170,23 +182,32 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <h5 className="text-[13px] font-black uppercase tracking-tight text-white truncate leading-none">
-              {(entry.payload as any).description || 'Update'}
+              {(entry.payload as any).description || 'Record update'}
             </h5>
             <Badge variant="outline" className={cn(
               "h-4 px-1.5 text-[7px] font-black uppercase tracking-[0.2em] rounded-md",
-              entry.operation === 'CREATE' ? "text-green-500 border-green-500/20" : "text-primary border-primary/20"
-            )}>{entry.operation}</Badge>
+              entry.status === 'FAILED' ? "text-red-500 border-red-500/20 bg-red-500/5" :
+              entry.operation === 'CREATE' ? "text-green-500 border-green-500/20 bg-green-500/5" : "text-primary border-primary/20"
+            )}>{entry.status === 'FAILED' ? 'FAILED' : entry.operation}</Badge>
           </div>
           <div className="flex items-center gap-4 mt-2 text-[8px] font-bold text-white/20 uppercase">
             <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
+            {entry.error && <span className="text-red-500 italic truncate max-w-[200px]">{entry.error}</span>}
           </div>
         </div>
 
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {entry.status === 'FAILED' && (
-            <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} className="h-8 w-8 rounded-lg bg-white/5 hover:bg-primary/10 text-primary">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+          {(entry.status === 'FAILED' || entry.status === 'PENDING') && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} disabled={isRetryingId === entry.id} className="h-8 w-8 rounded-lg bg-white/5 hover:bg-primary/10 text-primary">
+                    {isRetryingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Attempt to send this change again</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           <Button variant="ghost" size="icon" onClick={() => storage.dequeue(entry.id).then(loadQueue)} className="h-8 w-8 rounded-lg bg-white/5 text-destructive/40 hover:text-destructive hover:bg-destructive/10">
             <Trash2 className="h-4 w-4" />
@@ -207,14 +228,14 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Sync Hub' : 'Connection'}</h3>
+              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Sync Status' : 'Cloud Link'}</h3>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                {isOnline ? 'Online with Cloud' : 'Working Offline'}
+                {isOnline ? 'Online Pulse Active' : 'Offline Regional Scope'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10 shadow-inner">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Connect to Cloud</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Connect</span>
             <Switch checked={isOnline} onCheckedChange={setIsOnline} className="data-[state=checked]:bg-green-500" />
           </div>
         </div>
@@ -224,38 +245,24 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-8">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Pending Pulses' : 'Waiting Changes'}</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Pending' : 'Waiting'}</span>
                   <span className="text-3xl font-black tabular-nums text-white">{pendingCount}</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Exceptions' : 'Errors'}</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Failures' : 'Errors'}</span>
                   <span className="text-3xl font-black tabular-nums text-red-600">{failedCount}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
-                        <Download className="h-4 w-4 mr-2" /> Fetch
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Download latest records from the cloud.</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
+                  <Download className="h-4 w-4 mr-2" /> Sync Down
+                </Button>
                 
                 {selectedIds.size > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button onClick={handlePushSelected} disabled={isSyncing || !isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-105">
-                          {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
-                          Sync {selectedIds.size}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Upload selected changes to the cloud database.</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Button onClick={handlePushSelected} disabled={isSyncing || !isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-105">
+                    {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
+                    Sync {selectedIds.size}
+                  </Button>
                 )}
               </div>
             </div>
@@ -279,7 +286,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                 onClick={() => setIsFullViewOpen(true)}
                 className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-primary hover:bg-primary/10 transition-all"
               >
-                See all {queue.length} items <ChevronRight className="h-4 w-4" />
+                Review all {queue.length} <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -296,9 +303,9 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                   <Activity className="h-8 w-8 text-primary" />
                 </div>
                 <div className="space-y-1">
-                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Pending Sync</DialogTitle>
+                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Pending Sync Log</DialogTitle>
                   <DialogDescription className="text-[10px] font-bold uppercase text-white/40 tracking-[0.3em]">
-                    Review and send your local changes to the cloud.
+                    Review the chronological order of local changes.
                   </DialogDescription>
                 </div>
               </div>
@@ -317,15 +324,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                   className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
                 />
                 <label htmlFor="pop-select-all" className="text-[11px] font-black uppercase tracking-widest text-primary/80 cursor-pointer">
-                  {selectedIds.size > 0 ? `${selectedIds.size} Items Selected` : 'Select all pending items'}
+                  {selectedIds.size > 0 ? `${selectedIds.size} Changes Staged` : 'Select all pending changes'}
                 </label>
               </div>
               
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-3">
-                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Remove Selection</Button>
+                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Discard Selection</Button>
                   <Button onClick={handlePushSelected} disabled={!isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
-                    Sync Selected
+                    Broadast Changes
                   </Button>
                 </div>
               )}
@@ -359,7 +366,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><FileEdit className="h-5 w-5" /></div>
-                            <h4 className="text-sm font-black uppercase text-white leading-none">Record Updates ({opGroups.UPDATE.length})</h4>
+                            <h4 className="text-sm font-black uppercase text-white leading-none">Record Edits ({opGroups.UPDATE.length})</h4>
                           </div>
                         </div>
                       </AccordionTrigger>
@@ -376,7 +383,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 bg-red-500/10 rounded-xl text-red-500"><Eraser className="h-5 w-5" /></div>
-                            <h4 className="text-sm font-black uppercase text-white leading-none">Deleted Records ({opGroups.DELETE.length})</h4>
+                            <h4 className="text-sm font-black uppercase text-white leading-none">Deletions ({opGroups.DELETE.length})</h4>
                           </div>
                         </div>
                       </AccordionTrigger>
@@ -393,10 +400,10 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
             <div className="p-8 bg-white/[0.02] border-t border-white/5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4 text-[10px] font-bold text-white/40 uppercase italic max-w-sm">
                 <Info className="h-4 w-4 text-primary shrink-0" />
-                <p>Changes are sent to the cloud in the same order they were made to keep data accurate.</p>
+                <p>Changes are broadcast sequentially to maintain the audit trail's structural integrity.</p>
               </div>
               <Button variant="ghost" onClick={() => setIsFullViewOpen(false)} className="h-14 px-12 rounded-2xl font-black uppercase text-[11px] tracking-[0.25em] bg-white/5 hover:bg-white/10 text-white">
-                Close
+                Dismiss Panel
               </Button>
             </div>
           </div>

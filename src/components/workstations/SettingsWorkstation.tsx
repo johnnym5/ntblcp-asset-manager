@@ -3,8 +3,8 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1010: Integrated Project Switch Reset Pulse.
  * Phase 1011: Renamed Auditors to Users and merged Database into Resilience.
+ * Phase 1012: Integrated guidance explanations and UX mode toggles.
  */
 
 import React, { useState } from 'react';
@@ -45,7 +45,9 @@ import {
   PlaneTakeoff,
   AlertTriangle,
   FolderOpen,
-  Settings2
+  Settings2,
+  HelpCircle,
+  GraduationCap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,7 +66,7 @@ import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
-import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
+import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -188,12 +190,22 @@ export function SettingsWorkstation() {
     return <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
+  const SectionTitle = ({ title, description, icon: Icon }: { title: string, description: string, icon: any }) => (
+    <div className="space-y-1 px-1 mb-6">
+      <div className="flex items-center gap-3">
+        <Icon className="h-5 w-5 text-primary" />
+        <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{title}</h3>
+      </div>
+      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{description}</p>
+    </div>
+  );
+
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in duration-700 pb-40">
       <div className="flex items-center justify-between px-1 mb-10">
         <div className="space-y-1">
           <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
-          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest mt-1">Administrative Control Hub</p>
+          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest mt-1">Operational Control Hub</p>
         </div>
         <button 
           onClick={() => setActiveView('DASHBOARD')}
@@ -231,100 +243,100 @@ export function SettingsWorkstation() {
         </div>
 
         <TabsContent value="general" className="space-y-12 m-0 outline-none">
-          <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Appearance</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Palette className="h-4 w-4 text-primary" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Theme Selection</span>
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Sun className="h-4 w-4" /> Light</Button>
-                  <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button>
-                  <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Database className="h-4 w-4" /> System</Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Reporting</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase text-white leading-none">Travel Report Generator</h4>
-                  <p className="text-[10px] text-white/40 italic">Compile field verification findings into a professional Word document.</p>
-                </div>
-                <Button onClick={() => setIsTravelReportOpen(true)} variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2.5 border-white/10 text-white hover:bg-white/5 transition-all">
-                  <PlaneTakeoff className="h-4 w-4 text-primary" /> Create Travel Report
-                </Button>
-              </div>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Security</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
-              <div className="space-y-8">
-                <div className="flex items-center gap-3">
-                  <KeyRound className="h-4 w-4 text-primary" />
-                  <h4 className="text-xs font-black uppercase tracking-widest text-white/80">Update Your Passphrase</h4>
-                </div>
-                
-                <div className="space-y-6">
+          <div className="space-y-10">
+            <section>
+              <SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Current Passphrase</Label>
-                    <Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} placeholder="•••••" className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">New Passphrase</Label>
-                    <Input type="password" value={passwords.next} onChange={e => setPasswords({...passwords, next: e.target.value})} className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Confirm New Passphrase</Label>
-                    <Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
-                  </div>
-                  
-                  <Button onClick={() => toast({title: "Security Staged"})} className="h-12 bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl shadow-xl shadow-primary/20">
-                    Stage Pulse Change
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {isAdmin && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Governance</h3>
-              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
-                <div className="flex items-center justify-between pt-0 pb-4">
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase text-white leading-none">Application Mode</h4>
-                    <p className="text-[10px] text-white/40 italic">
-                      {appSettings.appMode === 'verification' ? 'Verification: Users can update status/remarks.' : 'Management: Restricted logic pulse.'}
+                    <h4 className="text-sm font-black uppercase text-white">Usage Mode</h4>
+                    <p className="text-[11px] text-white/40 leading-relaxed italic">
+                      {appSettings.uxMode === 'beginner' 
+                        ? "Beginner: Expanded explanations and guided steps are shown throughout the app."
+                        : "Advanced: Minimal guidance, higher density views, and faster shortcuts are enabled."}
                     </p>
                   </div>
-                  <Select value={appSettings.appMode} onValueChange={v => handleSettingChange('appMode', v as any)}>
-                    <SelectTrigger className="w-40 h-11 rounded-xl bg-black border-2 border-white/10 text-[10px] font-black uppercase tracking-widest shadow-inner">
+                  <Select value={appSettings.uxMode} onValueChange={v => handleSettingChange('uxMode', v as UXMode)}>
+                    <SelectTrigger className="h-14 rounded-xl bg-black border-2 border-white/10 font-black uppercase text-[10px] tracking-widest">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-black border-white/10 rounded-xl">
-                      <SelectItem value="management" className="text-[10px] font-black uppercase text-white">Management</SelectItem>
-                      <SelectItem value="verification" className="text-[10px] font-black uppercase text-white">Verification</SelectItem>
+                      <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
+                      <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center justify-between pt-8">
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase text-white leading-none">Lock Asset List</h4>
-                    <p className="text-[10px] text-white/40 italic">Prevent adding/deleting from main list.</p>
+              </Card>
+            </section>
+
+            <section>
+              <SectionTitle title="Appearance" description="Visual surface & identity" icon={Palette} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Palette className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Theme selection</span>
                   </div>
-                  <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
+                  <div className="flex flex-wrap gap-4">
+                    <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Sun className="h-4 w-4" /> Light</Button>
+                    <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button>
+                    <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Database className="h-4 w-4" /> System</Button>
+                  </div>
                 </div>
               </Card>
-            </div>
-          )}
+            </section>
+
+            <section>
+              <SectionTitle title="Guided Assistance" description="Help center & tips" icon={HelpCircle} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
+                <div className="flex items-center justify-between pb-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Contextual Tooltips</h4>
+                    <p className="text-[10px] text-white/40 italic">Show short hints when hovering over buttons.</p>
+                  </div>
+                  <Switch checked={appSettings.showHelpTooltips} onCheckedChange={v => handleSettingChange('showHelpTooltips', v)} className="data-[state=checked]:bg-primary" />
+                </div>
+                <div className="flex items-center justify-between pt-8">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Onboarding Restart</h4>
+                    <p className="text-[10px] text-white/40 italic">Show the welcome tour again on next reload.</p>
+                  </div>
+                  <Button variant="ghost" onClick={() => handleSettingChange('onboardingComplete', false)} className="text-[10px] font-black uppercase text-primary hover:bg-primary/10 h-10 px-4 rounded-lg">Reset Tour</Button>
+                </div>
+              </Card>
+            </section>
+
+            {isAdmin && (
+              <section>
+                <SectionTitle title="Global Governance" description="Project-wide integrity rules" icon={Lock} />
+                <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
+                  <div className="flex items-center justify-between pt-0 pb-4">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black uppercase text-white leading-none">Application Mode</h4>
+                      <p className="text-[10px] text-white/40 italic">
+                        {appSettings.appMode === 'verification' ? 'Verification: Users can update status/remarks.' : 'Management: Restricted logic pulse.'}
+                      </p>
+                    </div>
+                    <Select value={appSettings.appMode} onValueChange={v => handleSettingChange('appMode', v as any)}>
+                      <SelectTrigger className="w-40 h-11 rounded-xl bg-black border-2 border-white/10 text-[10px] font-black uppercase tracking-widest shadow-inner">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10 rounded-xl">
+                        <SelectItem value="management" className="text-[10px] font-black uppercase text-white">Management</SelectItem>
+                        <SelectItem value="verification" className="text-[10px] font-black uppercase text-white">Verification</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between pt-8">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black uppercase text-white leading-none">Lock Asset List</h4>
+                      <p className="text-[10px] text-white/40 italic">Prevent non-admins from adding or deleting records from the main list.</p>
+                    </div>
+                    <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
+                  </div>
+                </section>
+              )}
+          </div>
 
           <div className="p-10 rounded-[3rem] bg-destructive/5 border-2 border-destructive/20 shadow-3xl flex items-center justify-between gap-8 group hover:bg-destructive/[0.02] transition-all">
             <div className="space-y-1">
@@ -334,7 +346,7 @@ export function SettingsWorkstation() {
               <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
             </div>
             <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all">
-              Reset local workspace
+              Reset workspace
             </Button>
           </div>
         </TabsContent>

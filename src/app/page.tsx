@@ -3,7 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Consolidated for production: eliminates sub-pages to reduce build size and memory footprint.
- * Refined for Responsive Fidelity.
+ * Refined for Responsive Fidelity & Interactive Guidance.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -25,7 +25,8 @@ import {
   RefreshCw,
   LayoutDashboard,
   Filter,
-  ShieldAlert
+  ShieldAlert,
+  HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -56,6 +57,9 @@ import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from '@/hooks/use-mobile';
+import { WelcomeExperience } from '@/components/WelcomeExperience';
+import { HelpCenter } from '@/components/HelpCenter';
+import { storage } from '@/offline/storage';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -70,14 +74,33 @@ export default function SPAHub() {
     manualDownload,
     manualUpload,
     isSyncing,
-    filters
+    filters,
+    appSettings,
+    setAppSettings
   } = useAppState();
   
   const isMobile = useIsMobile();
   const { unreadCount } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (profileSetupComplete && appSettings && !appSettings.onboardingComplete) {
+      setIsWelcomeOpen(true);
+    }
+  }, [profileSetupComplete, appSettings]);
+
+  const handleOnboardingComplete = async () => {
+    setIsWelcomeOpen(false);
+    if (appSettings) {
+      const nextSettings = { ...appSettings, onboardingComplete: true };
+      setAppSettings(nextSettings);
+      await storage.saveSettings(nextSettings);
+    }
+  };
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -113,21 +136,32 @@ export default function SPAHub() {
     }
   };
 
+  const showTooltips = appSettings?.showHelpTooltips !== false;
+
   return (
     <div className="app-container bg-black font-sans text-white">
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
+      <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
+      <WelcomeExperience isOpen={isWelcomeOpen} onComplete={handleOnboardingComplete} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-50 shrink-0">
           <div className="flex items-center gap-2 sm:gap-4">
-            <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2.5 p-1.5 sm:p-2 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary group tactile-pulse">
-              <Boxes className="h-5 w-5" />
-              <div className="flex flex-col text-left">
-                <h1 className="text-xs sm:text-sm font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
-                <span className="text-[6px] sm:text-[7px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control Hub</span>
-              </div>
-            </button>
+            <TooltipProvider disableHoverableContent={!showTooltips}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2.5 p-1.5 sm:p-2 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary group tactile-pulse">
+                    <Boxes className="h-5 w-5" />
+                    <div className="flex flex-col text-left">
+                      <h1 className="text-xs sm:text-sm font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
+                      <span className="text-[6px] sm:text-[7px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Control Hub</span>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-[10px] font-black uppercase">Return to Overview Dashboard</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           <div className="flex-1 flex items-center justify-center mx-2 sm:mx-12">
@@ -142,7 +176,7 @@ export default function SPAHub() {
                   className="flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
                 >
                   <Search className="h-3.5 w-3.5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Global Spotlight Search</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Registry Search</span>
                   {!isMobile && (
                     <div className="flex items-center gap-1 ml-4 px-1 py-0.5 rounded-md bg-white/5 border border-white/5 text-[7px] font-black opacity-40">
                       <span>⌘</span>
@@ -163,7 +197,7 @@ export default function SPAHub() {
                     ref={searchInputRef}
                     autoFocus
                     type="text"
-                    placeholder={isMobile ? "Search..." : "Registry Search..."}
+                    placeholder={isMobile ? "Search..." : "Quick Search Records..."}
                     className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-12 sm:pr-24 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
@@ -192,33 +226,44 @@ export default function SPAHub() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5">
-              <TooltipProvider>
+              <TooltipProvider disableHoverableContent={!showTooltips}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
                       <Download className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="text-[9px] font-black uppercase">Fetch Cloud State</TooltipContent>
+                  <TooltipContent className="text-[9px] font-black uppercase">Fetch latest from Cloud</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <TooltipProvider>
+              <TooltipProvider disableHoverableContent={!showTooltips}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
                       <Upload className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="text-[9px] font-black uppercase">Push Local Updates</TooltipContent>
+                  <TooltipContent className="text-[9px] font-black uppercase">Push changes to Cloud</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
 
-            <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 sm:gap-2 group tactile-pulse px-1 sm:px-2">
-              <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-              <span className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? (isMobile ? 'ON' : 'Online') : (isMobile ? 'OFF' : 'Offline')}</span>
-            </button>
+            <TooltipProvider disableHoverableContent={!showTooltips}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 sm:gap-2 group tactile-pulse px-1 sm:px-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+                    <span className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? (isMobile ? 'ON' : 'Online') : (isMobile ? 'OFF' : 'Offline')}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[9px] font-black uppercase">{isOnline ? 'System is connected' : 'Working in local scope'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
+            <button onClick={() => setIsHelpOpen(true)} className="p-2 bg-white/5 rounded-lg text-white/40 hover:text-primary transition-all">
+              <HelpCircle className="h-4 w-4" />
+            </button>
+
             <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-all">
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-red-600 rounded-full flex items-center justify-center border-2 border-black"><span className="text-[7px] font-black text-white">!</span></div>}
@@ -242,7 +287,7 @@ export default function SPAHub() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('ALERTS')} className="p-2.5 rounded-lg focus:bg-destructive focus:text-white m-1">
                   <ShieldAlert className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">Alerts</span>
+                  <span className="text-[10px] font-black uppercase">Critical Alerts</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
