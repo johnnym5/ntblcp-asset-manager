@@ -3,7 +3,6 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Consolidated for production: eliminates sub-pages to reduce build size and memory footprint.
- * Phase 1200: Integrated GIS and Alerts into the primary workstation switch.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -25,7 +24,6 @@ import {
   RefreshCw,
   LayoutDashboard,
   Filter,
-  Navigation,
   ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,7 +37,6 @@ import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
-import { GISWorkstation } from '@/components/workstations/GISWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
@@ -109,7 +106,6 @@ export default function SPAHub() {
       case 'VERIFY': return <VerifyWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />;
-      case 'GIS': return <GISWorkstation />;
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
@@ -237,10 +233,6 @@ export default function SPAHub() {
                 <DropdownMenuItem onClick={() => setActiveView('REGISTRY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
                   <Boxes className="mr-2 h-3.5 w-3.5" />
                   <span className="text-[10px] font-black uppercase">Registry</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveView('GIS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                  <Navigation className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">GIS Hub</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('ALERTS')} className="p-2.5 rounded-lg focus:bg-destructive focus:text-white m-1">
                   <ShieldAlert className="mr-2 h-3.5 w-3.5" />

@@ -1,14 +1,13 @@
 /**
  * @fileOverview Registry Integrity Engine.
  * Provides high-performance heuristics for identifying data quality gaps and critical alerts.
- * Phase 64: Added Coordinate Precision and Fidelity Gap scanners.
  */
 
 import type { Asset } from '@/types/domain';
 
 export interface IntegrityIssue {
   id: string;
-  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH' | 'UNOPTIMIZED_MEDIA' | 'TACTICAL_ALERT' | 'COORDINATE_DRIFT' | 'FIDELITY_GAP';
+  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH' | 'UNOPTIMIZED_MEDIA' | 'TACTICAL_ALERT' | 'FIDELITY_GAP';
   severity: 'CRITICAL' | 'WARNING' | 'INFO';
   description: string;
   affectedIds: string[];
@@ -59,20 +58,7 @@ export const IntegrityEngine = {
       }
     });
 
-    // 3. Coordinate Drift (Low Precision Geotags)
-    const lowPrecision = assets.filter(a => a.geotag && a.geotag.accuracy > 50);
-    if (lowPrecision.length > 0) {
-      issues.push({
-        id: 'coordinate-drift',
-        type: 'COORDINATE_DRIFT',
-        severity: 'WARNING',
-        description: `${lowPrecision.length} assets have low-precision spatial anchors (>50m drift).`,
-        affectedIds: lowPrecision.map(a => a.id),
-        suggestedFix: "Re-anchor GPS coordinates in an open-sky environment."
-      });
-    }
-
-    // 4. Fidelity Gaps (High-Value items missing evidence)
+    // 3. Fidelity Gaps (High-Value items missing evidence)
     const fidelityGaps = assets.filter(a => a.value > 1000000 && !a.photoUrl && !a.photoDataUri);
     if (fidelityGaps.length > 0) {
       issues.push({
@@ -85,7 +71,7 @@ export const IntegrityEngine = {
       });
     }
 
-    // 5. Inconsistent Location Casing
+    // 4. Inconsistent Location Casing
     const locationVariants = new Map<string, Set<string>>();
     assets.forEach(a => {
       if (a.location) {
@@ -109,7 +95,7 @@ export const IntegrityEngine = {
       }
     });
 
-    // 6. Hierarchy Gaps
+    // 5. Hierarchy Gaps
     const missingHierarchy = assets.filter(a => !a.section || a.section === 'General' || !a.subsection);
     if (missingHierarchy.length > 0) {
       issues.push({
@@ -123,32 +109,5 @@ export const IntegrityEngine = {
     }
 
     return issues;
-  },
-
-  /**
-   * Standardizes location strings to Title Case.
-   */
-  standardizeLocation(loc: string): string {
-    return loc
-      .trim()
-      .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  },
-
-  /**
-   * Calculates a holistic health score (0-100) based on identified issues.
-   */
-  calculateFidelityScore(assets: Asset[], issues: IntegrityIssue[]): number {
-    if (assets.length === 0) return 100;
-    
-    let penalty = 0;
-    issues.forEach(issue => {
-      const weight = issue.severity === 'CRITICAL' ? 10 : issue.severity === 'WARNING' ? 5 : 2;
-      penalty += weight;
-    });
-
-    return Math.max(0, 100 - penalty);
   }
 };

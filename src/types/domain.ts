@@ -30,7 +30,6 @@ export type WorkstationView =
   | 'INFRASTRUCTURE' 
   | 'DATABASE' 
   | 'SETTINGS'
-  | 'GIS'
   | 'ANOMALIES';
 
 export interface SectionHierarchy {
@@ -45,13 +44,6 @@ export interface ImportMetadata {
   sheetName: string;
   rowNumber: number;
   importedAt: string;
-}
-
-export interface Geotag {
-  lat: number;
-  lng: number;
-  accuracy: number;
-  timestamp: string;
 }
 
 export interface ConditionAuditEntry {
@@ -141,7 +133,6 @@ export interface Asset {
   supplier?: string;
   remarks?: string;
   
-  geotag?: Geotag;
   classification?: AssetClassification;
 
   hierarchy: SectionHierarchy;
