@@ -85,8 +85,9 @@ const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count,
 export function AssetSummaryDashboard() {
     const { 
         assets, 
-        refreshRegistry, 
+        manualDownload, 
         isSyncing, 
+        isOnline,
         setActiveView,
         setSearchTerm,
         setSelectedStatuses,
@@ -154,7 +155,13 @@ export function AssetSummaryDashboard() {
                             Drill-down
                         </button>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={refreshRegistry} className="rounded-xl h-12 w-12 bg-white/5 border border-white/5 text-white/40 hover:text-primary">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={manualDownload} 
+                        disabled={isSyncing || !isOnline}
+                        className="rounded-xl h-12 w-12 bg-white/5 border border-white/5 text-white/40 hover:text-primary"
+                    >
                         <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
                     </Button>
                 </div>

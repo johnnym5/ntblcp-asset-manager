@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -23,7 +22,8 @@ import {
   ScanSearch,
   DatabaseZap,
   Settings,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -48,7 +48,7 @@ import {
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { assets, appSettings, setActiveView } = useAppState();
+  const { assets, appSettings, setActiveView, manualDownload, isSyncing, isOnline } = useAppState();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
@@ -78,15 +78,26 @@ export function DashboardWorkstation() {
             </div>
           </div>
 
-          <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl shrink-0">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
-              <TabsTrigger value="overview" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="inventory" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
-                Inventory
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex items-center gap-3">
+            <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl shrink-0">
+              <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
+                <TabsTrigger value="overview" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="inventory" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+                  Inventory
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={manualDownload} 
+              disabled={isSyncing || !isOnline}
+              className="rounded-xl h-12 w-12 bg-white/5 border border-white/5 text-white/40 hover:text-primary shrink-0"
+            >
+              <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
+            </Button>
           </div>
         </div>
       </div>
