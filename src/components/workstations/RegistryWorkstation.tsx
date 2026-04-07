@@ -25,7 +25,8 @@ import {
   FolderOpen,
   Boxes,
   PlusCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Settings
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -88,7 +89,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSortDir,
     selectedCategory,
     setSelectedCategory,
-    isOnline
+    isOnline,
+    activeGrantId
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -108,6 +110,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   // Category Hub state
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // 1. Data Intelligence
+  const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
+  const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
   // Filter & Sort Pulse
   const processedAssets = useMemo(() => {
@@ -193,7 +199,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   };
 
   const handleAddCategory = async (name: string) => {
-    if (!name.trim() || !appSettings) return;
+    if (!name.trim() || !appSettings || !activeGrantId) return;
     setIsProcessing(true);
     
     const newSheet: SheetDefinition = {
@@ -208,17 +214,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       ]
     };
 
-    const nextSettings = {
-      ...appSettings,
-      sheetDefinitions: { ...appSettings.sheetDefinitions, [name.trim()]: newSheet },
-      enabledSheets: [...appSettings.enabledSheets, name.trim()]
-    };
+    const nextGrants = appSettings.grants.map(g => {
+      if (g.id === activeGrantId) {
+        return {
+          ...g,
+          sheetDefinitions: { ...g.sheetDefinitions, [name.trim()]: newSheet },
+          enabledSheets: [...g.enabledSheets, name.trim()]
+        };
+      }
+      return g;
+    });
+
+    const nextSettings = { ...appSettings, grants: nextGrants };
 
     try {
       await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings({ grants: nextGrants });
       setAppSettings(nextSettings);
-      toast({ title: "Category Identity Created" });
+      toast({ title: "Category Created" });
     } finally {
       setIsProcessing(false);
     }
@@ -227,12 +240,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const handleExportCategory = async (category: string) => {
     const categoryAssets = assets.filter(a => a.category === category);
     if (categoryAssets.length === 0) {
-      toast({ variant: "destructive", title: "Empty Pulse", description: "No records found in this category." });
+      toast({ variant: "destructive", title: "Empty Group", description: "No records found in this category." });
       return;
     }
     try {
-      await ExcelService.exportRegistry(categoryAssets, headers, `${category}-Audit-Pulse.xlsx`);
-      toast({ title: "Batch Export Complete" });
+      await ExcelService.exportRegistry(categoryAssets, headers, `${category}-Export.xlsx`);
+      toast({ title: "Export Complete" });
     } catch (e) {
       toast({ variant: "destructive", title: "Export Failure" });
     }
@@ -250,7 +263,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       const currentLocal = await storage.getAssets();
       await storage.saveAssets(currentLocal.filter(a => a.category !== category));
       await refreshRegistry();
-      toast({ title: "Category Purged", description: `Removed ${categoryAssets.length} records from registry.` });
+      toast({ title: "Group Purged", description: `Removed ${categoryAssets.length} records.` });
     } finally {
       setIsProcessing(false);
     }
@@ -269,7 +282,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
           <div className="space-y-0.5">
             <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Inventory Registry</h2>
-            <p className="text-[9px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Technical Browse</p>
+            <p className="text-[9px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Technical Data Browse</p>
           </div>
         </div>
 
@@ -277,7 +290,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <div className="relative group flex-1 lg:min-w-[320px]">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder="Search registry..." 
+              placeholder="Search active scope..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-12 md:h-14 pl-11 rounded-xl bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 text-sm"
@@ -297,13 +310,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
-      {/* Registry Metric Bar */}
+      {/* Registry Metric Bar & Category Dropdown */}
       <div className="px-1 flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 shrink-0">
         <Badge variant="outline" className="h-8 px-4 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest whitespace-nowrap">
-          {processedAssets.length} RECORDS
+          {processedAssets.length} RECORDS IN PULSE
         </Badge>
         
-        {/* Category Hub Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="h-8 px-4 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[9px] tracking-widest whitespace-nowrap gap-2 hover:text-white hover:border-primary/20 transition-all">
@@ -313,15 +325,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64 bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white">
-            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest px-3 py-2 opacity-40">Registry Hub</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest px-3 py-2 opacity-40">Group Orchestrator</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
               <Database className="h-4 w-4 opacity-40" />
-              <span className="text-[11px] font-black uppercase">All records</span>
+              <span className="text-[11px] font-black uppercase">Overall Scope</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-white/5" />
             
             <ScrollArea className="h-64">
-              {Object.keys(appSettings?.sheetDefinitions || {}).sort().map(cat => (
+              {categories.map(cat => (
                 <DropdownMenuSub key={cat}>
                   <DropdownMenuSubTrigger className="rounded-xl p-3 focus:bg-primary/10 gap-3">
                     <Boxes className="h-4 w-4 opacity-40" />
@@ -331,7 +343,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <DropdownMenuSubContent className="bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white w-56">
                       <DropdownMenuItem onClick={() => setSelectedCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
                         <ChevronRight className="h-4 w-4 text-primary" />
-                        <span className="text-[11px] font-black uppercase">View Inventory</span>
+                        <span className="text-[11px] font-black uppercase">Focus Group</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleExportCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
                         <FileSpreadsheet className="h-4 w-4 text-green-500" />
@@ -340,8 +352,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       {isAdmin && (
                         <>
                           <DropdownMenuItem onClick={() => { setSelectedCategory(cat); setIsHeaderManagerOpen(true); }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                            <Settings2 className="h-4 w-4 text-primary" />
-                            <span className="text-[11px] font-black uppercase">Edit Layout</span>
+                            <Settings className="h-4 w-4 text-primary" />
+                            <span className="text-[11px] font-black uppercase">Edit Setup</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-white/5" />
                           <DropdownMenuItem onClick={() => handleWipeCategory(cat)} className="rounded-xl p-3 focus:bg-red-600/10 text-red-500 gap-3">
@@ -361,7 +373,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setIsAddCategoryOpen(true)} className="rounded-xl p-3 focus:bg-primary/10 gap-3 text-primary">
                   <PlusCircle className="h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">Provision New Group</span>
+                  <span className="text-[11px] font-black uppercase">Create New Group</span>
                 </DropdownMenuItem>
               </>
             )}
@@ -429,7 +441,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </AnimatePresence>
 
-      {/* Category Creation Dialog */}
+      {/* Provision Category Dialog */}
       <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
         <DialogContent className="max-w-md bg-black border-white/10 rounded-[2.5rem] shadow-3xl text-white">
           <DialogHeader>
@@ -440,7 +452,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Group Title</Label>
               <Input 
-                placeholder="e.g. INVERTER BATTERIES, PRINTERS..." 
+                placeholder="e.g. LAPTOPS, VEHICLES..." 
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 className="h-14 bg-white/5 border-white/10 rounded-2xl font-black uppercase text-sm focus-visible:ring-primary/20"
