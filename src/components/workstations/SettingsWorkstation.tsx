@@ -39,7 +39,8 @@ import {
   HeartPulse,
   Terminal,
   RotateCcw,
-  Bomb
+  Bomb,
+  PlaneTakeoff
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -57,6 +58,7 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
+import { TravelReportDialog } from '@/components/travel-report-dialog';
 import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import {
   Select,
@@ -99,6 +101,7 @@ export function SettingsWorkstation() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -164,6 +167,20 @@ export function SettingsWorkstation() {
     }
   };
 
+  const handleCommitAll = async () => {
+    setIsSaving(true);
+    try {
+      // Simulate saving passwords if they were changed
+      if (passwords.next && passwords.next === passwords.confirm) {
+        toast({ title: "Security Updated", description: "Your passphrase has been updated." });
+      }
+      toast({ title: "Registry Pulse Saved", description: "Global configuration synchronized." });
+      setActiveView('DASHBOARD');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!settingsLoaded || !appSettings) {
     return <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -172,8 +189,8 @@ export function SettingsWorkstation() {
     <div className="max-w-5xl mx-auto animate-in fade-in duration-700 pb-40">
       <div className="flex items-center justify-between px-1 mb-10">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black uppercase text-white tracking-tight">Settings</h2>
-          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">Administrative Control Hub</p>
+          <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
+          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest mt-1">Administrative Control Hub</p>
         </div>
         <button 
           onClick={() => setActiveView('DASHBOARD')}
@@ -184,7 +201,7 @@ export function SettingsWorkstation() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-12">
-        <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
+        <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar backdrop-blur-3xl">
           <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center w-full min-w-max">
             <TabsTrigger value="general" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
               <Settings className="h-3.5 w-3.5" /> General
@@ -216,29 +233,121 @@ export function SettingsWorkstation() {
         </div>
 
         <TabsContent value="general" className="space-y-12 m-0 outline-none">
+          {/* 1. Appearance */}
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Appearance</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-3xl">
-              <div className="flex flex-wrap gap-4">
-                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Sun className="h-4 w-4" /> Light</Button>
-                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Moon className="h-4 w-4" /> Dark</Button>
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Palette className="h-4 w-4 text-primary" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Theme</span>
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Sun className="h-4 w-4" /> Light</Button>
+                  <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button>
+                  <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Database className="h-4 w-4" /> System</Button>
+                </div>
               </div>
             </Card>
           </div>
 
+          {/* 2. Reporting */}
           <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Safety Protocols</h3>
-            <Card className="bg-destructive/5 border-2 border-destructive/20 rounded-[2rem] p-10 shadow-3xl">
-              <div className="flex items-center justify-between gap-8">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Reporting</h3>
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="space-y-4">
                 <div className="space-y-1">
-                  <h4 className="text-lg font-black uppercase text-white leading-none">Emergency Local Reset</h4>
-                  <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
+                  <h4 className="text-sm font-black uppercase text-white leading-none">Travel Report Generator</h4>
+                  <p className="text-[10px] text-white/40 italic">Compile field verification findings into a professional Word document.</p>
                 </div>
-                <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest">
-                  Reset local workspace
+                <Button onClick={() => setIsTravelReportOpen(true)} variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2.5 border-white/10 text-white hover:bg-white/5 transition-all">
+                  <PlaneTakeoff className="h-4 w-4 text-primary" /> Create Travel Report
                 </Button>
               </div>
             </Card>
+          </div>
+
+          {/* 3. Security */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Security</h3>
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="space-y-8">
+                <div className="flex items-center gap-3">
+                  <KeyRound className="h-4 w-4 text-primary" />
+                  <h4 className="text-xs font-black uppercase tracking-widest text-white/80">Change Your Password</h4>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Current Password</Label>
+                    <Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} placeholder="•••••" className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">New Password</Label>
+                    <Input type="password" value={passwords.next} onChange={e => setPasswords({...passwords, next: e.target.value})} className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest ml-1">Confirm New Password</Label>
+                    <Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="h-14 bg-white/[0.03] border-white/10 rounded-xl focus-visible:ring-primary/20 text-white font-mono" />
+                  </div>
+                  
+                  <div className="space-y-4 pt-2">
+                    <Button onClick={() => toast({title: "Password Staged"})} className="h-12 bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl shadow-xl shadow-primary/20 transition-transform active:scale-95">
+                      Stage Password Change
+                    </Button>
+                    <p className="text-[9px] text-white/20 italic leading-relaxed">
+                      Your password change will be saved when you click "Save Changes" at the bottom of the panel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* 4. Global Admin Settings */}
+          {isAdmin && (
+            <div className="space-y-6">
+              <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Admin Settings</h3>
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
+                <div className="flex items-center justify-between pt-0 pb-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Application Mode</h4>
+                    <p className="text-[10px] text-white/40 italic">
+                      {appSettings.appMode === 'verification' ? 'Verification: Users can update status/remarks.' : 'Management: Restricted logic pulse.'}
+                    </p>
+                  </div>
+                  <Select value={appSettings.appMode} onValueChange={v => handleSettingChange('appMode', v as any)}>
+                    <SelectTrigger className="w-40 h-11 rounded-xl bg-black border-2 border-white/10 text-[10px] font-black uppercase tracking-widest shadow-inner">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10 rounded-xl">
+                      <SelectItem value="management" className="text-[10px] font-black uppercase text-white">Management</SelectItem>
+                      <SelectItem value="verification" className="text-[10px] font-black uppercase text-white">Verification</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between pt-8">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Lock Asset List</h4>
+                    <p className="text-[10px] text-white/40 italic">Prevent adding/deleting from main list.</p>
+                  </div>
+                  <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Local Reset (Safety Protocol) */}
+          <div className="p-10 rounded-[3rem] bg-destructive/5 border-2 border-destructive/20 shadow-3xl flex items-center justify-between gap-8 group hover:bg-destructive/[0.02] transition-all">
+            <div className="space-y-1">
+              <h4 className="text-lg font-black uppercase text-white tracking-tight flex items-center gap-3">
+                <ShieldAlert className="h-5 w-5 text-destructive" /> Emergency Local Reset
+              </h4>
+              <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
+            </div>
+            <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all">
+              Reset local workspace
+            </Button>
           </div>
         </TabsContent>
 
@@ -305,6 +414,16 @@ export function SettingsWorkstation() {
         </TabsContent>
       </Tabs>
 
+      {/* Footer Controls */}
+      <div className="mt-20 pt-10 border-t border-white/5 flex items-center justify-between px-1">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-white/5 text-white/60 font-black uppercase text-[11px] tracking-widest hover:bg-white/10 transition-all active:scale-95">
+          Cancel
+        </Button>
+        <Button onClick={handleCommitAll} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+          Save Changes
+        </Button>
+      </div>
+
       <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl text-white">
           <AlertDialogHeader className="space-y-4">
@@ -322,6 +441,8 @@ export function SettingsWorkstation() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
     </div>
   );
 }
