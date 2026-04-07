@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   MapPin,
   Terminal,
-  SearchCode
+  SearchCode,
+  LayoutDashboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -116,12 +117,8 @@ export default function SPAHub() {
           </div>
 
           <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5">
+            <button onClick={() => setActiveView('DASHBOARD')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'DASHBOARD' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Dashboard</button>
             <button onClick={() => setActiveView('REGISTRY')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Inventory</button>
-            <button onClick={() => setActiveView('GROUPS')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'GROUPS' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Folders</button>
-            <button onClick={() => setActiveView('ANOMALIES')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2", activeView === 'ANOMALIES' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>
-              Anomalies
-              {anomalyCount > 0 && <span className="h-4 w-4 rounded-full bg-red-600 text-[8px] font-black flex items-center justify-center text-white animate-pulse">{anomalyCount}</span>}
-            </button>
           </div>
 
           <div className="flex items-center gap-4">

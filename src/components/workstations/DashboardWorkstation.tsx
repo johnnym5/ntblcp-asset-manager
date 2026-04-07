@@ -5,14 +5,16 @@
  * Optimized for mobile-first stacking and responsive spacing.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   LayoutDashboard,
   Boxes,
   ShieldCheck,
   Activity,
   FileText,
-  History
+  History,
+  FolderOpen,
+  SearchCode
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -21,16 +23,21 @@ import { RegistryWorkstation } from './RegistryWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
+import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
+import { DiscrepancyWorkstation } from './DiscrepancyWorkstation';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-type DashboardTab = 'dashboard' | 'inventory';
+type DashboardTab = 'overview' | 'inventory' | 'folders' | 'anomalies';
 
 export function DashboardWorkstation() {
-  const { isOnline, isSyncing, appSettings } = useAppState();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
+  const { assets, appSettings } = useAppState();
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
   const isAdvanced = appSettings?.uxMode === 'advanced';
+
+  const anomalyCount = useMemo(() => {
+    return assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
+  }, [assets]);
 
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in duration-700 max-w-[1600px] mx-auto pb-40">
@@ -54,11 +61,18 @@ export function DashboardWorkstation() {
         <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
-              <TabsTrigger value="dashboard" className="px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+              <TabsTrigger value="overview" className="px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
                 Overview
               </TabsTrigger>
               <TabsTrigger value="inventory" className="px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
-                Asset Categories
+                Categories
+              </TabsTrigger>
+              <TabsTrigger value="folders" className="px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+                Folders
+              </TabsTrigger>
+              <TabsTrigger value="anomalies" className="px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap flex items-center gap-2">
+                Anomalies
+                {anomalyCount > 0 && <span className="h-4 w-4 rounded-full bg-red-600 text-[8px] font-black flex items-center justify-center text-white animate-pulse">{anomalyCount}</span>}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -67,7 +81,7 @@ export function DashboardWorkstation() {
 
       <div className="min-h-0">
         <Tabs value={activeTab} className="w-full">
-          <TabsContent value="dashboard" className="m-0 space-y-12 md:space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <TabsContent value="overview" className="m-0 space-y-12 md:space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <AssetSummaryDashboard />
             
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 md:gap-12 items-start px-1">
@@ -99,6 +113,14 @@ export function DashboardWorkstation() {
 
           <TabsContent value="inventory" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <RegistryWorkstation viewAll />
+          </TabsContent>
+
+          <TabsContent value="folders" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <AssetGroupsWorkstation />
+          </TabsContent>
+
+          <TabsContent value="anomalies" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <DiscrepancyWorkstation />
           </TabsContent>
         </Tabs>
       </div>
