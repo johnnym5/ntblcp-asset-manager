@@ -3,8 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1018: Wired Manual Add, Template Import, and Scan & Import triggers.
- * Phase 1019: Optimized Sticky Header Pulse for adaptive cage layout.
+ * Phase 1020: Unified Tabs root to prevent 'TabsList must be used within Tabs' error.
  */
 
 import React, { useState, useRef } from 'react';
@@ -44,7 +43,8 @@ import {
   HelpCircle,
   GraduationCap,
   DatabaseZap,
-  Type
+  Type,
+  Check
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -225,10 +225,13 @@ export function SettingsWorkstation() {
   );
 
   return (
-    <div className="animate-in fade-in duration-700 h-full flex flex-col relative">
+    <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative">
       
-      {/* Sticky Settings Header */}
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-6 px-1 border-b border-white/5 mb-8 -mx-1">
+      {/* 
+          Workstation Sticky Header:
+          Persistent within the enclosed window shell.
+      */}
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-6 px-1 border-b border-white/5 mb-8 -mx-1 shrink-0">
         <div className="flex flex-col gap-6 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -271,263 +274,261 @@ export function SettingsWorkstation() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 pt-4">
-        <Tabs defaultValue="general" className="space-y-12">
-          <TabsContent value="general" className="space-y-12 m-0 outline-none">
-            <div className="space-y-10">
+      <div className="flex-1 min-h-0 pt-4 overflow-y-auto custom-scrollbar pb-40">
+        <TabsContent value="general" className="space-y-12 m-0 outline-none">
+          <div className="space-y-10">
+            <section>
+              <SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-black uppercase text-white">Usage Mode</h4>
+                    <p className="text-[11px] text-white/40 leading-relaxed italic">
+                      {appSettings.uxMode === 'beginner' 
+                        ? "Beginner: Expanded explanations and guided steps are shown throughout the app."
+                        : "Advanced: Minimal guidance, higher density views, and faster shortcuts are enabled."}
+                    </p>
+                  </div>
+                  <Select value={appSettings.uxMode} onValueChange={v => handleSettingChange('uxMode', v as UXMode)}>
+                    <SelectTrigger className="h-14 rounded-xl bg-black border-2 border-white/10 font-black uppercase text-[10px] tracking-widest">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10 rounded-xl">
+                      <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
+                      <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </Card>
+            </section>
+
+            <section>
+              <SectionTitle title="Appearance" description="Visual surface & identity" icon={Palette} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Palette className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Theme selection</span>
+                  </div>
+                  <div className="flex flex-wrap gap-4">
+                    <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Sun className="h-4 w-4" /> Light</Button>
+                    <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button>
+                    <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Database className="h-4 w-4" /> System</Button>
+                  </div>
+                </div>
+              </Card>
+            </section>
+
+            <section>
+              <SectionTitle title="Guided Assistance" description="Help center & tips" icon={HelpCircle} />
+              <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
+                <div className="flex items-center justify-between pb-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Contextual Tooltips</h4>
+                    <p className="text-[10px] text-white/40 italic">Show short hints when hovering over buttons.</p>
+                  </div>
+                  <Switch checked={appSettings.showHelpTooltips} onCheckedChange={v => handleSettingChange('showHelpTooltips', v)} className="data-[state=checked]:bg-primary" />
+                </div>
+                <div className="flex items-center justify-between pt-8">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-white leading-none">Onboarding Restart</h4>
+                    <p className="text-[10px] text-white/40 italic">Show the welcome tour again on next reload.</p>
+                  </div>
+                  <Button variant="ghost" onClick={() => handleSettingChange('onboardingComplete', false)} className="text-[10px] font-black uppercase text-primary hover:bg-primary/10 h-10 px-4 rounded-lg">Reset Tour</Button>
+                </div>
+              </Card>
+            </section>
+
+            {isAdmin && (
               <section>
-                <SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} />
-                <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-black uppercase text-white">Usage Mode</h4>
-                      <p className="text-[11px] text-white/40 leading-relaxed italic">
-                        {appSettings.uxMode === 'beginner' 
-                          ? "Beginner: Expanded explanations and guided steps are shown throughout the app."
-                          : "Advanced: Minimal guidance, higher density views, and faster shortcuts are enabled."}
+                <SectionTitle title="Global Governance" description="Project-wide integrity rules" icon={Lock} />
+                <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
+                  <div className="flex items-center justify-between pt-0 pb-4">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-black uppercase text-white leading-none">Application Mode</h4>
+                      <p className="text-[10px] text-white/40 italic">
+                        {appSettings.appMode === 'verification' ? 'Verification: Users can update status/remarks.' : 'Management: Restricted logic pulse.'}
                       </p>
                     </div>
-                    <Select value={appSettings.uxMode} onValueChange={v => handleSettingChange('uxMode', v as UXMode)}>
-                      <SelectTrigger className="h-14 rounded-xl bg-black border-2 border-white/10 font-black uppercase text-[10px] tracking-widest">
+                    <Select value={appSettings.appMode} onValueChange={v => handleSettingChange('appMode', v as any)}>
+                      <SelectTrigger className="w-40 h-11 rounded-xl bg-black border-2 border-white/10 text-[10px] font-black uppercase tracking-widest shadow-inner">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-black border-white/10 rounded-xl">
-                        <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
-                        <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
+                        <SelectItem value="management" className="text-[10px] font-black uppercase text-white">Management</SelectItem>
+                        <SelectItem value="verification" className="text-[10px] font-black uppercase text-white">Verification</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </Card>
-              </section>
-
-              <section>
-                <SectionTitle title="Appearance" description="Visual surface & identity" icon={Palette} />
-                <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Palette className="h-4 w-4 text-primary" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Theme selection</span>
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Sun className="h-4 w-4" /> Light</Button>
-                      <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Moon className="h-4 w-4" /> Dark</Button>
-                      <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3 shadow-lg"><Database className="h-4 w-4" /> System</Button>
-                    </div>
-                  </div>
-                </Card>
-              </section>
-
-              <section>
-                <SectionTitle title="Guided Assistance" description="Help center & tips" icon={HelpCircle} />
-                <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
-                  <div className="flex items-center justify-between pb-4">
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-black uppercase text-white leading-none">Contextual Tooltips</h4>
-                      <p className="text-[10px] text-white/40 italic">Show short hints when hovering over buttons.</p>
-                    </div>
-                    <Switch checked={appSettings.showHelpTooltips} onCheckedChange={v => handleSettingChange('showHelpTooltips', v)} className="data-[state=checked]:bg-primary" />
-                  </div>
                   <div className="flex items-center justify-between pt-8">
                     <div className="space-y-1">
-                      <h4 className="text-sm font-black uppercase text-white leading-none">Onboarding Restart</h4>
-                      <p className="text-[10px] text-white/40 italic">Show the welcome tour again on next reload.</p>
+                      <h4 className="text-sm font-black uppercase text-white leading-none">Lock Asset List</h4>
+                      <p className="text-[10px] text-white/40 italic">Prevent non-admins from adding or deleting records from the main list.</p>
                     </div>
-                    <Button variant="ghost" onClick={() => handleSettingChange('onboardingComplete', false)} className="text-[10px] font-black uppercase text-primary hover:bg-primary/10 h-10 px-4 rounded-lg">Reset Tour</Button>
+                    <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
                   </div>
                 </Card>
               </section>
+            )}
+          </div>
 
-              {isAdmin && (
-                <section>
-                  <SectionTitle title="Global Governance" description="Project-wide integrity rules" icon={Lock} />
-                  <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl space-y-8 divide-y divide-white/5">
-                    <div className="flex items-center justify-between pt-0 pb-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-black uppercase text-white leading-none">Application Mode</h4>
-                        <p className="text-[10px] text-white/40 italic">
-                          {appSettings.appMode === 'verification' ? 'Verification: Users can update status/remarks.' : 'Management: Restricted logic pulse.'}
-                        </p>
-                      </div>
-                      <Select value={appSettings.appMode} onValueChange={v => handleSettingChange('appMode', v as any)}>
-                        <SelectTrigger className="w-40 h-11 rounded-xl bg-black border-2 border-white/10 text-[10px] font-black uppercase tracking-widest shadow-inner">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-black border-white/10 rounded-xl">
-                          <SelectItem value="management" className="text-[10px] font-black uppercase text-white">Management</SelectItem>
-                          <SelectItem value="verification" className="text-[10px] font-black uppercase text-white">Verification</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center justify-between pt-8">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-black uppercase text-white leading-none">Lock Asset List</h4>
-                        <p className="text-[10px] text-white/40 italic">Prevent non-admins from adding or deleting records from the main list.</p>
-                      </div>
-                      <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
-                    </div>
-                  </Card>
-                </section>
-              )}
+          <div className="p-10 rounded-[3rem] bg-destructive/5 border-2 border-destructive/20 shadow-3xl flex items-center justify-between gap-8 group hover:bg-destructive/[0.02] transition-all">
+            <div className="space-y-1">
+              <h4 className="text-lg font-black uppercase text-white tracking-tight flex items-center gap-3">
+                <ShieldAlert className="h-5 w-5 text-destructive" /> Emergency Local Reset
+              </h4>
+              <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
             </div>
+            <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all">
+              Reset workspace
+            </Button>
+          </div>
+        </TabsContent>
 
-            <div className="p-10 rounded-[3rem] bg-destructive/5 border-2 border-destructive/20 shadow-3xl flex items-center justify-between gap-8 group hover:bg-destructive/[0.02] transition-all">
-              <div className="space-y-1">
-                <h4 className="text-lg font-black uppercase text-white tracking-tight flex items-center gap-3">
-                  <ShieldAlert className="h-5 w-5 text-destructive" /> Emergency Local Reset
-                </h4>
-                <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
-              </div>
-              <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all">
-                Reset workspace
+        <TabsContent value="groups" className="m-0 outline-none space-y-10 px-1">
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Manage Projects (Grants)</h3>
+            <div className="flex gap-3">
+              <Input 
+                placeholder="New project name..." 
+                value={newProjectName} 
+                onChange={(e) => setNewProjectName(e.target.value)} 
+                className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white placeholder:text-white/20" 
+              />
+              <Button 
+                onClick={handleAddProject} 
+                disabled={!newProjectName.trim()} 
+                className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4" /> Add Project
               </Button>
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="groups" className="m-0 outline-none space-y-10 px-1">
-            <div className="space-y-6">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Manage Projects (Grants)</h3>
-              <div className="flex gap-3">
-                <Input 
-                  placeholder="New project name..." 
-                  value={newProjectName} 
-                  onChange={(e) => setNewProjectName(e.target.value)} 
-                  className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white placeholder:text-white/20" 
-                />
-                <Button 
-                  onClick={handleAddProject} 
-                  disabled={!newProjectName.trim()} 
-                  className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"
+          <Accordion type="single" collapsible className="space-y-4">
+            {appSettings.grants.map((grant) => {
+              const isActive = activeGrantId === grant.id;
+              const categories = Object.keys(grant.sheetDefinitions || {});
+              
+              return (
+                <AccordionItem 
+                  key={grant.id} 
+                  value={grant.id}
+                  className={cn(
+                    "border-2 transition-all duration-500 rounded-[1.5rem] overflow-hidden bg-black",
+                    isActive ? "border-primary/40 shadow-2xl" : "border-white/5"
+                  )}
                 >
-                  <PlusCircle className="h-4 w-4" /> Add Project
-                </Button>
-              </div>
-            </div>
-
-            <Accordion type="single" collapsible className="space-y-4">
-              {appSettings.grants.map((grant) => {
-                const isActive = activeGrantId === grant.id;
-                const categories = Object.keys(grant.sheetDefinitions || {});
-                
-                return (
-                  <AccordionItem 
-                    key={grant.id} 
-                    value={grant.id}
-                    className={cn(
-                      "border-2 transition-all duration-500 rounded-[1.5rem] overflow-hidden bg-black",
-                      isActive ? "border-primary/40 shadow-2xl" : "border-white/5"
-                    )}
-                  >
-                    <div className="flex items-center justify-between bg-black">
-                      <div className="flex-1">
-                        <AccordionTrigger className="hover:no-underline p-6 border-none group/trigger justify-start gap-4 [&>svg]:hidden">
-                          <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0 group-hover/trigger:text-primary transition-colors" />
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
-                            {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
-                          </div>
-                        </AccordionTrigger>
-                      </div>
-                      
-                      <div className="flex items-center gap-6 px-6 shrink-0">
-                        {!isActive && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={(e) => { e.stopPropagation(); setActiveGrantId(grant.id); }}
-                            disabled={isSyncing}
-                            className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-primary hover:text-black transition-all"
-                          >
-                            {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
-                          </Button>
-                        )}
-                        <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors" onClick={(e) => e.stopPropagation()}>Rename</button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteProject(grant.id); }}
-                          className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
-                      <div className="space-y-4">
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions for this Project</h4>
-                        <div className="p-10 border-2 border-dashed border-white/5 rounded-2xl bg-black/40 flex items-center justify-center">
-                          {categories.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
-                              {categories.map(sheetName => (
-                                <div key={sheetName} className="flex items-center justify-between p-4 bg-black/60 border border-white/10 rounded-xl group/sheet hover:border-primary/20 transition-all">
-                                  <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                    className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
-                                  >
-                                    <Settings2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] font-black uppercase tracking-widest text-white/20">No sheets defined for this project.</p>
-                          )}
+                  <div className="flex items-center justify-between bg-black pr-6">
+                    <div className="flex-1">
+                      <AccordionTrigger className="hover:no-underline p-6 border-none group/trigger justify-start gap-4 [&>svg]:hidden">
+                        <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0 group-hover/trigger:text-primary transition-colors" />
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                          {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Button onClick={() => setIsAssetFormOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                          <PlusCircle className="h-4 w-4" /> Add Manually
+                      </AccordionTrigger>
+                    </div>
+                    
+                    <div className="flex items-center gap-6 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {!isActive && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setActiveGrantId(grant.id)}
+                          disabled={isSyncing}
+                          className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-primary hover:text-black transition-all"
+                        >
+                          {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
                         </Button>
-                        <Button onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                          <FileUp className="h-4 w-4" /> Import Template
-                        </Button>
-                        <input type="file" ref={templateInputRef} onChange={handleTemplateImport} className="hidden" accept=".xlsx,.xls" />
-                        <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                          <ScanSearch className="h-4 w-4" /> Scan & Import Data
-                        </Button>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          </TabsContent>
-
-          <TabsContent value="users" className="m-0 outline-none px-1">
-            <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
-              <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="resilience" className="m-0 outline-none px-1 space-y-12">
-            <ErrorAuditWorkstation />
-            <DatabaseWorkstation />
-          </TabsContent>
-
-          <TabsContent value="history" className="m-0 outline-none px-1">
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
-                <AccordionTrigger className="hover:no-underline py-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2.5 bg-primary/10 rounded-xl"><History className="h-5 w-5 text-primary" /></div>
-                    <div className="text-left">
-                      <h4 className="text-sm font-black uppercase text-white">Registry Activity Ledger</h4>
-                      <p className="text-[10px] text-white/40 italic">Review chronological mutation pulses.</p>
+                      )}
+                      <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors">Rename</button>
+                      <button 
+                        onClick={() => handleDeleteProject(grant.id)}
+                        className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-8">
-                  <AuditLogWorkstation isEmbedded={true} />
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </TabsContent>
-        </Tabs>
+
+                  <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions for this Project</h4>
+                      <div className="p-10 border-2 border-dashed border-white/5 rounded-2xl bg-black/40 flex items-center justify-center">
+                        {categories.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                            {categories.map(sheetName => (
+                              <div key={sheetName} className="flex items-center justify-between p-4 bg-black/60 border border-white/10 rounded-xl group/sheet hover:border-primary/20 transition-all">
+                                <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                                  className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                                >
+                                  <Settings2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-white/20">No sheets defined for this project.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Button onClick={() => setIsAssetFormOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <PlusCircle className="h-4 w-4" /> Add Manually
+                      </Button>
+                      <Button onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <FileUp className="h-4 w-4" /> Import Template
+                      </Button>
+                      <input type="file" ref={templateInputRef} onChange={handleTemplateImport} className="hidden" accept=".xlsx,.xls" />
+                      <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </TabsContent>
+
+        <TabsContent value="users" className="m-0 outline-none px-1">
+          <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
+            <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resilience" className="m-0 outline-none px-1 space-y-12">
+          <ErrorAuditWorkstation />
+          <DatabaseWorkstation />
+        </TabsContent>
+
+        <TabsContent value="history" className="m-0 outline-none px-1">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-primary/10 rounded-xl"><History className="h-5 w-5 text-primary" /></div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-black uppercase text-white">Registry Activity Ledger</h4>
+                    <p className="text-[10px] text-white/40 italic">Review chronological mutation pulses.</p>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <AuditLogWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </TabsContent>
       </div>
 
-      <div className="mt-20 pt-10 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
+      <div className="mt-2 pt-10 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-[#0A0A0A] text-white/60 font-black uppercase text-[11px] tracking-widest hover:bg-white/5 transition-all active:scale-95">
           Cancel
         </Button>
@@ -586,12 +587,12 @@ export function SettingsWorkstation() {
         onOpenChange={setIsAssetFormOpen} 
         isReadOnly={false} 
         onSave={async (a) => {
-          await enqueueMutation('CREATE', 'assets', a);
+          await enqueueMutation('UPDATE', 'assets', a);
           await refreshRegistry();
           setIsAssetFormOpen(false);
           toast({ title: "Asset Added Locally" });
         }}
       />
-    </div>
+    </Tabs>
   );
 }
