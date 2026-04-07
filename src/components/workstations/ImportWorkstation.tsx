@@ -31,6 +31,7 @@ import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
+import { FirestoreService } from '@/services/firebase/firestore';
 import * as XLSX from 'xlsx';
 import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,7 +42,16 @@ type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 
 export function ImportWorkstation() {
   const { toast } = useToast();
-  const { assets: existingAssets, refreshRegistry, activeGrantId, setDataSource, setActiveView } = useAppState();
+  const { 
+    assets: existingAssets, 
+    refreshRegistry, 
+    activeGrantId, 
+    setDataSource, 
+    setActiveView, 
+    appSettings,
+    setAppSettings,
+    isOnline
+  } = useAppState();
   const { userProfile } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');
@@ -134,24 +144,37 @@ export function ImportWorkstation() {
   };
 
   const handleCommitToRegistry = async () => {
-    if (!activeGrantId) {
+    if (!activeGrantId || !appSettings) {
       toast({ variant: "destructive", title: "Project Required", description: "Select an active project in settings." });
       return;
     }
 
     setIsProcessing(true);
     try {
+      // 1. Queue all assets for sync
       for (const asset of stagedAssets) {
         const assetWithGrant = { ...asset, grantId: activeGrantId };
         await enqueueMutation('CREATE', 'assets', assetWithGrant);
       }
 
+      // 2. Persist to local registry
       const current = await storage.getAssets();
       const validAssets = stagedAssets.map(a => ({ ...a, grantId: activeGrantId }));
       await storage.saveAssets([...validAssets, ...current]);
+      
+      // 3. AUTO-ENABLE new categories in settings for Overview pulse
+      const newCategories = Array.from(new Set(validAssets.map(a => a.category)));
+      const nextEnabledSheets = Array.from(new Set([...appSettings.enabledSheets, ...newCategories]));
+      
+      // Also update sheetDefinitions if needed (though already done via import)
+      const nextSettings = { ...appSettings, enabledSheets: nextEnabledSheets };
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings({ enabledSheets: nextEnabledSheets });
+      setAppSettings(nextSettings);
+
       await storage.clearSandbox();
       
-      toast({ title: "Merge Complete", description: `${validAssets.length} records pushed to registry.` });
+      toast({ title: "Merge Complete", description: `${validAssets.length} records pushed to registry and enabled in overview.` });
       setDataSource('PRODUCTION');
       await refreshRegistry();
       setCurrentStep('SUMMARY');

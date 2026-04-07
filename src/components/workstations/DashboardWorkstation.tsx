@@ -3,6 +3,7 @@
 /**
  * @fileOverview Dashboard Workstation - Unified Mission Control.
  * Phase 303: Enforced permission-aware action pulses.
+ * Phase 304: Fixed Pinned Control Hub with solid background and z-index priority.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -62,7 +63,8 @@ export function DashboardWorkstation() {
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-8 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
       
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 sm:pt-4 pb-6 px-1 border-b border-white/5 mb-8 -mx-1 shrink-0">
+      {/* PERSISTENT CONTROL HUB HEADER */}
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-50 bg-[#050505] pt-2 sm:pt-4 pb-6 px-1 border-b border-white/5 mb-8 -mx-1 shrink-0 shadow-2xl">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-4 self-start">
             <div className="p-2.5 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl shadow-inner border border-primary/5">
@@ -79,7 +81,7 @@ export function DashboardWorkstation() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl shrink-0">
+            <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-inner backdrop-blur-xl flex items-center shrink-0">
               <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
                 <TabsTrigger value="overview" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
                   Overview

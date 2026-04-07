@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Phase 302: Enforced RBAC visibility for Add/Edit pulses.
+ * Phase 303: Integrated Multi-Select Syncing Pulse.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -60,6 +60,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
+import { processSelectedSyncQueue } from '@/offline/sync';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -301,6 +302,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       setSelectedAssetIds(new Set());
       toast({ title: "Records Removed" });
     } finally { setIsProcessing(false); }
+  };
+
+  const handleSyncSelected = async () => {
+    if (!isOnline) {
+      toast({ variant: "destructive", title: "Offline", description: "Internet required for cloud broadcast." });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const queue = await storage.getQueue();
+      const opsToSync = queue.filter(q => selectedAssetIds.has(String(q.payload.id || ''))).map(q => q.id);
+      if (opsToSync.length > 0) {
+        await processSelectedSyncQueue(opsToSync);
+        await refreshRegistry();
+        setSelectedAssetIds(new Set());
+        toast({ title: "Sync Pulse Complete", description: `Synchronized ${opsToSync.length} selected records.` });
+      } else {
+        toast({ title: "Up-to-date", description: "Selected items have no pending local changes." });
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const toggleCategorySelection = (cat: string) => {
@@ -635,6 +658,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </div>
               <div className="h-6 w-px bg-white/10 hidden sm:block" />
               <div className="flex items-center gap-1.5">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleSyncSelected} 
+                  disabled={isProcessing || !isOnline}
+                  className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10"
+                >
+                  {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Sync
+                </Button>
                 {canEdit && (
                   <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white">
                     <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Edit</span>

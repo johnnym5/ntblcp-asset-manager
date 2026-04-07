@@ -3,6 +3,7 @@
 /**
  * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
  * Phase 206: Resolved button overlap by switching to horizontal flex actions.
+ * Phase 207: Fixed drill-down pulse navigation.
  */
 
 import React from 'react';
@@ -48,13 +49,13 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
   const { setActiveView, setSearchTerm } = useAppState();
 
   const handleNotificationClick = (n: any) => {
+    markAllAsRead(); 
     if (n.assetId) {
-      markAllAsRead(); 
       const shortId = n.assetId.split('-')[0];
       setSearchTerm(shortId); 
-      setActiveView('REGISTRY');
-      onOpenChange(false);
     }
+    setActiveView('REGISTRY');
+    onOpenChange(false);
   };
 
   return (
