@@ -20,7 +20,8 @@ import {
   FileUp,
   PlusCircle,
   ScanSearch,
-  DatabaseZap
+  DatabaseZap,
+  Settings
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -100,19 +101,18 @@ export function DashboardWorkstation() {
                 <Card className="bg-[#080808] border-2 border-white/5 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-3xl">
                   <div className="p-5 sm:p-6 border-b border-white/5 bg-white/[0.02]">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
-                      <DatabaseZap className="h-3.5 w-3.5" /> Data Orchestration
+                      <DatabaseZap className="h-3.5 w-3.5" /> Quick Controls
                     </h4>
                   </div>
                   <CardContent className="p-5 sm:p-6 space-y-3">
-                    <Button onClick={() => setIsFormOpen(true)} className="w-full h-12 sm:h-14 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all justify-start px-6">
-                      <PlusCircle className="h-4 w-4 text-primary" /> Manual Add
+                    <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 sm:h-14 rounded-xl sm:rounded-2xl border-white/10 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-3 hover:bg-white/5 transition-all justify-start px-6">
+                      <Settings className="h-4 w-4 text-primary" /> App Settings
                     </Button>
-                    <Button onClick={() => setIsImportScanOpen(true)} className="w-full h-12 sm:h-14 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all justify-start px-6">
-                      <ScanSearch className="h-4 w-4 text-primary" /> Import Workbook
-                    </Button>
-                    <Button variant="ghost" onClick={() => setActiveView('IMPORT')} className="w-full h-12 rounded-xl text-white/40 font-black uppercase text-[8px] sm:text-[9px] tracking-widest gap-3 hover:text-white transition-all">
-                      <FileUp className="h-3.5 w-3.5" /> Manual Mapping Flow
-                    </Button>
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                      <p className="text-[9px] font-bold text-white/40 uppercase leading-relaxed italic">
+                        Manual add, record imports, and template management have moved to <strong>Settings &gt; Projects</strong>.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -159,7 +159,7 @@ export function DashboardWorkstation() {
               <div className="space-y-6 sm:space-y-8">
                 <div className="flex items-center gap-3 px-1">
                   <Activity className="h-4 w-4 text-primary" />
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{isAdvanced ? 'Sync Queue' : 'Pending Changes'}</h3>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{isAdvanced ? 'Sync Queue' : 'Pending Sync'}</h3>
                 </div>
                 <SyncQueueWorkstation isEmbedded={true} />
               </div>
@@ -171,23 +171,6 @@ export function DashboardWorkstation() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <AssetForm 
-        isOpen={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
-        isReadOnly={false} 
-        onSave={async (a) => {
-          await enqueueMutation('CREATE', 'assets', a);
-          await refreshRegistry();
-          setIsFormOpen(false);
-          toast({ title: "Asset Added Locally" });
-        }}
-      />
-
-      <ImportScannerDialog 
-        isOpen={isImportScanOpen} 
-        onOpenChange={setIsImportScanOpen} 
-      />
     </div>
   );
 }

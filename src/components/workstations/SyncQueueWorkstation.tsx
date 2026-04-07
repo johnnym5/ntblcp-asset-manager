@@ -3,6 +3,7 @@
 /**
  * @fileOverview Pending Sync - Waiting Cloud Updates.
  * Phase 45: Integrated Retry pulse for failed sync operations.
+ * Phase 1012: Applied friendlier naming "Pending Sync".
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -228,7 +229,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Sync Status' : 'Cloud Link'}</h3>
+              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Pending Sync' : 'Waiting Changes'}</h3>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
                 {isOnline ? 'Online Pulse Active' : 'Offline Regional Scope'}
               </p>

@@ -3,6 +3,7 @@
 /**
  * @fileOverview Records to Review - Field Verification Hub.
  * Phase 26: Added Expandable Search pulse and input sanitization.
+ * Phase 1012: Applied friendlier naming "Records to Review".
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';

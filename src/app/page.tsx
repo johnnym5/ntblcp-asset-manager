@@ -26,7 +26,8 @@ import {
   LayoutDashboard,
   Filter,
   ShieldAlert,
-  HelpCircle
+  HelpCircle,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -282,8 +283,12 @@ export default function SPAHub() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('REGISTRY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                  <Boxes className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">Registry</span>
+                  <ClipboardList className="mr-2 h-3.5 w-3.5" />
+                  <span className="text-[10px] font-black uppercase">Asset Registry</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveView('VERIFY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
+                  <ShieldCheck className="mr-2 h-3.5 w-3.5" />
+                  <span className="text-[10px] font-black uppercase">Records to Review</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('ALERTS')} className="p-2.5 rounded-lg focus:bg-destructive focus:text-white m-1">
                   <ShieldAlert className="mr-2 h-3.5 w-3.5" />

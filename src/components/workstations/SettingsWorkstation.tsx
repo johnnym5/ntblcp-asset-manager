@@ -4,7 +4,7 @@
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
  * Phase 1011: Renamed Auditors to Users and merged Database into Resilience.
- * Phase 1012: Integrated guidance explanations and UX mode toggles.
+ * Phase 1012: Integrated Data Orchestration pulse into Projects tab.
  */
 
 import React, { useState } from 'react';
@@ -47,7 +47,8 @@ import {
   FolderOpen,
   Settings2,
   HelpCircle,
-  GraduationCap
+  GraduationCap,
+  DatabaseZap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -66,6 +67,9 @@ import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
+import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
+import AssetForm from '@/components/asset-form';
+import { enqueueMutation } from '@/offline/queue';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
   Select,
@@ -108,12 +112,12 @@ export function SettingsWorkstation() {
   const [newProjectName, setNewProjectName] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
+  const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
-
-  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
@@ -173,19 +177,6 @@ export function SettingsWorkstation() {
     }
   };
 
-  const handleCommitAll = async () => {
-    setIsSaving(true);
-    try {
-      if (passwords.next && passwords.next === passwords.confirm) {
-        toast({ title: "Security Updated", description: "Your passphrase has been updated." });
-      }
-      toast({ title: "Registry Pulse Saved", description: "Global configuration synchronized." });
-      setActiveView('DASHBOARD');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   if (!settingsLoaded || !appSettings) {
     return <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -199,6 +190,12 @@ export function SettingsWorkstation() {
       <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{description}</p>
     </div>
   );
+
+  const handleCommitAll = async () => {
+    toast({ title: "Synchronizing State", description: "Broadcasting configuration pulse..." });
+    await refreshRegistry();
+    setActiveView('DASHBOARD');
+  };
 
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in duration-700 pb-40">
@@ -223,7 +220,7 @@ export function SettingsWorkstation() {
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="groups" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <LayoutGrid className="h-3.5 w-3.5" /> Projects
+                <LayoutGrid className="h-3.5 w-3.5" /> Projects & Sheets
               </TabsTrigger>
             )}
             {isAdmin && (
@@ -334,8 +331,9 @@ export function SettingsWorkstation() {
                     </div>
                     <Switch checked={appSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
                   </div>
-                </section>
-              )}
+                </Card>
+              </section>
+            )}
           </div>
 
           <div className="p-10 rounded-[3rem] bg-destructive/5 border-2 border-destructive/20 shadow-3xl flex items-center justify-between gap-8 group hover:bg-destructive/[0.02] transition-all">
@@ -404,23 +402,44 @@ export function SettingsWorkstation() {
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="pb-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                            {categories.map(sheetName => (
-                              <div key={sheetName} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl group/sheet hover:border-primary/20 transition-all">
-                                <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                  className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
-                                >
-                                  <Settings2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ))}
-                            {categories.length === 0 && (
-                              <div className="col-span-full py-10 text-center opacity-20 border-2 border-dashed rounded-2xl">
-                                <p className="text-[10px] font-black uppercase tracking-widest">No Definitions Configured</p>
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+                              {categories.map(sheetName => (
+                                <div key={sheetName} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl group/sheet hover:border-primary/20 transition-all">
+                                  <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                                    className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                                  >
+                                    <Settings2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ))}
+                              {categories.length === 0 && (
+                                <div className="col-span-full py-10 text-center opacity-20 border-2 border-dashed rounded-2xl">
+                                  <p className="text-[10px] font-black uppercase tracking-widest">No Definitions Configured</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {isActive && (
+                              <div className="p-6 rounded-[2rem] bg-white/[0.02] border-2 border-dashed border-white/5 space-y-6">
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
+                                  <DatabaseZap className="h-3.5 w-3.5" /> Data Orchestration
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <Button onClick={() => setIsAssetFormOpen(true)} className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                                    <PlusCircle className="h-4 w-4" /> Add Record
+                                  </Button>
+                                  <Button onClick={() => setIsImportScanOpen(true)} className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                                    <ScanSearch className="h-4 w-4" /> Import Excel
+                                  </Button>
+                                  <Button variant="outline" className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                                    <FileUp className="h-4 w-4" /> Template Setup
+                                  </Button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -518,6 +537,18 @@ export function SettingsWorkstation() {
       )}
 
       <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
+      <AssetForm 
+        isOpen={isAssetFormOpen} 
+        onOpenChange={setIsAssetFormOpen} 
+        isReadOnly={false} 
+        onSave={async (a) => {
+          await enqueueMutation('CREATE', 'assets', a);
+          await refreshRegistry();
+          setIsAssetFormOpen(false);
+          toast({ title: "Asset Added Locally" });
+        }}
+      />
     </div>
   );
 }
