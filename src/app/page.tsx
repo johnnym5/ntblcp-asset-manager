@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Unified Command Hub.
  * Optimized for RBAC and Location-Aware Pulse filtering.
  * Phase 400: Integrated Discrepancy Review Workstation.
+ * Phase 401: Replaced navigation toggle with Global Spotlight Search Pulse.
  */
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
@@ -23,7 +24,10 @@ import {
   MapPin,
   Terminal,
   SearchCode,
-  LayoutDashboard
+  LayoutDashboard,
+  Search,
+  Filter,
+  Command
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -55,7 +59,9 @@ export default function SPAHub() {
     setActiveView, 
     isOnline, 
     setIsOnline,
-    assets
+    assets,
+    searchTerm,
+    setSearchTerm
   } = useAppState();
   
   const { unreadCount } = useNotifications();
@@ -116,9 +122,30 @@ export default function SPAHub() {
             )}
           </div>
 
-          <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5">
-            <button onClick={() => setActiveView('DASHBOARD')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'DASHBOARD' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Dashboard</button>
-            <button onClick={() => setActiveView('REGISTRY')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Inventory</button>
+          {/* Spotlight-style Global Search Bar */}
+          <div className="hidden lg:flex items-center flex-1 max-w-xl mx-12 relative group">
+            <Search className="absolute left-5 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all duration-300" />
+            <input 
+              type="text"
+              placeholder="Search Registry, Folders or Anomalies... (⌘K)"
+              className="w-full h-12 bg-white/[0.03] border border-white/5 rounded-2xl pl-12 pr-32 text-sm font-medium focus:outline-none focus:border-primary/20 focus:bg-white/[0.05] transition-all placeholder:text-white/10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="absolute right-3 flex items-center gap-3">
+              <div className="hidden xl:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/5 text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">
+                <span>CMD</span>
+                <span className="text-white/10">/</span>
+                <span>K</span>
+              </div>
+              <div className="h-6 w-px bg-white/5" />
+              <button 
+                onClick={() => setActiveView('REGISTRY')}
+                className="p-2 rounded-xl text-white/20 hover:text-primary hover:bg-white/5 transition-all tactile-pulse"
+              >
+                <Filter className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
