@@ -4,6 +4,7 @@
  * @fileOverview SyncQueueWorkstation - Grouped Multi-Select Sync Hub.
  * Phase 500: Implemented compact Dashboard list (last 10) and full-audit pop-up.
  * Grouped by Operation Type (Created, Updated, Deleted) in the pop-up.
+ * Phase 501: Fixed ReferenceError for missing Info icon.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -37,7 +38,8 @@ import {
   ChevronRight,
   PlusCircle,
   FileEdit,
-  Eraser
+  Eraser,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
