@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 318: Updated primary action label to "Save Change".
+ * Phase 320: Fixed functional logic for Project actions and resolved ReferenceErrors.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -63,8 +63,7 @@ import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
-import AssetForm from '@/components/asset-form';
-import { enqueueMutation } from '@/offline/queue';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { addNotification } from '@/hooks/use-notifications';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
@@ -112,6 +111,8 @@ export function SettingsWorkstation() {
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
@@ -188,6 +189,42 @@ export function SettingsWorkstation() {
     setSelectedSheetDef(newSheet);
     setActiveGrantIdForSchema(activeGrantId);
     setIsColumnSheetOpen(true);
+  };
+
+  const handleImportTemplate = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!appSettings || !activeGrantId) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const templates = await parseExcelForTemplate(file);
+      const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
+      if (!activeGrant) return;
+
+      const nextSheetDefs = { ...activeGrant.sheetDefinitions };
+      templates.forEach(t => {
+        nextSheetDefs[t.name] = t;
+      });
+
+      const updatedGrants = appSettings.grants.map(g => 
+        g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g
+      );
+
+      const nextSettings = { ...appSettings, grants: updatedGrants };
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+
+      addNotification({ title: 'Templates Imported', description: `${templates.length} group definitions added.`, variant: 'success' });
+    } catch (error) {
+      addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSaveChange = async () => {
@@ -351,11 +388,11 @@ export function SettingsWorkstation() {
                     <Button variant="outline" onClick={handleAddSheetManually} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <PlusCircle className="h-3 w-3" /> Add Manually
                     </Button>
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
+                    <Button variant="outline" onClick={handleImportTemplate} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <FileUp className="h-3 w-3" /> Import Template
                     </Button>
                     <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
-                      <ScanSearch className="h-3 w-3 text-primary" /> Scan & Import Data
+                      <ScanSearch className="h-3.5 w-3.5 text-primary" /> Scan & Import Data
                     </Button>
                   </div>
                 </AccordionContent>
@@ -420,6 +457,7 @@ export function SettingsWorkstation() {
         </DialogContent>
       </Dialog>
 
+      <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".xlsx,.xls" />
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
       
       {selectedSheetDef && (
@@ -427,7 +465,7 @@ export function SettingsWorkstation() {
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          originalSheetName={selectedSheetDef.name}
+          originalSheetName={selectedSheetDef?.name || null}
           onSave={(orig, newDef, all) => {
             const updatedGrants = appSettings.grants.map(grant => {
               if (grant.id === activeGrantId) {
