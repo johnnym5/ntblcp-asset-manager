@@ -3,7 +3,7 @@
 /**
  * @fileOverview AssetGroupsWorkstation - Folder-Based Registry Hub.
  * Optimized for High-Density Grid Pulse.
- * Phase 1100: Added isEmbedded prop to blend into Dashboard Overview.
+ * Phase 1106: Removed default expanded groups to start closed.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -259,7 +259,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
           <div className="space-y-6">
             <ConditionSummary counts={groupAssetsByCondition(filteredAssets) as any} total={filteredAssets.length} />
             <ScrollArea className={cn("pr-4", isEmbedded ? "h-[500px]" : "h-[calc(100vh-20rem)]")}>
-              <Accordion type="multiple" defaultValue={['Good', 'Discrepancy']} className="space-y-4">
+              <Accordion type="multiple" className="space-y-4">
                 {CONDITION_GROUPS.map(group => {
                   const groupAssets = conditionGroups[group];
                   if (groupAssets.length === 0 && group !== 'Good') return null;

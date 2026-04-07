@@ -3,7 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1015: Redesigned Projects & Sheets tab to match user specification image.
+ * Phase 1016: Fixed clickable AccordionTrigger for Project cards.
  */
 
 import React, { useState } from 'react';
@@ -178,6 +178,12 @@ export function SettingsWorkstation() {
     }
   };
 
+  const handleCommitAll = async () => {
+    toast({ title: "Synchronizing State", description: "Broadcasting configuration pulse..." });
+    await refreshRegistry();
+    setActiveView('DASHBOARD');
+  };
+
   if (!settingsLoaded || !appSettings) {
     return <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -191,12 +197,6 @@ export function SettingsWorkstation() {
       <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{description}</p>
     </div>
   );
-
-  const handleCommitAll = async () => {
-    toast({ title: "Synchronizing State", description: "Broadcasting configuration pulse..." });
-    await refreshRegistry();
-    setActiveView('DASHBOARD');
-  };
 
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in duration-700 pb-40">
@@ -384,38 +384,38 @@ export function SettingsWorkstation() {
                     isActive ? "border-primary/40 shadow-2xl" : "border-white/5"
                   )}
                 >
-                  <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
-                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
+                  <AccordionTrigger className="hover:no-underline p-0 border-none group/trigger">
+                    <div className="p-6 flex items-center justify-between w-full">
+                      <div className="flex items-center gap-4 flex-1 text-left">
+                        <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0 group-hover/trigger:text-primary transition-colors" />
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                          {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
+                        {!isActive && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={(e) => { e.stopPropagation(); setActiveGrantId(grant.id); }}
+                            disabled={isSyncing}
+                            className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-primary hover:text-black transition-all"
+                          >
+                            {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
+                          </Button>
+                        )}
+                        <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors">Rename</button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteProject(grant.id); }}
+                          className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-6">
-                      {!isActive && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={(e) => { e.stopPropagation(); setActiveGrantId(grant.id); }}
-                          disabled={isSyncing}
-                          className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-primary hover:text-black transition-all"
-                        >
-                          {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
-                        </Button>
-                      )}
-                      <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors">Rename</button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteProject(grant.id); }}
-                        className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  <AccordionTrigger className="hidden" />
+                  </AccordionTrigger>
 
                   <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
                     <div className="space-y-4">
