@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview RegistryWorkstation - Condition-Grouped Asset Inventory.
- * Overhauled to organize assets into canonical condition groups.
+ * Organizes assets into canonical condition groups with administrative controls.
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutGrid,
@@ -61,47 +61,48 @@ import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isWithinScope } from '@/core/auth/rbac';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
-import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
-import { FirestoreService } from '@/services/firebase/firestore';
 import { ConditionSummary } from '@/components/registry/ConditionSummary';
-import { getCanonicalGroup, groupAssetsByCondition, CONDITION_GROUPS, GROUP_COLORS, GROUP_BG_COLORS } from '@/lib/condition-logic';
-import type { Asset, SheetDefinition, Grant, ConditionGroup } from '@/types/domain';
+import { groupAssetsByCondition, CONDITION_GROUPS, GROUP_COLORS, GROUP_BG_COLORS } from '@/lib/condition-logic';
+import type { Asset, ConditionGroup } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     assets, 
     searchTerm,
     headers,
-    sortKey,
-    sortDir,
     refreshRegistry,
     appSettings,
-    setAppSettings,
     isOnline
   } = useAppState();
   
-  const { userProfile, loading: authLoading } = useAuth();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [groupViewMode, setGroupViewMode] = useState<'grid' | 'table'>('grid');
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
-  const [customizingCategory, setCustomizingCategory] = useState<string | null>(null);
+  const [isCategoryWipeDialogOpen, setIsCategoryWipeDialogOpen] = useState(false);
+  const [categoryToWipe, setCategoryToWipe] = useState<ConditionGroup | null>(null);
 
-  const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === appSettings.activeGrantId), [appSettings]);
-  
   const filteredAssets = useMemo(() => {
     let results = assets;
     if (selectedCategory && selectedCategory !== 'ALL') results = results.filter(a => a.category === selectedCategory);
@@ -140,6 +141,50 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedAssetIds(next);
   };
+
+  const handleDeleteSelectedAssets = async () => {
+    if (selectedAssetIds.size === 0) return;
+    setIsProcessing(true);
+    try {
+      const ids = Array.from(selectedAssetIds);
+      for (const id of ids) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.filter(a => !selectedAssetIds.has(a.id)));
+      
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      toast({ title: "Records Removed", description: `Successfully deleted ${ids.length} assets.` });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWipeCategory = async () => {
+    if (!categoryToWipe) return;
+    setIsProcessing(true);
+    try {
+      const assetsInGroup = assetsByCondition[categoryToWipe];
+      for (const asset of assetsInGroup) {
+        await enqueueMutation('DELETE', 'assets', { id: asset.id });
+      }
+      
+      const currentLocal = await storage.getAssets();
+      const idsToWipe = new Set(assetsInGroup.map(a => a.id));
+      await storage.saveAssets(currentLocal.filter(a => !idsToWipe.has(a.id)));
+      
+      await refreshRegistry();
+      setIsCategoryWipeDialogOpen(false);
+      setCategoryToWipe(null);
+      toast({ title: "Group Wiped", description: `All assets in ${categoryToWipe} group removed.` });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="space-y-10 h-full flex flex-col">
@@ -242,6 +287,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     
                     <AccordionContent className="p-8 pt-0 border-t border-white/5 bg-black/20">
                       <div className="pt-8">
+                        <div className="flex justify-end mb-6">
+                          {isAdmin && groupAssets.length > 0 && (
+                            <Button 
+                              variant="ghost" 
+                              onClick={() => { setCategoryToWipe(group); setIsCategoryWipeDialogOpen(true); }}
+                              className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Bomb className="h-3.5 w-3.5" /> Wipe Group
+                            </Button>
+                          )}
+                        </div>
                         {viewMode === 'grid' || isMobile ? (
                           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                             {groupAssets.map(asset => (
