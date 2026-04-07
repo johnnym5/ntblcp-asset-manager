@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 309: Integrated granular notifications for manual sync pulses.
+ * Consolidated to use the hardened service layer and removed redundant lib imports.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -14,17 +13,19 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
-import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
+import type { 
+  Asset, 
+  AppSettings, 
+  DataSource, 
+  AuthorityNode, 
+  WorkstationView, 
+  OptionType, 
+  SortConfig, 
+  DataActions 
+} from '@/types/domain';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
-import { toast } from '@/hooks/use-toast';
-
-export interface OptionType {
-  label: string;
-  value: string;
-  count?: number;
-}
 
 interface AppStateContextType {
   assets: Asset[];

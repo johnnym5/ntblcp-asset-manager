@@ -3,6 +3,8 @@
  * Authoritative type definitions for the entire application pulse.
  */
 
+import { type Dispatch, type SetStateAction } from 'react';
+
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type ConditionGroup = 'Good' | 'Bad' | 'Stolen' | 'Obsolete' | 'Unsalvageable' | 'Discrepancy';
@@ -32,6 +34,27 @@ export type WorkstationView =
   | 'DATABASE' 
   | 'SETTINGS'
   | 'ANOMALIES';
+
+export interface OptionType {
+  label: string;
+  value: string;
+  count?: number;
+}
+
+export interface SortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface DataActions {
+  onImport?: () => void;
+  onScanAndImport?: () => void;
+  onExport?: () => void;
+  onAddAsset?: () => void;
+  onClearAll?: () => void;
+  onTravelReport?: () => void;
+  isImporting?: boolean;
+}
 
 export interface SectionHierarchy {
   document: string;
