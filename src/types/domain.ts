@@ -12,6 +12,7 @@ export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
+  | 'GROUPS'
   | 'IMPORT' 
   | 'VERIFY' 
   | 'REPORTS' 
@@ -43,6 +44,18 @@ export interface Geotag {
   lng: number;
   accuracy: number;
   timestamp: string;
+}
+
+export interface AssetClassification {
+  group: string;
+  subgroup: string;
+  type: string;
+  brand: string;
+  normalizedLabel: string;
+  conditionBucket: string;
+  yearBucket: number | null;
+  isTransfer: boolean;
+  transferSource: string | null;
 }
 
 export interface Asset {
@@ -81,6 +94,9 @@ export interface Asset {
   remarks?: string;
   
   geotag?: Geotag;
+
+  // Smart Classification (Post-Import)
+  classification?: AssetClassification;
 
   // Metadata & Traceability
   hierarchy: SectionHierarchy;

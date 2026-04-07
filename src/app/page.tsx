@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Unified Global Command Hub.
  * Phase 305: Implemented global workstation scrolling and consistent container padding.
  * Phase 310: Converted status dot into interactive Online/Offline trigger.
+ * Phase 400: Integrated Asset Groups Post-Import Intelligence Hub.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -24,14 +25,16 @@ import {
   Settings as SettingsIcon,
   DatabaseZap,
   Menu,
-  X
+  X,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
-import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
+import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
+import { AssetGroupsWorkstation } from '@/components/workstations/AssetGroupsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
@@ -120,8 +123,9 @@ export default function SPAHub() {
   const renderWorkstation = () => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
+      case 'REGISTRY': return <RegistryWorkstation />;
+      case 'GROUPS': return <AssetGroupsWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
-      case 'IMPORT': return <ImportWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
@@ -144,7 +148,7 @@ export default function SPAHub() {
                 className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back to Dashboard</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Dashboard</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 md:gap-4">
@@ -159,38 +163,20 @@ export default function SPAHub() {
             )}
           </div>
 
-          {/* Global Search Interface - Tablet & Desktop */}
-          <div className="flex-1 max-w-2xl relative group hidden md:block">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
-            <Input 
-              placeholder="Search all assets..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-12 pl-11 pr-24 rounded-xl bg-white/[0.03] border-white/5 text-sm font-medium focus-visible:ring-primary/20 text-white placeholder:text-white/20 shadow-inner"
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsSortOpen(true)}
-                className="h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all"
-              >
-                <ArrowUpDown className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant="ghost" size="icon" 
-                onClick={() => setIsFilterOpen(true)}
-                className={cn(
-                  "h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all relative",
-                  activeFilterCount > 0 && "text-primary bg-primary/5"
-                )}
-              >
-                <Filter className="h-4 w-4" />
-                {activeFilterCount > 0 && (
-                  <div className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full border-2 border-black" />
-                )}
-              </Button>
-            </div>
+          {/* Global Navigation Pulse */}
+          <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5 shadow-inner">
+            <button 
+              onClick={() => setActiveView('REGISTRY')}
+              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+            >
+              Inventory
+            </button>
+            <button 
+              onClick={() => setActiveView('GROUPS')}
+              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'GROUPS' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+            >
+              Asset Groups
+            </button>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
@@ -259,7 +245,7 @@ export default function SPAHub() {
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-black border-white/5 text-white rounded-2xl">
+              <DropdownMenuContent align="end" className="w-56 bg-black border-white/5 text-white rounded-2xl shadow-3xl">
                 <DropdownMenuLabel className="font-normal p-4">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-black uppercase tracking-tight">{userProfile?.displayName}</p>
@@ -267,22 +253,14 @@ export default function SPAHub() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => setActiveView('GROUPS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase">Asset Groups</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <SettingsIcon className="mr-2 h-4 w-4" />
                   <span className="text-[11px] font-black uppercase">System Settings</span>
                 </DropdownMenuItem>
-                {isMobile && (
-                  <>
-                    <DropdownMenuItem onClick={manualDownload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
-                      <CloudDownload className="mr-2 h-4 w-4" />
-                      <span className="text-[11px] font-black uppercase">Fetch Updates</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={manualUpload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
-                      <CloudUpload className="mr-2 h-4 w-4" />
-                      <span className="text-[11px] font-black uppercase">Save Locally</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={logout} className="p-3 focus:bg-red-600 focus:text-white rounded-xl cursor-pointer m-1 text-red-500">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -293,7 +271,7 @@ export default function SPAHub() {
           </div>
         </header>
 
-        {/* Mobile Search Overlay - High Fidelity */}
+        {/* Mobile Search Overlay */}
         {showMobileSearch && (
           <div className="md:hidden bg-black/90 backdrop-blur-2xl border-b border-white/5 p-4 animate-in slide-in-from-top duration-300 z-30">
             <div className="relative">
@@ -310,10 +288,6 @@ export default function SPAHub() {
               >
                 <X className="h-4 w-4" />
               </button>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={() => { setIsSortOpen(true); setShowMobileSearch(false); }} className="flex-1 h-10 rounded-xl text-[9px] font-black uppercase"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Sort</Button>
-              <Button variant="outline" size="sm" onClick={() => { setIsFilterOpen(true); setShowMobileSearch(false); }} className="flex-1 h-10 rounded-xl text-[9px] font-black uppercase"><Filter className="h-3.5 w-3.5 mr-2" /> Filter</Button>
             </div>
           </div>
         )}
