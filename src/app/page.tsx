@@ -283,19 +283,6 @@ export default function SPAHub() {
                   <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role} &bull; {userProfile?.state}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setActiveView('REGISTRY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                  <ClipboardList className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">Asset Registry</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveView('VERIFY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                  <ShieldCheck className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">Records to Review</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveView('ALERTS')} className="p-2.5 rounded-lg focus:bg-destructive focus:text-white m-1">
-                  <ShieldAlert className="mr-2 h-3.5 w-3.5" />
-                  <span className="text-[10px] font-black uppercase">Critical Alerts</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
                   <SettingsIcon className="mr-2 h-3.5 w-3.5" />
                   <span className="text-[10px] font-black uppercase">Settings</span>
