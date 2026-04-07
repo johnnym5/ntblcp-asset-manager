@@ -1,11 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1010: Implemented Project Switch Isolation Pulse.
- * Phase 1012: Integrated Drill-down pulses for Categories and Search.
- * Phase 1013: Upgraded to multi-select Category state.
- * Phase 1014: Resolved Project Switch data loss. Removed destructive wipe.
+ * Phase 309: Integrated granular notifications for manual sync pulses.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -76,7 +74,6 @@ interface AppStateContextType {
   conditionOptions: OptionType[];
   statusOptions: OptionType[];
 
-  // Global UI State
   isFilterOpen: boolean;
   setIsFilterOpen: (open: boolean) => void;
   isSortOpen: boolean;
@@ -84,7 +81,6 @@ interface AppStateContextType {
   filters: HeaderFilter[];
   setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
 
-  // Category Hub State
   selectedCategory: string | null;
   selectedCategories: string[];
   setSelectedCategories: (cats: string[]) => void;
@@ -140,12 +136,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
 
-  // Global Drawers & Filters
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
 
-  // Category Hub state
   const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
@@ -246,6 +240,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
 
     setIsSyncing(true);
+    addNotification({ title: "Download Initiated", description: "Fetching latest assigned records from Cloud Authority..." });
     
     try {
       const remoteSettings = await FirestoreService.getSettings();
@@ -273,12 +268,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           }
             
           await storage.saveAssets(nextAssets);
-          addNotification({ title: "Download Complete", description: `Synced ${remoteAssets.length} records.` });
+          addNotification({ title: "Sync Successful", description: `Retrieved ${remoteAssets.length} records for ${profile?.state || 'Global'}.`, variant: "success" });
         }
       }
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed.", variant: "destructive" });
+      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed. Retry when link stabilizes.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
@@ -326,7 +321,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     setAppSettings(nextSettings);
     await storage.saveSettings(nextSettings);
     if (isOnline) await FirestoreService.updateSettings({ readAuthority: node });
-    addNotification({ title: 'Authority Shifted', description: `Priority: ${node}` });
+    addNotification({ title: 'Authority Shifted', description: `Priority: ${node}`, variant: "success" });
     await refreshRegistry();
   };
 
@@ -335,6 +330,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (typeof window !== 'undefined') {
       localStorage.setItem('assetain-online-status', JSON.stringify(status));
     }
+    addNotification({ 
+      title: status ? "Online Mode" : "Offline Scope", 
+      description: status ? "Connecting to Cloud Authority..." : "Working in regional persistence pulse." 
+    });
   }, []);
 
   const setActiveGrantId = useCallback(async (id: string) => {
@@ -343,20 +342,27 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     
     try {
       const next = { ...appSettings, activeGrantId: id };
-      
-      // Commit settings switch
       await storage.saveSettings(next);
       if (isOnline) {
         await FirestoreService.updateSettings({ activeGrantId: id });
       }
-      
       setAppSettings(next);
       await refreshRegistry();
-      toast({ title: "Project Scope Switched", description: `Active: ${next.grants.find(g => g.id === id)?.name}` });
+      addNotification({ title: "Project Scope Switched", description: `Active: ${next.grants.find(g => g.id === id)?.name}`, variant: "success" });
     } finally {
       setIsSyncing(false);
     }
-  }, [appSettings, isOnline, refreshRegistry, toast]);
+  }, [appSettings, isOnline, refreshRegistry]);
+
+  const manualUpload = useCallback(async () => {
+    if (!isOnline) {
+      addNotification({ title: "Upload Failed", description: "Internet required for cloud broadcast.", variant: "destructive" });
+      return;
+    }
+    addNotification({ title: "Upload Initiated", description: "Broadcasting local modifications to Cloud Authority..." });
+    await processSyncQueue();
+    await refreshRegistry();
+  }, [isOnline, refreshRegistry]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -367,7 +373,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     <AppStateContext.Provider value={{
       assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload: () => processSyncQueue().then(refreshRegistry),
+      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
       setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,

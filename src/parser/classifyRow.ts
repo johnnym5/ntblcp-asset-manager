@@ -1,7 +1,8 @@
+
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
- * Phase 700: Hardened for Column A standalone markers and low-density section labels.
+ * Phase 701: Relaxed density requirements to prevent data loss in legacy transfers.
  */
 
 import { RowClassification } from './types';
@@ -25,7 +26,6 @@ export function classifyRow(row: any[]): RowClassification {
     return 'EMPTY';
   }
 
-  // Normalize Column A for authority checking
   const firstCellRaw = String(row[0] || '').trim();
   const firstCellUpper = firstCellRaw.toUpperCase();
   const firstCellNoSpace = firstCellUpper.replace(/\s+/g, '');
@@ -33,34 +33,31 @@ export function classifyRow(row: any[]): RowClassification {
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
   const isNumericColA = firstCellRaw !== '' && !isNaN(Number(firstCellRaw));
 
-  // 1. SCHEMA_HEADER: Explicitly starts with S/N or variations
-  // Requirements: High density (>=4 cols) AND Column A starts with anchor.
+  // 1. SCHEMA_HEADER
+  // Lowered populatedCount from 4 to 3 to capture simplified tables.
   const normalizedAnchors = SCHEMA_ANCHORS.map(a => a.replace(/\s+/g, ''));
   if (normalizedAnchors.some(anchor => firstCellNoSpace === anchor || firstCellNoSpace.startsWith(anchor))) {
-    if (populatedCount >= 4) {
+    if (populatedCount >= 3) {
       return 'SCHEMA_HEADER';
     }
   }
 
-  // 2. GROUP_HEADER: Structural marker in Column A
-  // Rules: Column A text matches known markers OR is a standalone label (low density).
+  // 2. GROUP_HEADER
   const isKnownMarker = KNOWN_MARKERS.some(m => firstCellUpper.includes(m));
   if (firstCellRaw !== '' && !isNumericColA) {
-    // If it's a known keyword, it's a header regardless of density
     if (isKnownMarker) return 'GROUP_HEADER';
     
     // Standalone text in Col A with low density is usually a section label
     if (populatedCount <= 3) {
-      // Noise suppression
       const lower = firstCellRaw.toLowerCase();
       if (['sn', 's/n', 'total', 'page', 'date'].includes(lower)) return 'UNKNOWN';
       return 'GROUP_HEADER';
     }
   }
 
-  // 3. DATA_ROW: Likely an asset record
-  // Rules: Starts with a number OR is a high-density row not otherwise classified.
-  if (isNumericColA || (populatedCount >= 5)) {
+  // 3. DATA_ROW
+  // Lowered requirements: if it starts with a number or has decent density, it's an asset.
+  if (isNumericColA || (populatedCount >= 3)) {
     return 'DATA_ROW';
   }
 

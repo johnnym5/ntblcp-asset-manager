@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 301: Added logic to trigger Welcome Experience ONLY on fresh login sessions.
+ * Phase 306: Implemented Bell-Anchored Notification Toast Pulse.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -15,21 +16,14 @@ import {
   LogOut, 
   Bell, 
   Settings as SettingsIcon,
-  Wifi, 
-  WifiOff,
   Search,
   X,
   Download,
   Upload,
-  RefreshCw,
-  LayoutDashboard,
   Filter,
-  ShieldAlert,
-  ShieldCheck,
-  HelpCircle,
-  ClipboardList,
-  Globe,
-  CloudOff
+  CheckCircle2,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -46,7 +40,7 @@ import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -64,6 +58,32 @@ import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { storage } from '@/offline/storage';
+
+function NotificationToast({ notification }: { notification: Notification }) {
+  const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+      className={cn(
+        "absolute top-full right-0 mt-4 w-72 p-4 rounded-2xl border-2 shadow-3xl z-[100] flex items-center gap-4 backdrop-blur-xl",
+        notification.variant === 'destructive' ? "bg-red-600 border-red-500 text-white" :
+        notification.variant === 'success' ? "bg-green-600 border-green-500 text-white" :
+        "bg-[#0A0A0A] border-white/10 text-white"
+      )}
+    >
+      <div className="shrink-0">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
+        <p className="text-[9px] font-medium opacity-80 line-clamp-1 mt-1">{notification.description}</p>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -98,22 +118,33 @@ export default function SPAHub() {
   } = useAppState();
   
   const isMobile = useIsMobile();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, notifications, lastAddedId } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (profileSetupComplete) {
-      // Trigger welcome ONLY if this is a fresh login in the current browser session
       const isFreshLogin = sessionStorage.getItem('assetain-fresh-login') === 'true';
       if (isFreshLogin) {
         setIsWelcomeOpen(true);
       }
     }
   }, [profileSetupComplete]);
+
+  useEffect(() => {
+    if (lastAddedId) {
+      const latest = notifications.find(n => n.id === lastAddedId);
+      if (latest) {
+        setActiveToast(latest);
+        const timer = setTimeout(() => setActiveToast(null), 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [lastAddedId, notifications]);
 
   const handleOnboardingComplete = async () => {
     setIsWelcomeOpen(false);
@@ -306,10 +337,15 @@ export default function SPAHub() {
             <HelpCircle className="h-4 w-4" />
           </button>
 
-          <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-all">
-            <Bell className="h-4 w-4" />
-            {unreadCount > 0 && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-red-600 rounded-full flex items-center justify-center border-2 border-black"><span className="text-[7px] font-black text-white">!</span></div>}
-          </button>
+          <div className="relative">
+            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2 bg-white/5 rounded-lg text-white/40 hover:text-white transition-all">
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && <div className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-red-600 rounded-full flex items-center justify-center border-2 border-black"><span className="text-[7px] font-black text-white">!</span></div>}
+            </button>
+            <AnimatePresence>
+              {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
+            </AnimatePresence>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

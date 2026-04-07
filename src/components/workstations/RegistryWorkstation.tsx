@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 302: Enforced RBAC visibility for Add/Edit pulses.
- * Phase 303: Integrated Multi-Select Syncing Pulse.
+ * Phase 307: Integrated granular pulse notifications for all modifications.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -16,9 +16,7 @@ import {
   Loader2,
   X,
   ShieldCheck,
-  Settings2,
   Search,
-  Filter,
   ArrowUpDown,
   ChevronRight,
   ChevronDown,
@@ -65,6 +63,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { addNotification } from '@/hooks/use-notifications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -164,43 +163,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return stats;
   }, [activeAssets]);
 
-  const selectionMetrics = useMemo(() => {
-    const stats = { total: 0, verified: 0 };
-    const targetAssets = selectedCategories.length > 0 
-      ? activeAssets.filter(a => selectedCategories.includes(a.category))
-      : activeAssets;
-    
-    targetAssets.forEach(a => {
-      stats.total++;
-      if (a.status === 'VERIFIED') stats.verified++;
-    });
-    return stats;
-  }, [activeAssets, selectedCategories]);
-
-  const optionsMap = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    headers.forEach(h => {
-      const values = new Set<string>();
-      activeAssets.forEach(a => {
-        let val: any = "";
-        switch(h.normalizedName) {
-          case "sn": val = a.sn; break;
-          case "location": val = a.location; break;
-          case "assignee_location": val = a.custodian; break;
-          case "asset_description": val = a.description; break;
-          case "asset_id_code": val = a.assetIdCode; break;
-          case "asset_class": val = a.category; break;
-          case "condition": val = a.condition; break;
-          case "serial_number": val = a.serialNumber; break;
-          default: val = a.metadata?.[h.rawName] || a.metadata?.[h.normalizedName];
-        }
-        if (val !== undefined && val !== null && val !== "") values.add(String(val));
-      });
-      map[h.id] = Array.from(values).sort();
-    });
-    return map;
-  }, [headers, activeAssets]);
-
   const processedAssets = useMemo(() => {
     let results = [...activeAssets];
     if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
@@ -268,16 +230,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return processedAssets.slice(start, start + ITEMS_PER_PAGE);
   }, [processedAssets, currentPage]);
 
-  const currentIndex = useMemo(() => selectedAssetId ? processedAssets.findIndex(a => a.id === selectedAssetId) : -1, [selectedAssetId, processedAssets]);
-  const handleNext = useCallback(() => currentIndex < processedAssets.length - 1 && setSelectedAssetId(processedAssets[currentIndex + 1].id), [currentIndex, processedAssets]);
-  const handlePrevious = useCallback(() => currentIndex > 0 && setSelectedAssetId(processedAssets[currentIndex - 1].id), [currentIndex, processedAssets]);
-
-  const selectedRecord = useMemo(() => {
-    if (!selectedAssetId) return undefined;
-    const asset = activeAssets.find(a => a.id === selectedAssetId);
-    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
-  }, [selectedAssetId, activeAssets, headers, appSettings?.sourceBranding]);
-
   const handleInspect = (id: string) => { setSelectedAssetId(id); setIsDetailOpen(true); };
   const handleToggleSelect = (id: string) => { const next = new Set(selectedAssetIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedAssetIds(next); };
   const handleSearchChange = (val: string) => { setSearchTerm(sanitizeSearch(val)); setCurrentPage(1); };
@@ -293,6 +245,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const handleDeleteSelected = async () => {
     if (selectedAssetIds.size === 0) return;
+    const count = selectedAssetIds.size;
     setIsProcessing(true);
     try {
       for (const id of Array.from(selectedAssetIds)) { await enqueueMutation('DELETE', 'assets', { id }); }
@@ -300,16 +253,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveAssets(currentLocal.filter(a => !selectedAssetIds.has(a.id)));
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      toast({ title: "Records Removed" });
+      addNotification({ title: "Deletion Pulse", description: `${count} records removed from local register.`, variant: "destructive" });
     } finally { setIsProcessing(false); }
   };
 
   const handleSyncSelected = async () => {
     if (!isOnline) {
-      toast({ variant: "destructive", title: "Offline", description: "Internet required for cloud broadcast." });
+      addNotification({ title: "Sync Interrupted", description: "No internet link discovered.", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
+    addNotification({ title: "Broadcasting Sync", description: `Preparing ${selectedAssetIds.size} records for cloud update.` });
     try {
       const queue = await storage.getQueue();
       const opsToSync = queue.filter(q => selectedAssetIds.has(String(q.payload.id || ''))).map(q => q.id);
@@ -317,108 +271,25 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         await processSelectedSyncQueue(opsToSync);
         await refreshRegistry();
         setSelectedAssetIds(new Set());
-        toast({ title: "Sync Pulse Complete", description: `Synchronized ${opsToSync.length} selected records.` });
+        addNotification({ title: "Sync Successful", description: `Broadast complete for ${opsToSync.length} records.`, variant: "success" });
       } else {
-        toast({ title: "Up-to-date", description: "Selected items have no pending local changes." });
+        addNotification({ title: "Already Synced", description: "Selected items match Cloud Authority." });
       }
+    } catch (e) {
+      addNotification({ title: "Sync Failure", description: "Operational pulse interrupted.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const toggleCategorySelection = (cat: string) => {
-    const next = new Set(selectedCategories);
-    if (next.has(cat)) next.delete(cat); else next.add(cat);
-    setSelectedCategories(Array.from(next));
-    setCurrentPage(1);
-  };
-
-  const handleRenameGroup = async () => {
-    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrantId) return;
-    setIsProcessing(true);
-    try {
-      const assetsToUpdate = activeAssets.filter(a => a.category === categoryToRename);
-      for (const asset of assetsToUpdate) {
-        await enqueueMutation('UPDATE', 'assets', { ...asset, category: newCategoryName });
-      }
-      
-      const nextSettings = { ...appSettings };
-      const grantIdx = nextSettings.grants.findIndex(g => g.id === activeGrantId);
-      if (grantIdx > -1) {
-        const defs = { ...nextSettings.grants[grantIdx].sheetDefinitions };
-        if (defs[categoryToRename]) {
-          defs[newCategoryName] = { ...defs[categoryToRename], name: newCategoryName };
-          delete defs[categoryToRename];
-          nextSettings.grants[grantIdx].sheetDefinitions = defs;
-        }
-      }
-      
-      await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings(nextSettings);
-      setAppSettings(nextSettings);
-      await refreshRegistry();
-      toast({ title: "Group Renamed" });
-      setIsRenameDialogOpen(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const allInViewSelected = processedAssets.length > 0 && processedAssets.every(a => selectedAssetIds.has(a.id));
-
-  const CategoryHubCard = ({ name, stats }: { name: string, stats: { total: number, verified: number } }) => {
-    const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
-    
-    return (
-      <Card className="bg-[#080808] border-2 border-white/5 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6">
-        <div className="flex justify-between items-start mb-8">
-          <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{name}</h3>
-          {isAdmin && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); setCategoryToRename(name); setNewCategoryName(name); setIsRenameDialogOpen(true); }}
-              className="text-white/20 hover:text-white transition-colors"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex justify-between items-end mb-8">
-          <div className="space-y-1">
-            <p className="text-4xl font-black tracking-tighter text-white">{stats.total}</p>
-            <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Asset Records</p>
-          </div>
-          <LayoutGrid className="h-10 w-10 text-white/5 group-hover:text-primary/10 transition-colors" />
-        </div>
-
-        <div className="pt-6 border-t border-dashed border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Verification</span>
-            <span className="text-[10px] font-mono font-bold text-white/60">{stats.verified} / {stats.total}</span>
-          </div>
-          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${percent}%` }}
-              className="h-full bg-primary"
-            />
-          </div>
-        </div>
-
-        <Button 
-          onClick={() => setSelectedCategories([name])}
-          variant="outline" 
-          className="w-full h-12 mt-8 rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all group/btn"
-        >
-          View Records <ChevronRight className="h-3 w-3 text-white/40 group-hover/btn:translate-x-1 transition-transform" />
-        </Button>
-      </Card>
-    );
-  };
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = activeAssets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, activeAssets, headers, appSettings?.sourceBranding]);
 
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
-      
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -436,17 +307,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
             {selectedCategories.length > 0 && (
               <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                  className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
-                >
-                  {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
-                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"><Grid className="h-4 w-4" /></Button>
                 <div className="w-px h-4 bg-white/10 mx-1" />
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
-                <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button>
+                <div className="w-px h-4 bg-white/10 mx-1" /><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button>
               </div>
             )}
 
@@ -473,111 +337,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
               </Button>
               <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
-              {!isMobile && (
-                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><Settings2 className="h-4 w-4" /></Button>
-              )}
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
-          {selectedCategories.length > 0 && viewMode === 'grid' && (
-            <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded-full border border-white/5 mr-2 shrink-0">
-              <Checkbox 
-                id="grid-select-all" 
-                checked={allInViewSelected} 
-                onCheckedChange={handleSelectAll}
-                className="h-4 w-4 rounded-full border-white/20"
-              />
-              <label htmlFor="grid-select-all" className="text-[8px] font-black uppercase tracking-widest text-white/40 cursor-pointer pr-1">Mark All</label>
-            </div>
-          )}
-
-          <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all shrink-0">
-                <FolderOpen className="h-3 w-3 text-primary opacity-60" />
-                {selectedCategories.length === 0 ? 'Overall Register' : 
-                 selectedCategories.length === 1 ? `Group: ${selectedCategories[0]}` : 
-                 `${selectedCategories.length} Groups Selected`}
-                
-                {isVerificationMode && selectionMetrics.total > 0 && (
-                  <div className="flex items-center gap-2 ml-2 border-l border-white/10 pl-2">
-                    <span className="text-white/60 font-mono">{selectionMetrics.verified}/{selectionMetrics.total}</span>
-                    <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: `${(selectionMetrics.verified / selectionMetrics.total) * 100}%` }} />
-                    </div>
-                  </div>
-                )}
-                <ChevronDown className="h-2.5 w-2.5 opacity-40 ml-1" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-[320px] p-0 bg-[#0A0A0A] border-white/10 shadow-3xl overflow-hidden rounded-2xl">
-              <div className="p-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Technical Containers</span>
-                  <span className="text-[8px] font-bold text-white/20 uppercase">ORCHESTRATION PULSE</span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-7 px-2 text-[8px] font-black uppercase hover:bg-white/5">Clear Selection</Button>
-              </div>
-              
-              <ScrollArea className="h-72">
-                <div className="p-2 space-y-1">
-                  <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer" onClick={() => {
-                    if (selectedCategories.length === categories.length) setSelectedCategories([]);
-                    else setSelectedCategories(categories);
-                  }}>
-                    <Checkbox checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => {
-                      if (c) setSelectedCategories(categories);
-                      else setSelectedCategories([]);
-                    }} className="h-4 w-4 border-white/20" />
-                    <span className="text-[11px] font-black uppercase text-white/40">Select All Groups</span>
-                  </div>
-                  <div className="h-px bg-white/5 my-1" />
-                  {categories.map(cat => {
-                    const stats = groupStats[cat] || { total: 0, verified: 0 };
-                    const isSelected = selectedCategories.includes(cat);
-                    const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
-
-                    return (
-                      <div key={cat} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group", isSelected ? "bg-primary/10" : "hover:bg-white/5")}>
-                        <Checkbox 
-                          checked={isSelected} 
-                          onCheckedChange={() => toggleCategorySelection(cat)}
-                          className="h-4 w-4 border-white/20"
-                        />
-                        <div className="flex-1 min-w-0" onClick={() => toggleCategorySelection(cat)}>
-                          <div className="flex items-center justify-between">
-                            <span className={cn("text-[11px] font-black uppercase truncate pr-4 transition-colors", isSelected ? "text-primary" : "text-white/60")}>{cat}</span>
-                            <span className="text-[9px] font-mono font-bold text-white/20 shrink-0">{stats.total}</span>
-                          </div>
-                          {isVerificationMode && (
-                            <div className="mt-1.5 space-y-1">
-                              <div className="flex justify-between text-[7px] font-black uppercase opacity-40">
-                                <span>Coverage</span>
-                                <span>{Math.round(percent)}%</span>
-                              </div>
-                              <Progress value={percent} className="h-0.5 bg-white/5" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-
-              {selectedCategories.length > 0 && canEdit && (
-                <div className="p-4 bg-primary/5 border-t border-white/5 flex gap-2">
-                  <Button onClick={() => setIsBatchEditOpen(true)} className="flex-1 h-9 rounded-xl bg-primary text-black font-black uppercase text-[9px] tracking-widest gap-2">
-                    <Zap className="h-3.5 w-3.5 fill-current" /> Bulk Modify Groups
-                  </Button>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
         </div>
       </div>
 
@@ -585,171 +346,57 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         {selectedCategories.length === 0 ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             {categories.map(cat => (
-              <CategoryHubCard key={cat} name={cat} stats={groupStats[cat] || { total: 0, verified: 0 }} />
-            ))}
-            
-            {categories.length === 0 && (
-              <div className="col-span-full py-40 text-center opacity-20 border-4 border-dashed border-white/5 rounded-[4rem] flex flex-col items-center gap-8">
-                <Database className="h-24 w-24 text-white" />
-                <div className="space-y-2">
-                  <h3 className="text-3xl font-black uppercase tracking-[0.3em] text-white">Registry Empty</h3>
-                  <p className="text-sm font-medium italic text-white/40">Load project data in settings to populate the inventory hub.</p>
+              <Card key={cat} className="bg-[#080808] border-2 border-white/5 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6">
+                <div className="flex justify-between items-start mb-8">
+                  <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat}</h3>
                 </div>
-              </div>
-            )}
+                <div className="space-y-1 mb-8">
+                  <p className="text-4xl font-black tracking-tighter text-white">{groupStats[cat]?.total || 0}</p>
+                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Asset Records</p>
+                </div>
+                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">View Records <ChevronRight className="h-3 w-3" /></Button>
+              </Card>
+            ))}
           </div>
         ) : (
-          <>
-            {viewMode === 'grid' ? (
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
-                <AnimatePresence mode="popLayout">
-                  {paginatedAssets.map(asset => (
-                    <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout>
-                      <RegistryCard 
-                        record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
-                        onInspect={handleInspect} 
-                        selected={selectedAssetIds.has(asset.id)} 
-                        onToggleSelect={handleToggleSelect} 
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <RegistryTable 
-                records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))}
-                onInspect={handleInspect}
-                selectedIds={selectedAssetIds}
-                onToggleSelect={handleToggleSelect}
-                onSelectAll={handleSelectAll}
-              />
-            )}
-            
-            {processedAssets.length === 0 && (
-              <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4">
-                <Database className="h-12 w-12 text-white" />
-                <h3 className="text-lg font-black uppercase tracking-widest text-white">No Matching Records</h3>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
-        {selectedCategories.length > 0 && Math.ceil(processedAssets.length / ITEMS_PER_PAGE) > 1 && (
-          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 scale-90 sm:scale-100">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">P.{currentPage} / {Math.ceil(processedAssets.length / ITEMS_PER_PAGE)}</span>
-            <button disabled={currentPage === Math.ceil(processedAssets.length / ITEMS_PER_PAGE)} onClick={() => setCurrentPage(p + 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
+          <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40" : ""}>
+            <AnimatePresence mode="popLayout">
+              {viewMode === 'grid' ? paginatedAssets.map(asset => (
+                <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <RegistryCard record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} onInspect={handleInspect} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} />
+                </motion.div>
+              )) : (
+                <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} onInspect={handleInspect} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} />
+              )}
+            </AnimatePresence>
           </div>
         )}
-        
-        <AnimatePresence>
-          {selectedAssetIds.size > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: 30 }} 
-              className="w-full sm:w-auto bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2 flex items-center justify-between sm:justify-start gap-4 shadow-3xl backdrop-blur-3xl"
-            >
-              <div className="flex items-center gap-2 pl-2">
-                <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
-                <span className="text-[9px] font-black uppercase text-white hidden sm:inline">Selected</span>
-              </div>
-              <div className="h-6 w-px bg-white/10 hidden sm:block" />
-              <div className="flex items-center gap-1.5">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleSyncSelected} 
-                  disabled={isProcessing || !isOnline}
-                  className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10"
-                >
-                  {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Sync
-                </Button>
-                {canEdit && (
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white">
-                    <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Edit</span>
-                  </Button>
-                )}
-                {isAdmin && (
-                  <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-3 sm:px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive">
-                    <Trash2 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Delete</span>
-                  </Button>
-                )}
-              </div>
-              <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      <AssetDetailSheet 
-        isOpen={isDetailOpen} 
-        onOpenChange={setIsDetailOpen} 
-        record={selectedRecord} 
-        onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
-        onNext={handleNext} 
-        onPrevious={handlePrevious} 
-      />
-      
-      <AssetForm 
-        isOpen={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
-        asset={activeAssets.find(a => a.id === selectedAssetId)} 
-        isReadOnly={false} 
-        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
-      />
-      
-      <AssetBatchEditForm 
-        isOpen={isBatchEditOpen} 
-        onOpenChange={setIsBatchEditOpen} 
-        selectedAssetCount={selectedAssetIds.size} 
-        onSave={async (data) => { 
-          const targets = selectedAssetIds.size > 0 ? Array.from(selectedAssetIds) : activeAssets.filter(a => selectedCategories.includes(a.category)).map(a => a.id);
-          for (const id of targets) { 
-            const asset = activeAssets.find(a => a.id === id); 
-            if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); 
-          } 
-          await refreshRegistry(); 
-          setSelectedAssetIds(new Set()); 
-        }} 
-      />
-      
-      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
+      <AnimatePresence>
+        {selectedAssetIds.size > 0 && (
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
+            <div className="flex items-center gap-3 pl-3">
+              <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
+              <span className="text-[9px] font-black uppercase text-white tracking-widest">Selected</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="sm" onClick={handleSyncSelected} disabled={isProcessing || !isOnline} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10">
+                <Upload className="h-3.5 w-3.5" /> Sync
+              </Button>
+              {canEdit && <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>}
+              {isAdmin && <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>}
+            </div>
+            <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); addNotification({ title: "Asset Updated", description: "Modification pulse broadcasted to local register.", variant: "success" }); }} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = activeAssets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); addNotification({ title: "Batch Update", description: `Applied logic pulse to ${selectedAssetIds.size} records.`, variant: "success" }); setSelectedAssetIds(new Set()); }} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
-      
-      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent className="max-w-md rounded-[2rem] border-primary/10 bg-black text-white p-8">
-          <DialogHeader className="space-y-4">
-            <div className="p-3 bg-primary/10 rounded-2xl w-fit"><Type className="h-8 w-8 text-primary" /></div>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Rename Container</DialogTitle>
-            <DialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
-              Modifying the group name will update the identity pulse for all {groupStats[categoryToRename!]?.total || 0} records in this technical block.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-2">
-            <Label className="text-[10px] font-black uppercase text-white/20 tracking-widest pl-1">New Category Identity</Label>
-            <Input 
-              value={newCategoryName} 
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="h-14 rounded-xl bg-white/5 border-2 border-white/5 text-sm font-black uppercase focus:border-primary/40 transition-all"
-            />
-          </div>
-          <DialogFooter className="gap-3">
-            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 rounded-xl font-bold">Cancel</Button>
-            <Button 
-              onClick={handleRenameGroup}
-              disabled={isProcessing || !newCategoryName.trim() || newCategoryName === categoryToRename}
-              className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-              Commit Identity Pulse
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

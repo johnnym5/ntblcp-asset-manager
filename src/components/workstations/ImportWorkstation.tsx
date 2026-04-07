@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
- * Phase 650: strictly processes only the first sheet and focuses on structural groups.
+ * Phase 651: Added specific pulse notifications for discovery and commit.
  */
 
 import React, { useState, useRef } from 'react';
@@ -32,6 +33,7 @@ import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { FirestoreService } from '@/services/firebase/firestore';
+import { addNotification } from '@/hooks/use-notifications';
 import * as XLSX from 'xlsx';
 import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -70,6 +72,7 @@ export function ImportWorkstation() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    addNotification({ title: "Inbound Workbook", description: `Initializing pulse for ${file.name}...` });
     setCurrentStep('SCANNING');
     setIsProcessing(true);
     setProgress(10);
@@ -79,7 +82,6 @@ export function ImportWorkstation() {
       const workbook = XLSX.read(buffer, { type: 'array' });
       setProgress(40);
 
-      // CRITICAL: take only the first relevant sheet
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
@@ -92,13 +94,15 @@ export function ImportWorkstation() {
       setSelectedIds(new Set(groups.map(g => g.id)));
       setProgress(100);
 
+      addNotification({ title: "Discovery Complete", description: `Identified ${groups.length} structural groups in sheet.` });
+
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('STRUCTURE');
       }, 800);
 
     } catch (error) {
-      toast({ variant: "destructive", title: "Import Failure", description: "Workbook pulse was non-deterministic." });
+      addNotification({ title: "Ingestion Error", description: "Workbook pulse was non-deterministic.", variant: "destructive" });
       setCurrentStep('INGEST');
     }
   };
@@ -107,6 +111,7 @@ export function ImportWorkstation() {
     if (!engineRef.current || selectedGroupIds.size === 0 || !activeSheetData) return;
     
     setIsProcessing(true);
+    addNotification({ title: "Mapping Pulse", description: `Processing ${selectedGroupIds.size} selected blocks...` });
     setProgress(50);
 
     try {
@@ -133,40 +138,38 @@ export function ImportWorkstation() {
       await storage.saveToSandbox(allStaged as any[]);
       
       setProgress(100);
+      addNotification({ title: "Sandbox Ready", description: `Staged ${allStaged.length} records for reconciliation.`, variant: "success" });
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('RECONCILE');
       }, 500);
     } catch (e) {
-      toast({ variant: "destructive", title: "Ingestion Interrupted" });
+      addNotification({ title: "Mapping Interrupted", description: "Structural alignment failed.", variant: "destructive" });
       setIsProcessing(false);
     }
   };
 
   const handleCommitToRegistry = async () => {
     if (!activeGrantId || !appSettings) {
-      toast({ variant: "destructive", title: "Project Required", description: "Select an active project in settings." });
+      addNotification({ title: "Governance Lock", description: "Select an active project first.", variant: "destructive" });
       return;
     }
 
     setIsProcessing(true);
+    addNotification({ title: "Merging Registry", description: "Committing staged records to central register..." });
     try {
-      // 1. Queue all assets for sync
       for (const asset of stagedAssets) {
         const assetWithGrant = { ...asset, grantId: activeGrantId };
         await enqueueMutation('CREATE', 'assets', assetWithGrant);
       }
 
-      // 2. Persist to local registry
       const current = await storage.getAssets();
       const validAssets = stagedAssets.map(a => ({ ...a, grantId: activeGrantId }));
       await storage.saveAssets([...validAssets, ...current]);
       
-      // 3. AUTO-ENABLE new categories in settings for Overview pulse
       const newCategories = Array.from(new Set(validAssets.map(a => a.category)));
       const nextEnabledSheets = Array.from(new Set([...appSettings.enabledSheets, ...newCategories]));
       
-      // Also update sheetDefinitions if needed (though already done via import)
       const nextSettings = { ...appSettings, enabledSheets: nextEnabledSheets };
       await storage.saveSettings(nextSettings);
       if (isOnline) await FirestoreService.updateSettings({ enabledSheets: nextEnabledSheets });
@@ -174,7 +177,7 @@ export function ImportWorkstation() {
 
       await storage.clearSandbox();
       
-      toast({ title: "Merge Complete", description: `${validAssets.length} records pushed to registry and enabled in overview.` });
+      addNotification({ title: "Merge Complete", description: `${validAssets.length} records pushed to registry.`, variant: "success" });
       setDataSource('PRODUCTION');
       await refreshRegistry();
       setCurrentStep('SUMMARY');
