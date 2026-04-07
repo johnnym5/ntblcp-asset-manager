@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Unified Global Command Hub.
  * Phase 260: Applied user-friendly Asset Management terminology.
  * Phase 300: Mobile optimization with Notch Safety & Device padding.
+ * Phase 301: Applied app-container class for resolution-locked dynamic viewport logic.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -129,13 +130,13 @@ export default function SPAHub() {
   const isAdmin = userProfile?.isAdmin || false;
 
   return (
-    <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30 text-white">
+    <div className="app-container bg-black font-sans selection:bg-primary/30 text-white">
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-black/80 backdrop-blur-3xl z-40 gap-4 md:gap-8">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-black/80 backdrop-blur-3xl z-40 gap-4 md:gap-8 shrink-0">
           <div className="flex items-center gap-3 md:gap-6 shrink-0">
             {activeView !== 'DASHBOARD' ? (
               <button 
@@ -177,8 +178,7 @@ export default function SPAHub() {
                 <ArrowUpDown className="h-4 w-4" />
               </Button>
               <Button 
-                variant="ghost" 
-                size="icon" 
+                variant="ghost" size="icon" 
                 onClick={() => setIsFilterOpen(true)}
                 className={cn(
                   "h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all relative",

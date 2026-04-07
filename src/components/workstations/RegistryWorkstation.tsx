@@ -3,6 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - Asset Inventory & Category Hub.
  * Phase 700: Responsive Grid & List orchestration with fill-space scrollarea.
+ * Phase 701: Fixed ReferenceError by adding missing Table component imports.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -49,6 +50,14 @@ import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { transformAssetToRecord } from '@/lib/registry-utils';
@@ -381,7 +390,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <Card key={cat.name} className="bg-[#080808] border-2 border-white/5 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden group hover:border-primary/20 transition-all shadow-3xl">
                       <CardHeader className="p-6 md:p-8 pb-4 border-b border-white/5 bg-white/[0.01]">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3 min-0">
                             <div className="p-2 bg-primary/10 rounded-lg shrink-0"><TableIcon className="h-4 w-4 text-primary" /></div>
                             <h3 className="text-xs md:text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat.name}</h3>
                           </div>
