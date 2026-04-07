@@ -2,9 +2,8 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 1013: Upgraded to multi-select Group Orchestrator with metrics and renaming.
- * Phase 1014: Optimized Sticky Header Pulse for enclosed workstation cage.
- * Phase 1015: Added Grid View Select All logic.
+ * Phase 1020: Implemented Specification-Parity Category Hub cards.
+ * Phase 1021: Optimized for high-density amoled visual language.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -38,7 +37,8 @@ import {
   MoreVertical,
   Type,
   Globe,
-  CloudOff
+  CloudOff,
+  LayoutGrid
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -87,6 +87,7 @@ import {
 } from '@/components/ui/dialog';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition, Asset } from '@/types/domain';
+import { Card, CardContent } from '../ui/card';
 
 const ITEMS_PER_PAGE = 60;
 
@@ -341,6 +342,55 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const allInViewSelected = processedAssets.length > 0 && processedAssets.every(a => selectedAssetIds.has(a.id));
 
+  // High-Fidelity Category Card matching the user's specification
+  const CategoryHubCard = ({ name, stats }: { name: string, stats: { total: number, verified: number } }) => {
+    const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
+    
+    return (
+      <Card className="bg-[#080808] border-2 border-white/5 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6">
+        <div className="flex justify-between items-start mb-8">
+          <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{name}</h3>
+          <button 
+            onClick={(e) => { e.stopPropagation(); setCategoryToRename(name); setNewCategoryName(name); setIsRenameDialogOpen(true); }}
+            className="text-white/20 hover:text-white transition-colors"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex justify-between items-end mb-8">
+          <div className="space-y-1">
+            <p className="text-4xl font-black tracking-tighter text-white">{stats.total}</p>
+            <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Asset Records</p>
+          </div>
+          <LayoutGrid className="h-10 w-10 text-white/5 group-hover:text-primary/10 transition-colors" />
+        </div>
+
+        <div className="pt-6 border-t border-dashed border-white/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Verification</span>
+            <span className="text-[10px] font-mono font-bold text-white/60">{stats.verified} / {stats.total}</span>
+          </div>
+          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${percent}%` }}
+              className="h-full bg-primary"
+            />
+          </div>
+        </div>
+
+        <Button 
+          onClick={() => setSelectedCategories([name])}
+          variant="outline" 
+          className="w-full h-12 mt-8 rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all group/btn"
+        >
+          View Records <ChevronRight className="h-3 w-3 text-white/40 group-hover/btn:translate-x-1 transition-transform" />
+        </Button>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
       
@@ -348,30 +398,36 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           Workstation Sticky Header Pulse:
           Persistent within the windowed cage during scrolling.
       */}
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1">
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
             <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">Inventory</h2>
-              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">Registry Pulse</p>
+              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">
+                {selectedCategories.length === 0 ? 'Inventory Hub' : 'Registry Pulse'}
+              </h2>
+              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">
+                {selectedCategories.length === 0 ? 'GROUP OVERVIEW' : 'DETAILED INSPECTION'}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-            <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
-              >
-                {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
-              </Button>
-              <div className="w-px h-4 bg-white/10 mx-1" />
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
-              <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
-            </div>
+            {selectedCategories.length > 0 && (
+              <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                  className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
+                >
+                  {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
+                </Button>
+                <div className="w-px h-4 bg-white/10 mx-1" />
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
+              </div>
+            )}
 
             <div className="flex items-center justify-end flex-1 min-w-0">
               <AnimatePresence mode="wait">
@@ -401,9 +457,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        {/* Multifunctional Group Selector Pulse */}
+        {/* Global Toolbar Pulse */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
-          {viewMode === 'grid' && (
+          {selectedCategories.length > 0 && viewMode === 'grid' && (
             <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded-full border border-white/5 mr-2 shrink-0">
               <Checkbox 
                 id="grid-select-all" 
@@ -485,15 +541,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                             </div>
                           )}
                         </div>
-                        
-                        {isAdmin && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }}
-                            className="p-1.5 rounded-lg text-white/10 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
                     );
                   })}
@@ -512,44 +559,64 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
-      {/* Primary Registry Grid / Table */}
+      {/* Main Surface: Hub View or Drill-down View */}
       <div className="flex-1 min-h-0 px-1 pt-4">
-        {viewMode === 'grid' ? (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
-            <AnimatePresence mode="popLayout">
-              {paginatedAssets.map(asset => (
-                <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout>
-                  <RegistryCard 
-                    record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
-                    onInspect={handleInspect} 
-                    selected={selectedAssetIds.has(asset.id)} 
-                    onToggleSelect={handleToggleSelect} 
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+        {selectedCategories.length === 0 ? (
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
+            {categories.map(cat => (
+              <CategoryHubCard key={cat} name={cat} stats={groupStats[cat] || { total: 0, verified: 0 }} />
+            ))}
+            
+            {categories.length === 0 && (
+              <div className="col-span-full py-40 text-center opacity-20 border-4 border-dashed border-white/5 rounded-[4rem] flex flex-col items-center gap-8">
+                <Database className="h-24 w-24 text-white" />
+                <div className="space-y-2">
+                  <h3 className="text-3xl font-black uppercase tracking-[0.3em] text-white">Registry Empty</h3>
+                  <p className="text-sm font-medium italic text-white/40">Load project data in settings to populate the inventory hub.</p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          <RegistryTable 
-            records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))}
-            onInspect={handleInspect}
-            selectedIds={selectedAssetIds}
-            onToggleSelect={handleToggleSelect}
-            onSelectAll={handleSelectAll}
-          />
-        )}
-        
-        {processedAssets.length === 0 && (
-          <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4">
-            <Database className="h-12 w-12 text-white" />
-            <h3 className="text-lg font-black uppercase tracking-widest text-white">Registry Silent</h3>
-          </div>
+          <>
+            {viewMode === 'grid' ? (
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
+                <AnimatePresence mode="popLayout">
+                  {paginatedAssets.map(asset => (
+                    <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout>
+                      <RegistryCard 
+                        record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                        onInspect={handleInspect} 
+                        selected={selectedAssetIds.has(asset.id)} 
+                        onToggleSelect={handleToggleSelect} 
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <RegistryTable 
+                records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))}
+                onInspect={handleInspect}
+                selectedIds={selectedAssetIds}
+                onToggleSelect={handleToggleSelect}
+                onSelectAll={handleSelectAll}
+              />
+            )}
+            
+            {processedAssets.length === 0 && (
+              <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4">
+                <Database className="h-12 w-12 text-white" />
+                <h3 className="text-lg font-black uppercase tracking-widest text-white">No Matching Records</h3>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Floating Interactive Controls */}
       <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
-        {Math.ceil(processedAssets.length / ITEMS_PER_PAGE) > 1 && (
+        {selectedCategories.length > 0 && Math.ceil(processedAssets.length / ITEMS_PER_PAGE) > 1 && (
           <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4 scale-90 sm:scale-100">
             <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
             <span className="text-[9px] font-black uppercase tracking-widest text-white/60">P.{currentPage} / {Math.ceil(processedAssets.length / ITEMS_PER_PAGE)}</span>
