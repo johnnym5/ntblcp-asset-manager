@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 315: Implemented Category Selection, Batch Actions, and Rename Pulse.
+ * Phase 316: Fixed optionsMap and handleSelectAll reference errors.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -232,10 +232,42 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return processedAssets.slice(start, start + ITEMS_PER_PAGE);
   }, [processedAssets, currentPage]);
 
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    headers.forEach(header => {
+      const values = new Set<string>();
+      activeAssets.forEach(a => {
+        let val: any = "";
+        switch(header.normalizedName) {
+          case "sn": val = a.sn; break;
+          case "location": val = a.location; break;
+          case "assignee_location": val = a.custodian; break;
+          case "asset_description": val = a.description; break;
+          case "asset_id_code": val = a.assetIdCode; break;
+          case "asset_class": val = a.category; break;
+          case "condition": val = a.condition; break;
+          case "serial_number": val = a.serialNumber; break;
+          default: val = a.metadata?.[header.rawName] || a.metadata?.[header.normalizedName];
+        }
+        if (val !== undefined && val !== null && val !== "") values.add(String(val));
+      });
+      map[header.id] = Array.from(values).sort();
+    });
+    return map;
+  }, [activeAssets, headers]);
+
   const handleInspect = (id: string) => { setSelectedAssetId(id); setIsDetailOpen(true); };
   const handleToggleSelect = (id: string) => { const next = new Set(selectedAssetIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedAssetIds(next); };
   const handleSearchChange = (val: string) => { setSearchTerm(sanitizeSearch(val)); setCurrentPage(1); };
   
+  const handleSelectAll = useCallback((checked: boolean) => {
+    if (checked) {
+      setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
+    } else {
+      setSelectedAssetIds(new Set());
+    }
+  }, [processedAssets]);
+
   const toggleCategorySelection = (cat: string) => {
     const next = new Set(selectedCategories);
     if (next.has(cat)) next.delete(cat); else next.add(cat);
