@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Mission Control.
- * Phase 450: Hardened for mobile horizontal tab navigation.
+ * Phase 455: Enhanced with consistent workstation padding and scroll boundaries.
  */
 
 import React, { useState } from 'react';
@@ -32,7 +32,7 @@ export function DashboardWorkstation() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
   
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 max-w-[1600px] mx-auto pb-32 md:pb-20">
+    <div className="space-y-10 animate-in fade-in duration-700 max-w-[1600px] mx-auto pb-40">
       
       {/* 1. Unified Navigation Tabs - Optimized for swiping */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1">
@@ -63,15 +63,15 @@ export function DashboardWorkstation() {
       </div>
 
       {/* 2. Unified Content Surface */}
-      <div className="min-h-[50vh]">
+      <div className="min-h-screen">
         <Tabs value={activeTab} className="w-full">
-          <TabsContent value="dashboard" className="m-0 space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <TabsContent value="dashboard" className="m-0 space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Aggregate Stats Pulse */}
             <AssetSummaryDashboard />
             
             {/* Merged Logic Grid: Reports & Sync */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 items-start px-1">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 items-start px-1">
+              <div className="space-y-8">
                 <div className="flex items-center gap-3 px-1">
                   <FileText className="h-4 w-4 text-primary" />
                   <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Report Center</h3>
@@ -79,7 +79,7 @@ export function DashboardWorkstation() {
                 <ReportsWorkstation isEmbedded={true} />
               </div>
               
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <div className="flex items-center gap-3 px-1">
                   <Activity className="h-4 w-4 text-primary" />
                   <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Sync Architecture</h3>
@@ -89,7 +89,7 @@ export function DashboardWorkstation() {
             </div>
 
             {/* Merged History Pulse */}
-            <div className="space-y-6 px-1 pt-10 border-t border-white/5">
+            <div className="space-y-8 px-1 pt-12 border-t border-white/5">
               <div className="flex items-center gap-3 px-1">
                 <History className="h-4 w-4 text-primary" />
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Activity History</h3>

@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 260: Applied user-friendly Asset Management terminology.
- * Phase 300: Mobile optimization with Notch Safety & Device padding.
- * Phase 301: Applied app-container class for resolution-locked dynamic viewport logic.
+ * Phase 305: Implemented global workstation scrolling and consistent container padding.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -316,9 +314,11 @@ export default function SPAHub() {
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening Workspace...</p>
               </div>
             }>
-              <div className="h-full p-4 md:p-10">
-                {renderWorkstation()}
-              </div>
+              <ScrollArea className="h-full custom-scrollbar">
+                <div className="min-h-full p-6 md:p-12 lg:p-16">
+                  {renderWorkstation()}
+                </div>
+              </ScrollArea>
             </Suspense>
           </ErrorBoundary>
         </div>
