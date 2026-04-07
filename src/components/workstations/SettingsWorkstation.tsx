@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Hardened for deployment: fixed References and unified domain imports.
+ * Consolidated for production stability: integrates Database and System Health as tabs.
  */
 
 import React, { useState } from 'react';
@@ -37,7 +37,9 @@ import {
   Layers,
   Search,
   HeartPulse,
-  Terminal
+  Terminal,
+  RotateCcw,
+  Bomb
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -65,6 +67,16 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
   const { 
@@ -86,6 +98,7 @@ export function SettingsWorkstation() {
   const [newProjectName, setNewProjectName] = useState('');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -138,6 +151,19 @@ export function SettingsWorkstation() {
     toast({ title: "Project Removed" });
   };
 
+  const handleSystemReset = async () => {
+    setIsSaving(true);
+    try {
+      await storage.clearAssets();
+      await storage.clearSandbox();
+      localStorage.removeItem('assetain-user-session');
+      toast({ title: "Local Cache Purged" });
+      window.location.reload();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!settingsLoaded || !appSettings) {
     return <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -147,7 +173,7 @@ export function SettingsWorkstation() {
       <div className="flex items-center justify-between px-1 mb-10">
         <div className="space-y-1">
           <h2 className="text-3xl font-black uppercase text-white tracking-tight">Settings</h2>
-          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">Manage application settings and preferences.</p>
+          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">Administrative Control Hub</p>
         </div>
         <button 
           onClick={() => setActiveView('DASHBOARD')}
@@ -165,12 +191,12 @@ export function SettingsWorkstation() {
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="groups" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <LayoutGrid className="h-3.5 w-3.5" /> Projects & Sheets
+                <LayoutGrid className="h-3.5 w-3.5" /> Projects
               </TabsTrigger>
             )}
             {isAdmin && (
               <TabsTrigger value="users" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <Users className="h-3.5 w-3.5" /> Users
+                <Users className="h-3.5 w-3.5" /> Auditors
               </TabsTrigger>
             )}
             {isSuperAdmin && (
@@ -180,7 +206,7 @@ export function SettingsWorkstation() {
             )}
             {isSuperAdmin && (
               <TabsTrigger value="system" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <HeartPulse className="h-3.5 w-3.5" /> System Health
+                <HeartPulse className="h-3.5 w-3.5" /> Resilience
               </TabsTrigger>
             )}
             <TabsTrigger value="history" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
@@ -193,138 +219,55 @@ export function SettingsWorkstation() {
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Appearance</h3>
             <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-3xl">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <Palette className="h-4 w-4 text-white/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Theme Selection</span>
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Sun className="h-4 w-4" /> Light</Button>
-                  <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Moon className="h-4 w-4" /> Dark</Button>
-                  <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Database className="h-4 w-4" /> System</Button>
-                </div>
+              <div className="flex flex-wrap gap-4">
+                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Sun className="h-4 w-4" /> Light</Button>
+                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-14 rounded-xl font-black uppercase text-[10px] border-2 gap-3"><Moon className="h-4 w-4" /> Dark</Button>
               </div>
             </Card>
           </div>
 
           <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Security</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-10 shadow-3xl">
-              <div className="space-y-8">
-                <div className="flex items-center gap-3">
-                  <KeyRound className="h-4 w-4 text-white/40" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Change Passphrase</span>
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Safety Protocols</h3>
+            <Card className="bg-destructive/5 border-2 border-destructive/20 rounded-[2rem] p-10 shadow-3xl">
+              <div className="flex items-center justify-between gap-8">
+                <div className="space-y-1">
+                  <h4 className="text-lg font-black uppercase text-white leading-none">Emergency Local Reset</h4>
+                  <p className="text-[10px] font-bold text-destructive/60 uppercase tracking-widest italic">PURGE ALL LOCAL RECORDS AND SESSION CACHE</p>
                 </div>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-white/40">Current</Label>
-                      <Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} className="h-12 bg-black/40 border-white/5 rounded-xl font-bold" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-white/40">New</Label>
-                      <Input type="password" value={passwords.next} onChange={e => setPasswords({...passwords, next: e.target.value})} className="h-12 bg-black/40 border-white/5 rounded-xl font-bold" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-white/40">Confirm</Label>
-                      <Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} className="h-12 bg-black/40 border-white/5 rounded-xl font-bold" />
-                    </div>
-                  </div>
-                  <Button className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl">Stage Update</Button>
-                </div>
+                <Button variant="outline" onClick={() => setIsResetDialogOpen(true)} className="h-14 px-8 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest">
+                  Reset local workspace
+                </Button>
               </div>
             </Card>
           </div>
-
-          {isAdmin && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Admin Settings</h3>
-              <Card className="bg-black/40 border-2 border-white/5 rounded-[2.5rem] overflow-hidden">
-                <div className="divide-y divide-white/5">
-                  <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="space-y-1 flex-1">
-                      <h4 className="text-sm font-black uppercase text-white">Application Mode</h4>
-                      <p className="text-[10px] text-white/40 italic">{appSettings.appMode === 'management' ? 'Management: Structural locks active.' : 'Verification: Field status updates allowed.'}</p>
-                    </div>
-                    <Select value={appSettings.appMode} onValueChange={(v) => handleSettingChange('appMode', v)}>
-                      <SelectTrigger className="w-[240px] h-12 bg-black border-2 border-white/10 rounded-xl font-black uppercase text-[10px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0A0A0A] border-white/10 text-white">
-                        <SelectItem value="management" className="text-[10px] font-black uppercase py-3">Management</SelectItem>
-                        <SelectItem value="verification" className="text-[10px] font-black uppercase py-3">Verification</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="p-8 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-black uppercase text-white">Lock Asset List</h4>
-                      <p className="text-[10px] text-white/40 italic">Restrict creation and deletion pulses.</p>
-                    </div>
-                    <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none space-y-10">
           <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Manage Projects</h3>
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Project Orchestration</h3>
             <div className="flex gap-3 px-1">
-              <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
-              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl"><PlusCircle className="h-4 w-4" /> Add Project</Button>
+              <Input placeholder="New project identity..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
+              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"><PlusCircle className="h-4 w-4" /> Provision Project</Button>
             </div>
           </div>
 
           <div className="space-y-4 px-1">
-            {appSettings.grants.map((grant) => {
-              const isActive = appSettings.activeGrantId === grant.id;
-              return (
-                <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-2xl overflow-hidden", isActive ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5")}>
-                  <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
-                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      {!isActive && <button onClick={() => setActiveGrantId(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Set Active</button>}
-                      <button className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white">Rename</button>
-                      <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Delete</button>
+            {appSettings.grants.map((grant) => (
+              <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-2xl overflow-hidden", activeGrantId === grant.id ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5")}>
+                <div className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                      {activeGrantId === grant.id && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active Pulse</Badge>}
                     </div>
                   </div>
-                  {isActive && (
-                    <div className="px-6 pb-8 pt-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500 border-t border-white/5 bg-white/[0.01]">
-                      <div className="space-y-4">
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions</h4>
-                        <div className="space-y-2.5">
-                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                            <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group/sheet hover:border-white/20 transition-all shadow-inner">
-                              <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
-                              <div className="flex items-center gap-5 text-white/20">
-                                <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
-                                <button className="hover:text-white transition-colors"><Users className="h-4 w-4" /></button>
-                                <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }} className="hover:text-white transition-colors"><Wrench className="h-4 w-4" /></button>
-                                <button className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><PlusCircle className="h-4 w-4" /> Add Manually</Button>
-                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><FileUp className="h-4 w-4" /> Import Template</Button>
-                        <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><ScanSearch className="h-4 w-4" /> Scan & Import Data</Button>
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
+                  <div className="flex items-center gap-6">
+                    {activeGrantId !== grant.id && <button onClick={() => setActiveGrantId(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Set Active</button>}
+                    <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Purge</button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
@@ -343,48 +286,42 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="history" className="m-0 outline-none px-1">
-          <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Modification History</h3>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
-                <AccordionTrigger className="hover:no-underline py-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2.5 bg-primary/10 rounded-xl"><History className="h-5 w-5 text-primary" /></div>
-                    <div className="text-left">
-                      <h4 className="text-sm font-black uppercase text-white">Full Activity Ledger</h4>
-                      <p className="text-[10px] text-white/40 italic">Review every registry mutation pulse.</p>
-                    </div>
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-primary/10 rounded-xl"><History className="h-5 w-5 text-primary" /></div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-black uppercase text-white">Registry Activity Ledger</h4>
+                    <p className="text-[10px] text-white/40 italic">Review chronological mutation pulses.</p>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-8">
-                  <AuditLogWorkstation isEmbedded={true} />
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <AuditLogWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </TabsContent>
       </Tabs>
 
-      {selectedSheetDef && (
-        <ColumnCustomizationSheet 
-          isOpen={isColumnSheetOpen}
-          onOpenChange={setIsColumnSheetOpen}
-          sheetDefinition={selectedSheetDef}
-          originalSheetName={selectedSheetDef.name}
-          onSave={(orig, newDef, all) => {
-            const updatedGrants = appSettings.grants.map(grant => {
-              if (grant.id === activeGrantId) {
-                const newSheetDefs = { ...grant.sheetDefinitions };
-                if (all) { Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; }); }
-                else { newSheetDefs[newDef.name] = newDef; if (orig && orig !== newDef.name) delete newSheetDefs[orig]; }
-                return { ...grant, sheetDefinitions: newSheetDefs };
-              }
-              return grant;
-            });
-            handleSettingChange('grants', updatedGrants);
-          }}
-        />
-      )}
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-12 w-12 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Factory Reset?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
+              This will purge all local assets, sandbox records, and session tokens. You will be required to re-authenticate. Cloud data remains intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-10 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSystemReset} className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-destructive/30 bg-destructive text-white m-0">
+              Commit Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

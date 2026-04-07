@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview Root Shell - Unified Command Hub.
- * Hardened for deployment: fixed component ReferenceErrors and simplified workstation routing.
+ * @fileOverview Root Shell - Unified Command Hub (SPA).
+ * Consolidated for production: eliminates sub-pages to reduce build size and memory footprint.
+ * Phase 1200: Integrated GIS and Alerts into the primary workstation switch.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,7 +24,9 @@ import {
   Upload,
   RefreshCw,
   LayoutDashboard,
-  Filter
+  Filter,
+  Navigation,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -36,6 +39,8 @@ import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
+import { GISWorkstation } from '@/components/workstations/GISWorkstation';
+import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -66,7 +71,8 @@ export default function SPAHub() {
     setIsFilterOpen,
     manualDownload,
     manualUpload,
-    isSyncing
+    isSyncing,
+    filters
   } = useAppState();
   
   const { unreadCount } = useNotifications();
@@ -96,13 +102,15 @@ export default function SPAHub() {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
       case 'REGISTRY': return <RegistryWorkstation />;
-      case 'GROUPS': return <AssetGroupsWorkstation />;
-      case 'ANOMALIES': return <DiscrepancyWorkstation />;
+      case 'GROUPS': return <AssetGroupsWorkstation isEmbedded={false} />;
+      case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
       case 'VERIFY': return <VerifyWorkstation />;
-      case 'AUDIT_LOG': return <AuditLogWorkstation />;
-      case 'REPORTS': return <ReportsWorkstation />;
+      case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
+      case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />;
+      case 'GIS': return <GISWorkstation />;
+      case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
@@ -136,7 +144,7 @@ export default function SPAHub() {
                   className="flex items-center gap-3 px-5 py-2 bg-white/[0.03] border border-white/5 rounded-xl text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
                 >
                   <Search className="h-3.5 w-3.5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Spotlight Search</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Global Spotlight Search</span>
                   <div className="flex items-center gap-1 ml-4 px-1 py-0.5 rounded-md bg-white/5 border border-white/5 text-[7px] font-black opacity-40">
                     <span>⌘</span>
                     <span>K</span>
@@ -156,14 +164,25 @@ export default function SPAHub() {
                     autoFocus
                     type="text"
                     placeholder="Registry Search..."
-                    className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-10 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
+                    className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-24 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                     onBlur={() => !searchTerm && setIsSearchExpanded(false)}
                   />
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 p-1 rounded-lg text-white/20 hover:text-white">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="absolute right-2 flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setIsFilterOpen(true)}
+                      className={cn("h-7 w-7 rounded-lg text-white/20 hover:text-primary relative", filters.length > 0 && "text-primary")}
+                    >
+                      <Filter className="h-3.5 w-3.5" />
+                      {filters.length > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full flex items-center justify-center border border-black"><span className="text-[6px] font-black text-black">{filters.length}</span></span>}
+                    </Button>
+                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-lg text-white/20 hover:text-white">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -205,20 +224,29 @@ export default function SPAHub() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-9 w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all">
+                <button className="h-9 w-9 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-xs hover:border-primary/40 transition-all overflow-hidden shrink-0">
                   {userProfile.displayName[0]}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-black border-white/5 text-white rounded-xl shadow-3xl">
+              <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 text-white rounded-xl shadow-3xl p-1">
                 <DropdownMenuLabel className="p-3">
                   <p className="text-xs font-black uppercase">{userProfile.displayName}</p>
-                  <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile.role}</p>
+                  <p className="text-[9px] font-bold text-white/40 uppercase mt-0.5">{userProfile.role} &bull; {userProfile.state}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('REGISTRY')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
-                  <Search className="mr-2 h-3.5 w-3.5" />
+                  <Boxes className="mr-2 h-3.5 w-3.5" />
                   <span className="text-[10px] font-black uppercase">Registry</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveView('GIS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
+                  <Navigation className="mr-2 h-3.5 w-3.5" />
+                  <span className="text-[10px] font-black uppercase">GIS Hub</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveView('ALERTS')} className="p-2.5 rounded-lg focus:bg-destructive focus:text-white m-1">
+                  <ShieldAlert className="mr-2 h-3.5 w-3.5" />
+                  <span className="text-[10px] font-black uppercase">Alerts</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-lg focus:bg-primary focus:text-black m-1">
                   <SettingsIcon className="mr-2 h-3.5 w-3.5" />
                   <span className="text-[10px] font-black uppercase">Settings</span>
