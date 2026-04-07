@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview High-Fidelity Safety Fallback - Resilience Terminal UI.
- * Phase 127: Removed hardcoded colors for perfect contrast in both themes.
+ * Phase 128: Added forensic copy pulse for technical diagnostic reporting.
  */
 
 import React from 'react';
@@ -14,9 +14,12 @@ import {
   ShieldAlert,
   Terminal,
   AlertTriangle,
-  Activity
+  Activity,
+  Copy,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface ErrorFallbackProps {
   error: Error;
@@ -26,6 +29,17 @@ interface ErrorFallbackProps {
 }
 
 export function ErrorFallback({ error, resetErrorBoundary, title = "Safety Fallback Initialized", isGlobal = false }: ErrorFallbackProps) {
+  const { toast } = useToast();
+  const [hasCopied, setHasCopied] = React.useState(false);
+
+  const handleCopyPulse = () => {
+    const text = `Fault: ${title}\nMessage: ${error.message}\nStack: ${error.stack}`;
+    navigator.clipboard.writeText(text);
+    setHasCopied(true);
+    toast({ title: "Fault Pulse Copied", description: "Ready for forensic analysis." });
+    setTimeout(() => setHasCopied(false), 2000);
+  };
+
   return (
     <div className={cn(
       "flex items-center justify-center p-4 sm:p-6 bg-background selection:bg-primary/20",
@@ -55,9 +69,20 @@ export function ErrorFallback({ error, resetErrorBoundary, title = "Safety Fallb
               <Activity className="h-20 w-20 text-primary" />
             </div>
             
-            <div className="flex items-center gap-2">
-              <Terminal className="h-3 w-3 text-primary" />
-              <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-primary">INTERNAL FAULT DETAILS</h4>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-3 w-3 text-primary" />
+                <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-primary">INTERNAL FAULT DETAILS</h4>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleCopyPulse}
+                className="h-8 px-3 rounded-xl font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-primary/10 text-white/40 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+              >
+                {hasCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                {hasCopied ? 'Copied' : 'Copy Pulse'}
+              </Button>
             </div>
             
             <p className="text-xs sm:text-sm font-medium text-foreground italic leading-relaxed break-words font-mono opacity-80">

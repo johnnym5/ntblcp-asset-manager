@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 307: Integrated granular pulse notifications for all modifications.
- * Phase 308: Fixed optionsMap ReferenceError.
+ * Phase 309: Implemented Project-scoped category isolation and auto-hiding of empty sheets.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -148,8 +147,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
-  const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
-
+  
   const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
 
   const groupStats = useMemo(() => {
@@ -162,6 +160,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     });
     return stats;
   }, [activeAssets]);
+
+  // Project-Scoped Categories with Auto-Hide Empty Logic
+  const categories = useMemo(() => {
+    if (!activeGrant) return [];
+    
+    // 1. Identify all definitions belonging to the active grant pulse
+    const allInProject = Object.keys(activeGrant.sheetDefinitions || {}).sort();
+    
+    // 2. Filter by data presence or manual override
+    return allInProject.filter(cat => {
+      const stats = groupStats[cat];
+      const hasData = stats && stats.total > 0;
+      const isManuallyEnabled = appSettings?.enabledSheets?.includes(cat);
+      
+      // Rule: Hide empty sheets unless an admin has specifically authorized them via the settings pulse
+      return hasData || isManuallyEnabled;
+    });
+  }, [activeGrant, groupStats, appSettings?.enabledSheets]);
 
   // Facet Discovery Pulse: Dynamically populate filter options
   const optionsMap = useMemo(() => {

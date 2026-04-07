@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 320: Fixed functional logic for Project actions and resolved ReferenceErrors.
- * Phase 321: Updated Scan button to navigate to Import workstation.
+ * Phase 322: Corrected ReferenceErrors and hardened parity pulse logic.
  */
 
 import React, { useState, useRef } from 'react';

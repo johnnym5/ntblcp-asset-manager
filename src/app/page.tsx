@@ -3,7 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Optimized for High-Density Operational Flow & Smooth Transitions.
- * Phase 401: Integrated AnimatePresence to eliminate navigation glitches.
+ * Phase 402: Stabilized hook sequence to prevent "Rendered more hooks" errors.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -128,6 +128,23 @@ export default function SPAHub() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // PRE-RENDER DETERMINISTIC HOOKS (Ensures hook count doesn't change during early returns)
+  const CurrentWorkstation = useMemo(() => {
+    switch (activeView) {
+      case 'DASHBOARD': return <DashboardWorkstation />;
+      case 'REGISTRY': return <RegistryWorkstation />;
+      case 'GROUPS': return <AssetGroupsWorkstation isEmbedded={false} />;
+      case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
+      case 'SETTINGS': return <SettingsWorkstation />;
+      case 'IMPORT': return <ImportWorkstation />;
+      case 'VERIFY': return <VerifyWorkstation />;
+      case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
+      case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />;
+      case 'ALERTS': return <AlertsWorkstation />;
+      default: return <DashboardWorkstation />;
+    }
+  }, [activeView]);
+
   useEffect(() => {
     if (profileSetupComplete) {
       const isFreshLogin = sessionStorage.getItem('assetain-fresh-login') === 'true';
@@ -156,16 +173,6 @@ export default function SPAHub() {
     }
   }, [lastAddedId, notifications]);
 
-  const handleOnboardingComplete = async () => {
-    setIsWelcomeOpen(false);
-    sessionStorage.removeItem('assetain-fresh-login');
-    if (appSettings) {
-      const nextSettings = { ...appSettings, onboardingComplete: true };
-      setAppSettings(nextSettings);
-      await storage.saveSettings(nextSettings);
-    }
-  };
-
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -181,24 +188,18 @@ export default function SPAHub() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
+  const handleOnboardingComplete = async () => {
+    setIsWelcomeOpen(false);
+    sessionStorage.removeItem('assetain-fresh-login');
+    if (appSettings) {
+      const nextSettings = { ...appSettings, onboardingComplete: true };
+      setAppSettings(nextSettings);
+      await storage.saveSettings(nextSettings);
+    }
+  };
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
-
-  const CurrentWorkstation = useMemo(() => {
-    switch (activeView) {
-      case 'DASHBOARD': return <DashboardWorkstation />;
-      case 'REGISTRY': return <RegistryWorkstation />;
-      case 'GROUPS': return <AssetGroupsWorkstation isEmbedded={false} />;
-      case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
-      case 'SETTINGS': return <SettingsWorkstation />;
-      case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return <VerifyWorkstation />;
-      case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
-      case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />;
-      case 'ALERTS': return <AlertsWorkstation />;
-      default: return <DashboardWorkstation />;
-    }
-  }, [activeView]);
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
