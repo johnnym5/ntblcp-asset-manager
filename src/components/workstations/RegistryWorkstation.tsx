@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Optimized for high-performance with strict pagination and memoization.
- * Phase 1000: Integrated full Sort & Filter Logic drawers.
- * Phase 1001: Implemented Expanding Search bar (Start Closed).
+ * Phase 1002: Enforced Grid-Only view and High-Density layout.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -12,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
   Grid,
-  List,
   Edit3,
   Trash2,
   Loader2,
@@ -30,7 +27,10 @@ import {
   FileSpreadsheet,
   Settings,
   ChevronLeft,
-  ListFilter
+  ListFilter,
+  Download,
+  Upload,
+  Zap
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -38,7 +38,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { RegistryCard } from '@/components/registry/RegistryCard';
-import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
@@ -79,7 +78,7 @@ import { ExcelService } from '@/services/excel-service';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition, Asset } from '@/types/domain';
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE = 60;
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -104,7 +103,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     isFilterOpen,
     setIsFilterOpen,
     isSortOpen,
-    setIsSortOpen
+    setIsSortOpen,
+    manualDownload,
+    manualUpload,
+    isSyncing
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -112,7 +114,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const isMobile = useIsMobile();
 
   // UI State
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>(isMobile ? 'grid' : 'table');
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -304,22 +305,46 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   return (
-    <div className="space-y-6 md:space-y-10 h-full flex flex-col animate-in fade-in duration-700 relative">
+    <div className="space-y-4 md:space-y-6 h-full flex flex-col animate-in fade-in duration-700 relative">
       
-      {/* Search & Mode Controls */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1 shrink-0">
-        <div className="flex items-center gap-4 self-start">
-          <div className="p-2.5 md:p-3 bg-primary/10 rounded-2xl shadow-inner">
-            <Database className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+      {/* Header Actions - Optimized Spacing */}
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-1 shrink-0">
+        <div className="flex items-center gap-3 self-start">
+          <div className="p-2 md:p-2.5 bg-primary/10 rounded-xl shadow-inner">
+            <Database className="h-4 w-4 md:h-5 md:w-5 text-primary" />
           </div>
           <div className="space-y-0.5">
-            <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Inventory Registry</h2>
-            <p className="text-[9px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Technical Data Browse</p>
+            <h2 className="text-lg md:text-xl font-black uppercase text-white tracking-tight leading-none">Inventory</h2>
+            <p className="text-[8px] md:text-[9px] font-bold text-white/40 uppercase tracking-[0.2em]">Registry Pulse</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full lg:w-auto">
-          {/* Expanding Search Bar */}
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          {/* Sync Pulse Controls */}
+          <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Pull from Cloud</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="w-px h-4 bg-white/10" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary">
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Push to Cloud</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
           <div className="flex items-center justify-end flex-1 min-w-0">
             <AnimatePresence mode="wait">
               {!isSearchExpanded ? (
@@ -327,233 +352,138 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   variant="outline" 
                   size="icon" 
                   onClick={handleExpandSearch}
-                  className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
+                  className="h-10 w-10 md:h-11 md:w-11 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary"
                 >
-                  <Search className="h-5 w-5" />
+                  <Search className="h-4 w-4" />
                 </Button>
               ) : (
                 <motion.div 
                   initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: isMobile ? "100%" : "320px", opacity: 1 }}
+                  animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   className="relative group"
                 >
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
                   <Input 
                     ref={searchInputRef}
-                    placeholder="Search active scope..." 
+                    placeholder="Search..." 
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     onBlur={() => !searchTerm && setIsSearchExpanded(false)}
-                    className="h-12 md:h-14 pl-11 pr-10 rounded-xl bg-white/[0.05] border-2 border-primary/20 text-white placeholder:text-white/20 text-sm focus:border-primary"
+                    className="h-10 md:h-11 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white placeholder:text-white/20 text-xs focus:border-primary"
                   />
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
           
-          <div className="flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary relative", filters.length > 0 && "border-primary/40")}>
-                    <ListFilter className="h-5 w-5" />
-                    {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-black text-[9px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Logic Filters</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 md:h-11 md:w-11 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
+              <ListFilter className="h-4 w-4" />
+              {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
+            </Button>
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary">
-                    <ArrowUpDown className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Sort Sequence</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 md:h-11 md:w-11 rounded-lg border-white/10 bg-white/5 text-primary">
+              <ArrowUpDown className="h-4 w-4" />
+            </Button>
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary">
-                    <Settings2 className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Field Setup</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 md:h-11 md:w-11 rounded-lg border-white/10 bg-white/5 text-primary">
+              <Settings2 className="h-4 w-4" />
+            </Button>
           </div>
-
-          {!isMobile && (
-            <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5 shadow-inner">
-              <button onClick={() => setViewMode('grid')} className={cn("p-2.5 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}><Grid className="h-4 w-4" /></button>
-              <button onClick={() => setViewMode('table')} className={cn("p-2.5 rounded-lg transition-all", viewMode === 'table' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}><List className="h-4 w-4" /></button>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Registry Metric Bar & Category Hub */}
-      <div className="px-1 flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 shrink-0">
-        <Badge variant="outline" className="h-8 px-4 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest whitespace-nowrap">
-          {processedAssets.length} RECORDS IN PULSE
+      {/* Category Pulse - Compact */}
+      <div className="px-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+        <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap">
+          {processedAssets.length} Records
         </Badge>
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-8 px-4 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[9px] tracking-widest whitespace-nowrap gap-2 hover:text-white hover:border-primary/20 transition-all">
-              <FolderOpen className="h-3.5 w-3.5 text-primary opacity-60" />
-              Category: {selectedCategory || 'Overall Scope'}
-              <ChevronDown className="h-3 w-3 opacity-40" />
+            <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all">
+              <FolderOpen className="h-3 w-3 text-primary opacity-60" />
+              Group: {selectedCategory || 'Overall'}
+              <ChevronDown className="h-2.5 w-2.5 opacity-40" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64 bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white">
-            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest px-3 py-2 opacity-40">Group Orchestrator</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-              <Database className="h-4 w-4 opacity-40" />
-              <span className="text-[11px] font-black uppercase">Overall Scope</span>
+          <DropdownMenuContent align="start" className="w-56 bg-black border-white/10 rounded-xl p-1 shadow-3xl text-white">
+            <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-lg p-2 focus:bg-primary/10 gap-2">
+              <Database className="h-3.5 w-3.5 opacity-40" />
+              <span className="text-[10px] font-black uppercase">Overall Registry</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-white/5" />
-            
-            <ScrollArea className="h-64">
+            <ScrollArea className="h-48">
               {categories.map(cat => (
-                <DropdownMenuSub key={cat}>
-                  <DropdownMenuSubTrigger className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                    <Boxes className="h-4 w-4 opacity-40" />
-                    <span className="text-[11px] font-black uppercase truncate">{cat}</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent className="bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white w-56">
-                      <DropdownMenuItem onClick={() => { setSelectedCategory(cat); setCurrentPage(1); }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                        <ChevronRight className="h-4 w-4 text-primary" />
-                        <span className="text-[11px] font-black uppercase">Focus Group</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={async () => {
-                        const assetsToExport = assets.filter(a => a.category === cat);
-                        await ExcelService.exportRegistry(assetsToExport, headers);
-                      }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                        <FileSpreadsheet className="h-4 w-4 text-green-500" />
-                        <span className="text-[11px] font-black uppercase">Batch Export</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
+                <DropdownMenuItem key={cat} onClick={() => { setSelectedCategory(cat); setCurrentPage(1); }} className="rounded-lg p-2 focus:bg-primary/10 gap-2">
+                  <Boxes className="h-3.5 w-3.5 opacity-40" />
+                  <span className="text-[10px] font-black uppercase truncate">{cat}</span>
+                </DropdownMenuItem>
               ))}
             </ScrollArea>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Main Display Surface */}
+      {/* Grid Pulse Surface */}
       <div className="flex-1 min-h-0 px-1">
-        {viewMode === 'grid' || isMobile ? (
-          <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
-            <AnimatePresence mode="popLayout">
-              {paginatedAssets.map(asset => (
-                <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout>
-                  <RegistryCard 
-                    record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
-                    onInspect={handleInspect} 
-                    selected={selectedAssetIds.has(asset.id)} 
-                    onToggleSelect={handleToggleSelect} 
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="pb-40">
-            <RegistryTable 
-              records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
-              onInspect={handleInspect} 
-              selectedIds={selectedAssetIds} 
-              onToggleSelect={handleToggleSelect} 
-              onSelectAll={(c) => setSelectedAssetIds(c ? new Set(paginatedAssets.map(a => a.id)) : new Set())} 
-            />
-          </div>
-        )}
+        <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
+          <AnimatePresence mode="popLayout">
+            {paginatedAssets.map(asset => (
+              <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} layout>
+                <RegistryCard 
+                  record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                  onInspect={handleInspect} 
+                  selected={selectedAssetIds.has(asset.id)} 
+                  onToggleSelect={handleToggleSelect} 
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
 
         {processedAssets.length === 0 && (
-          <div className="py-32 md:py-48 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[3rem] flex flex-col items-center gap-6">
-            <Database className="h-16 w-16 md:h-20 md:w-20 text-white" />
-            <h3 className="text-xl md:text-2xl font-black uppercase tracking-[0.2em] text-white">Registry Silent</h3>
+          <div className="py-24 text-center opacity-20 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center gap-4">
+            <Database className="h-12 w-12 text-white" />
+            <h3 className="text-lg font-black uppercase tracking-widest text-white">Registry Silent</h3>
           </div>
         )}
       </div>
 
-      {/* Action & Pagination Bar */}
-      <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 z-50 flex flex-col items-center gap-4">
-        {/* Pagination Pulse */}
+      {/* Compact Action & Pagination Bar */}
+      <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 z-50 flex flex-col items-center gap-3">
         {totalPages > 1 && (
-          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-6 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-6">
-            <button 
-              disabled={currentPage === 1} 
-              onClick={() => setCurrentPage(p => p - 1)}
-              className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
-              Page {currentPage} <span className="text-white/20 mx-2">/</span> {totalPages}
-            </span>
-            <button 
-              disabled={currentPage === totalPages} 
-              onClick={() => setCurrentPage(p => p + 1)}
-              className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
+          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-4 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-4">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">P.{currentPage} / {totalPages}</span>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
           </div>
         )}
 
-        {/* Bulk Action Pulse */}
         <AnimatePresence>
           {selectedAssetIds.size > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 50 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: 50 }}
-              className="bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-[2rem] p-3 md:p-4 flex items-center gap-4 md:gap-8 shadow-3xl backdrop-blur-3xl md:min-w-[500px]"
-            >
-              <div className="flex items-center gap-3 md:gap-4 pl-2 md:pl-4">
-                <div className="h-8 w-8 md:h-10 md:w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] md:text-xs shadow-xl">{selectedAssetIds.size}</div>
-                <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-white hidden sm:inline">Selected</span>
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2 flex items-center gap-4 shadow-3xl backdrop-blur-3xl">
+              <div className="flex items-center gap-2 pl-2">
+                <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
+                <span className="text-[9px] font-black uppercase text-white hidden sm:inline">Selected</span>
               </div>
-              <div className="h-8 w-px bg-white/10 hidden md:block" />
-              <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end md:justify-start">
-                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Edit</Button>
-                <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
+              <div className="h-6 w-px bg-white/10" />
+              <div className="flex items-center gap-1.5">
+                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
+                <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
               </div>
-              <button onClick={() => setSelectedAssetIds(new Set())} className="p-2 text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
+              <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Global Modals */}
-      <AssetDetailSheet 
-        isOpen={isDetailOpen} 
-        onOpenChange={setIsDetailOpen} 
-        record={selectedRecord} 
-        onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
-        onNext={handleNext}
-        onPrevious={handlePrevious}
-      />
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} onNext={handleNext} onPrevious={handlePrevious} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { 
-        for (const id of Array.from(selectedAssetIds)) {
-          const asset = assets.find(a => a.id === id);
-          if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data });
-        }
-        await refreshRegistry();
-        setSelectedAssetIds(new Set());
-        toast({ title: "Bulk Update Applied" });
-      }} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = assets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); setSelectedAssetIds(new Set()); }} />
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
