@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 311: Restored Help Tooltips and Onboarding Reset pulses.
+ * Phase 312: Integrated Security section for self-service passphrase management.
  */
 
 import React, { useState } from 'react';
@@ -42,7 +42,9 @@ import {
   Eye,
   RefreshCw,
   Info,
-  Smartphone
+  Smartphone,
+  KeyRound,
+  ShieldAlert
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -64,7 +66,7 @@ import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import AssetForm from '@/components/asset-form';
 import { enqueueMutation } from '@/offline/queue';
 import { addNotification } from '@/hooks/use-notifications';
-import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
+import type { AppSettings, Grant, SheetDefinition, UXMode, AuthorizedUser } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -74,6 +76,14 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 export function SettingsWorkstation() {
   const { 
@@ -96,6 +106,11 @@ export function SettingsWorkstation() {
   const [newProjectName, setNewProjectName] = useState('');
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
+
+  // Password Change State
+  const [isPassphraseDialogOpen, setIsPassphraseDialogOpen] = useState(false);
+  const [newPassphrase, setNewPassphrase] = useState('');
+  const [confirmPassphrase, setConfirmPassphrase] = useState('');
 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -130,6 +145,37 @@ export function SettingsWorkstation() {
     await handleSettingChange('grants', nextGrants);
     setNewProjectName('');
     addNotification({ title: "Project Created", description: `Added ${newProjectName} to the registry.`, variant: "success" });
+  };
+
+  const handleUpdatePassphrase = async () => {
+    if (!appSettings || !userProfile) return;
+    if (newPassphrase !== confirmPassphrase) {
+      addNotification({ title: "Security Mismatch", description: "Passphrases do not match.", variant: "destructive" });
+      return;
+    }
+    if (newPassphrase.length < 4) {
+      addNotification({ title: "Passphrase Too Weak", description: "Minimum 4 characters required.", variant: "destructive" });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const nextUsers = appSettings.authorizedUsers.map(u => 
+        u.loginName === userProfile.loginName ? { ...u, password: newPassphrase } : u
+      );
+      
+      const updatedSettings = { ...appSettings, authorizedUsers: nextUsers };
+      if (isOnline) await FirestoreService.updateSettings({ authorizedUsers: nextUsers });
+      await storage.saveSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      
+      setIsPassphraseDialogOpen(false);
+      setNewPassphrase('');
+      setConfirmPassphrase('');
+      addNotification({ title: "Passphrase Updated", description: "Your security credentials have been rotated.", variant: "success" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEditSchema = (grantId: string, sheetDef: SheetDefinition) => {
@@ -182,6 +228,25 @@ export function SettingsWorkstation() {
 
       <div className="flex-1 min-h-0 pt-4 overflow-y-auto custom-scrollbar pb-40">
         <TabsContent value="general" className="space-y-12 m-0 outline-none">
+          
+          {/* Security Section */}
+          <section>
+            <SectionTitle title="Security & Credentials" description="Manage your access passphrase" icon={Lock} />
+            <Card className="bg-[#050505] border-white/5 rounded-2xl p-8 shadow-3xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black uppercase text-white">Access Passphrase</h4>
+                  <p className="text-[11px] text-white/40 leading-relaxed italic max-w-sm">
+                    Rotate your secure login credentials to maintain regional scope integrity.
+                  </p>
+                </div>
+                <Button onClick={() => setIsPassphraseDialogOpen(true)} variant="outline" className="h-12 px-8 rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/5">
+                  <KeyRound className="h-4 w-4 text-primary" /> Change Passphrase
+                </Button>
+              </div>
+            </Card>
+          </section>
+
           {/* Usage Mode Section */}
           <section>
             <SectionTitle title="Experience Mode" description="Choose your guidance level" icon={GraduationCap} />
@@ -419,6 +484,41 @@ export function SettingsWorkstation() {
           Commit Environment Pulse
         </Button>
       </div>
+
+      {/* Security Passphrase Dialog */}
+      <Dialog open={isPassphraseDialogOpen} onOpenChange={setIsPassphraseDialogOpen}>
+        <DialogContent className="max-w-md rounded-[2rem] border-white/10 bg-black p-0 overflow-hidden shadow-3xl text-white">
+          <div className="p-8 border-b border-white/5 bg-white/[0.02]">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary/10 rounded-xl"><KeyRound className="h-6 w-6 text-primary" /></div>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Access Rotation</DialogTitle>
+              </div>
+              <DialogDescription className="text-[10px] font-bold uppercase text-white/40 tracking-widest mt-2">Update your regional access passphrase.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Passphrase</Label>
+              <Input type="password" value={newPassphrase} onChange={(e) => setNewPassphrase(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-bold" placeholder="••••••••" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Confirm Passphrase</Label>
+              <Input type="password" value={confirmPassphrase} onChange={(e) => setConfirmPassphrase(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-bold" placeholder="••••••••" />
+            </div>
+            <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/20 flex items-start gap-3">
+              <ShieldAlert className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+              <p className="text-[9px] font-medium text-orange-600/80 leading-relaxed uppercase">Rotate passphrases regularly to maintain high-integrity regional scope protection.</p>
+            </div>
+          </div>
+          <DialogFooter className="p-8 bg-white/[0.02] border-t border-white/5 flex flex-row items-center gap-3">
+            <Button variant="ghost" onClick={() => setIsPassphraseDialogOpen(false)} className="flex-1 h-12 font-black uppercase text-[10px] rounded-xl text-white/40">Cancel</Button>
+            <Button onClick={handleUpdatePassphrase} disabled={isSaving} className="flex-[2] h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Commit Rotation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AssetForm 
         isOpen={isAssetFormOpen} 
