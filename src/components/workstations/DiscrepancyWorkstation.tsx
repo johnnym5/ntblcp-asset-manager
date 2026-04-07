@@ -2,9 +2,10 @@
 
 /**
  * @fileOverview Anomaly Dashboard - Intelligent Discrepancy Review Center.
+ * Optimized with pagination for high-fidelity auditing of large anomaly sets.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
   AlertTriangle, 
@@ -22,7 +23,9 @@ import {
   SearchCode,
   FileWarning,
   Zap,
-  Info
+  Info,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,11 +39,14 @@ import { cn } from '@/lib/utils';
 import type { Asset, AssetDiscrepancy } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const ITEMS_PER_PAGE = 24;
+
 export function DiscrepancyWorkstation() {
-  const { assets, settingsLoaded, setActiveView, headers, appSettings } = useAppState();
+  const { assets, settingsLoaded, headers, appSettings } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const flaggedAssets = useMemo(() => {
     return assets.filter(a => a.discrepancies && a.discrepancies.length > 0 && a.discrepancies.some(d => d.status === 'PENDING' || d.status === 'SUSPICIOUS'));
@@ -50,11 +56,17 @@ export function DiscrepancyWorkstation() {
     if (!searchTerm) return flaggedAssets;
     const term = searchTerm.toLowerCase();
     return flaggedAssets.filter(a => 
-      a.description.toLowerCase().includes(term) || 
-      a.assetIdCode?.toLowerCase().includes(term) ||
+      (a.description || '').toLowerCase().includes(term) || 
+      (a.assetIdCode || '').toLowerCase().includes(term) ||
       a.discrepancies.some(d => d.reason.toLowerCase().includes(term))
     );
   }, [flaggedAssets, searchTerm]);
+
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
 
   const stats = useMemo(() => {
     const totalFlagged = flaggedAssets.length;
@@ -68,11 +80,11 @@ export function DiscrepancyWorkstation() {
     setIsDetailOpen(true);
   };
 
-  const selectedAsset = useMemo(() => assets.find(a => a.id === selectedAssetId), [selectedAssetId, assets]);
   const selectedRecord = useMemo(() => {
-    if (!selectedAsset) return undefined;
-    return transformAssetToRecord(selectedAsset, headers, appSettings?.sourceBranding);
-  }, [selectedAsset, headers, appSettings?.sourceBranding]);
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
   if (!settingsLoaded) {
     return (
@@ -83,7 +95,7 @@ export function DiscrepancyWorkstation() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-32 max-w-7xl mx-auto">
+    <div className="space-y-10 animate-in fade-in duration-700 pb-32 max-w-7xl mx-auto relative">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
@@ -110,7 +122,7 @@ export function DiscrepancyWorkstation() {
         </div>
       </div>
 
-      {/* Logic Summary Cards */}
+      {/* Stats Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
         <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] p-8 shadow-3xl">
           <div className="flex justify-between items-start mb-4">
@@ -156,7 +168,7 @@ export function DiscrepancyWorkstation() {
             <Input 
               placeholder="Search by ID, Reason or Description..." 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="pl-12 h-14 rounded-2xl bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 font-medium"
             />
           </div>
@@ -167,7 +179,7 @@ export function DiscrepancyWorkstation() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map(asset => (
+            {paginatedItems.map(asset => (
               <motion.div
                 key={asset.id}
                 layout
@@ -178,7 +190,7 @@ export function DiscrepancyWorkstation() {
               >
                 <div className="absolute -top-3 -right-3 z-20">
                   <div className={cn(
-                    "h-10 w-10 rounded-2xl flex items-center justify-center text-white shadow-2xl border-2 border-black animate-in zoom-in duration-500",
+                    "h-10 w-10 rounded-2xl flex items-center justify-center text-white shadow-2xl border-2 border-black",
                     asset.discrepancies.some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH') ? "bg-red-600" : "bg-primary text-black"
                   )}>
                     <FileWarning className="h-5 w-5" />
@@ -202,7 +214,6 @@ export function DiscrepancyWorkstation() {
                           <p className="text-[10px] font-medium text-white/60 leading-relaxed italic">{d.reason}</p>
                         </div>
                       ))}
-                      {asset.discrepancies.length > 2 && <p className="text-[8px] font-black text-primary uppercase pl-4">+{asset.discrepancies.length - 2} More Anomalies</p>}
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
@@ -215,6 +226,14 @@ export function DiscrepancyWorkstation() {
             ))}
           </AnimatePresence>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-12 gap-6 items-center">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-6 w-6" /></button>
+            <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Page {currentPage} of {totalPages}</span>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-6 w-6" /></button>
+          </div>
+        )}
 
         {filteredItems.length === 0 && (
           <div className="py-40 text-center opacity-20 flex flex-col items-center gap-8 border-4 border-dashed rounded-[4rem]">
@@ -231,7 +250,7 @@ export function DiscrepancyWorkstation() {
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
         record={selectedRecord}
-        onEdit={(id) => setActiveView('REGISTRY')}
+        onEdit={(id) => {}}
       />
     </div>
   );

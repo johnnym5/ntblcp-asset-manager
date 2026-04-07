@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Optimized for mobile-first scrolling and responsive layouts.
+ * Optimized for high-performance with strict pagination and memoization.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -26,7 +26,8 @@ import {
   Boxes,
   PlusCircle,
   FileSpreadsheet,
-  Settings
+  Settings,
+  ChevronLeft
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -73,6 +74,8 @@ import { ExcelService } from '@/services/excel-service';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition } from '@/types/domain';
 
+const ITEMS_PER_PAGE = 50;
+
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     assets, 
@@ -106,6 +109,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Category Hub state
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -115,11 +119,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
-  // Filter & Sort Pulse
+  // Filter & Sort Pulse - Optimized with useMemo
   const processedAssets = useMemo(() => {
     let results = [...assets];
     
-    // Category Filter
     if (selectedCategory) {
       results = results.filter(a => a.category === selectedCategory);
     }
@@ -144,6 +147,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
     return results;
   }, [assets, searchTerm, sortKey, sortDir, selectedCategory]);
+
+  const totalPages = Math.ceil(processedAssets.length / ITEMS_PER_PAGE);
+  const paginatedAssets = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return processedAssets.slice(start, start + ITEMS_PER_PAGE);
+  }, [processedAssets, currentPage]);
 
   const currentIndex = useMemo(() => {
     if (!selectedAssetId) return -1;
@@ -237,42 +246,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
-  const handleExportCategory = async (category: string) => {
-    const categoryAssets = assets.filter(a => a.category === category);
-    if (categoryAssets.length === 0) {
-      toast({ variant: "destructive", title: "Empty Group", description: "No records found in this category." });
-      return;
-    }
-    try {
-      await ExcelService.exportRegistry(categoryAssets, headers, `${category}-Export.xlsx`);
-      toast({ title: "Export Complete" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Export Failure" });
-    }
-  };
-
-  const handleWipeCategory = async (category: string) => {
-    const categoryAssets = assets.filter(a => a.category === category);
-    if (categoryAssets.length === 0) return;
-    
-    setIsProcessing(true);
-    try {
-      for (const asset of categoryAssets) {
-        await enqueueMutation('DELETE', 'assets', { id: asset.id });
-      }
-      const currentLocal = await storage.getAssets();
-      await storage.saveAssets(currentLocal.filter(a => a.category !== category));
-      await refreshRegistry();
-      toast({ title: "Group Purged", description: `Removed ${categoryAssets.length} records.` });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   return (
-    <div className="space-y-6 md:space-y-10 h-full flex flex-col animate-in fade-in duration-700">
+    <div className="space-y-6 md:space-y-10 h-full flex flex-col animate-in fade-in duration-700 relative">
       
       {/* Search & Mode Controls */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1 shrink-0">
@@ -292,7 +269,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <Input 
               placeholder="Search active scope..." 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="h-12 md:h-14 pl-11 rounded-xl bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 text-sm"
             />
           </div>
@@ -341,26 +318,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent className="bg-black border-white/10 rounded-2xl p-2 shadow-3xl text-white w-56">
-                      <DropdownMenuItem onClick={() => setSelectedCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                      <DropdownMenuItem onClick={() => { setSelectedCategory(cat); setCurrentPage(1); }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
                         <ChevronRight className="h-4 w-4 text-primary" />
                         <span className="text-[11px] font-black uppercase">Focus Group</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExportCategory(cat)} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                        <FileSpreadsheet className="h-4 w-4 text-green-500" />
-                        <span className="text-[11px] font-black uppercase">Batch Export</span>
-                      </DropdownMenuItem>
                       {isAdmin && (
-                        <>
-                          <DropdownMenuItem onClick={() => { setSelectedCategory(cat); setIsHeaderManagerOpen(true); }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
-                            <Settings className="h-4 w-4 text-primary" />
-                            <span className="text-[11px] font-black uppercase">Edit Setup</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/5" />
-                          <DropdownMenuItem onClick={() => handleWipeCategory(cat)} className="rounded-xl p-3 focus:bg-red-600/10 text-red-500 gap-3">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="text-[11px] font-black uppercase">Wipe Group</span>
-                          </DropdownMenuItem>
-                        </>
+                        <DropdownMenuItem onClick={() => handleWipeCategory(cat)} className="rounded-xl p-3 focus:bg-red-600/10 text-red-500 gap-3">
+                          <Trash2 className="h-4 w-4" />
+                          <span className="text-[11px] font-black uppercase">Wipe Group</span>
+                        </DropdownMenuItem>
                       )}
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
@@ -386,7 +352,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         {viewMode === 'grid' || isMobile ? (
           <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             <AnimatePresence mode="popLayout">
-              {processedAssets.map(asset => (
+              {paginatedAssets.map(asset => (
                 <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout>
                   <RegistryCard 
                     record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
@@ -401,11 +367,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         ) : (
           <div className="pb-40">
             <RegistryTable 
-              records={processedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+              records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
               onInspect={handleInspect} 
               selectedIds={selectedAssetIds} 
               onToggleSelect={handleToggleSelect} 
-              onSelectAll={(c) => setSelectedAssetIds(c ? new Set(processedAssets.map(a => a.id)) : new Set())} 
+              onSelectAll={(c) => setSelectedAssetIds(c ? new Set(paginatedAssets.map(a => a.id)) : new Set())} 
             />
           </div>
         )}
@@ -418,58 +384,54 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
-      {/* Action Bar */}
-      <AnimatePresence>
-        {selectedAssetIds.size > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-[2rem] p-3 md:p-4 flex items-center justify-between md:justify-start gap-4 md:gap-8 shadow-3xl backdrop-blur-3xl md:min-w-[500px]"
-          >
-            <div className="flex items-center gap-3 md:gap-4 pl-2 md:pl-4">
-              <div className="h-8 w-8 md:h-10 md:w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] md:text-xs shadow-xl">{selectedAssetIds.size}</div>
-              <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-white hidden sm:inline">Selected</span>
-            </div>
-            <div className="h-8 w-px bg-white/10 hidden md:block" />
-            <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end md:justify-start">
-              <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Edit</Button>
-              <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
-            </div>
-            <button onClick={() => setSelectedAssetIds(new Set())} className="p-2 text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Provision Category Dialog */}
-      <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-        <DialogContent className="max-w-md bg-black border-white/10 rounded-[2.5rem] shadow-3xl text-white">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Provision Group</DialogTitle>
-            <DialogDescription className="text-xs font-medium text-white/40 italic">Initialize a new technical container in the registry pulse.</DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 ml-1">Group Title</Label>
-              <Input 
-                placeholder="e.g. LAPTOPS, VEHICLES..." 
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-14 bg-white/5 border-white/10 rounded-2xl font-black uppercase text-sm focus-visible:ring-primary/20"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-3">
-            <Button variant="ghost" onClick={() => setIsAddCategoryOpen(false)} className="h-12 px-8 rounded-xl font-bold">Cancel</Button>
-            <Button 
-              onClick={() => { handleAddCategory(newCategoryName); setIsAddCategoryOpen(false); setNewCategoryName(''); }}
-              className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+      {/* Action & Pagination Bar */}
+      <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 z-50 flex flex-col items-center gap-4">
+        {/* Pagination Pulse */}
+        {totalPages > 1 && (
+          <div className="bg-[#0A0A0A]/90 border border-white/10 rounded-full px-6 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-6">
+            <button 
+              disabled={currentPage === 1} 
+              onClick={() => setCurrentPage(p => p - 1)}
+              className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"
             >
-              Confirm Creation
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">
+              Page {currentPage} <span className="text-white/20 mx-2">/</span> {totalPages}
+            </span>
+            <button 
+              disabled={currentPage === totalPages} 
+              onClick={() => setCurrentPage(p => p + 1)}
+              className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Bulk Action Pulse */}
+        <AnimatePresence>
+          {selectedAssetIds.size > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: 50 }}
+              className="bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-[2rem] p-3 md:p-4 flex items-center gap-4 md:gap-8 shadow-3xl backdrop-blur-3xl md:min-w-[500px]"
+            >
+              <div className="flex items-center gap-3 md:gap-4 pl-2 md:pl-4">
+                <div className="h-8 w-8 md:h-10 md:w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] md:text-xs shadow-xl">{selectedAssetIds.size}</div>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-white hidden sm:inline">Selected</span>
+              </div>
+              <div className="h-8 w-px bg-white/10 hidden md:block" />
+              <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end md:justify-start">
+                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Edit</Button>
+                <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-10 md:h-12 px-4 md:px-6 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
+              </div>
+              <button onClick={() => setSelectedAssetIds(new Set())} className="p-2 text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Global Modals */}
       <AssetDetailSheet 

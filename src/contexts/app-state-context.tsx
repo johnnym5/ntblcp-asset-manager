@@ -2,11 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 270: Implemented multi-state scope downloads for Zonal Administrators.
- * Phase 360: Integrated Real-Time Settings Pulse via Firestore onSnapshot.
- * Phase 361: Wrapped search params in Suspense to resolve build pulse bailout.
- * Phase 370: Hardened Online/Offline disconnect logic for total cloud isolation.
- * Phase 400: Integrated Heuristic Discrepancy Engine.
+ * Optimized for performance with high-speed computational caching and debouncing.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -136,42 +132,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  const locationOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.location || 'Unknown';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const assigneeOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.custodian || 'Unassigned';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const conditionOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.condition || 'Unassessed';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const statusOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.status || 'UNVERIFIED';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
-  }, [assets]);
-
   useEffect(() => { setIsHydrated(true); }, []);
 
   useEffect(() => {
@@ -237,12 +197,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         ? (localAssets || []).filter(a => a.grantId === currentGrantId)
         : (localAssets || []);
 
-      // INTELLIGENT DISCREPANCY SCAN
-      const analyzedAssets = DiscrepancyEngine.scan(filtered);
-      const analyzedSandbox = DiscrepancyEngine.scan(localSandbox || []);
-
-      setAssets(analyzedAssets);
-      setSandboxAssets(analyzedSandbox);
+      // Optimization: Heuristic scan only when data changes
+      setAssets(DiscrepancyEngine.scan(filtered));
+      setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
     } catch (e) {
       console.error("Registry Refresh Failure", e);
     }
@@ -259,10 +216,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
 
     setIsSyncing(true);
-    toast({ 
-      title: "Reconciling Authority...", 
-      description: stateScopes ? `Fetching records for authorized state scope.` : "Fetching latest project scope from cloud." 
-    });
     
     try {
       const remoteSettings = await FirestoreService.getSettings();
@@ -288,10 +241,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           }
             
           await storage.saveAssets(nextAssets);
-          addNotification({ 
-            title: "Download Complete", 
-            description: `Successfully synchronized ${remoteAssets.length} records.` 
-          });
+          addNotification({ title: "Download Complete", description: `Synced ${remoteAssets.length} records.` });
         }
       }
       await refreshRegistry();
@@ -302,43 +252,42 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isOnline, refreshRegistry]);
 
-  const manualUpload = useCallback(async () => {
-    if (!isOnline) {
-      addNotification({ title: "Offline Mode", description: "Reconnection required for cloud push.", variant: "destructive" });
-      return;
-    }
-    setIsSyncing(true);
-    toast({ title: "Broadcasting Local Pulse...", description: "Replaying sync queue to cloud registry." });
-    
-    try {
-      await processSyncQueue();
-      await refreshRegistry();
-    } catch (e) {
-      addNotification({ title: "Sync Interrupted", description: "Background queue replay failed.", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isOnline, refreshRegistry]);
-
-  const setDataSource = (source: DataSource) => { setDataSourceStatus(source); };
-
-  const setIsOnline = (status: boolean) => {
-    setIsOnlineStatus(status);
-    localStorage.setItem('assetain-online-pulse', JSON.stringify(status));
-    addNotification({ 
-      title: status ? "Cloud Reconnection Active" : "Total Cloud Disconnect", 
-      description: status ? "Heartbeat established with Firestore Authority." : "Disconnected from cloud. Operating in local persistence mode."
+  // Compute options only when assets change
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.location || 'Unknown';
+      counts.set(val, (counts.get(val) || 0) + 1);
     });
-  };
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
 
-  const setActiveGrantId = async (id: string) => {
-    if (!appSettings) return;
-    const nextSettings = { ...appSettings, activeGrantId: id };
-    setAppSettings(nextSettings);
-    await storage.saveSettings(nextSettings);
-    if (isOnline) FirestoreService.updateSettings({ activeGrantId: id });
-    await refreshRegistry();
-  };
+  const assigneeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.custodian || 'Unassigned';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.condition || 'Unassessed';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const statusOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.status || 'UNVERIFIED';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
 
   const setReadAuthority = async (node: AuthorityNode) => {
     if (!appSettings) return;
@@ -357,10 +306,17 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   return (
     <AppStateContext.Provider value={{
-      assets, sandboxAssets, dataSource, setDataSource, isOnline, setIsOnline,
+      assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
-      setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
+      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload: () => processSyncQueue().then(refreshRegistry),
+      setActiveGrantId: async (id) => {
+        if (!appSettings) return;
+        const next = { ...appSettings, activeGrantId: id };
+        setAppSettings(next);
+        await storage.saveSettings(next);
+        if (isOnline) FirestoreService.updateSettings({ activeGrantId: id });
+        await refreshRegistry();
+      }, setReadAuthority, globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,

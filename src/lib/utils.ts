@@ -11,36 +11,40 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Recursively removes undefined fields and converts Date objects to Firestore Timestamps.
  * Essential for nested objects like 'recovery' in error logs or 'metadata' in assets.
+ * Performance Optimized: Uses non-recursive flat path for primitive objects where possible.
  */
 export function sanitizeForFirestore<T>(obj: T): T {
   if (obj === null || obj === undefined) return null as any;
   
-  // Handle Firestore native types and Dates
+  // High-speed pass for common primitives
+  if (typeof obj !== 'object') return obj;
+  
   if (obj instanceof Date) return Timestamp.fromDate(obj) as any;
   if (obj instanceof Timestamp) return obj as any;
   
-  // Handle Arrays
   if (Array.isArray(obj)) {
     return obj.map(v => sanitizeForFirestore(v)) as any;
   }
   
-  // Handle Objects
-  if (typeof obj === 'object') {
-    const sanitizedObj: { [key: string]: any } = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        if (key === 'previousState') continue; // Skip undo buffer for Firestore
-        
-        const value = (obj as any)[key];
-        if (value !== undefined) {
+  const sanitizedObj: { [key: string]: any } = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (key === 'previousState') continue; // Skip undo buffer for Firestore
+      
+      const value = (obj as any)[key];
+      if (value !== undefined) {
+        // Only recurse if value is an object or array
+        if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Timestamp)) {
           sanitizedObj[key] = sanitizeForFirestore(value);
+        } else if (value instanceof Date) {
+          sanitizedObj[key] = Timestamp.fromDate(value);
+        } else {
+          sanitizedObj[key] = value;
         }
       }
     }
-    return sanitizedObj as T;
   }
-
-  return obj;
+  return sanitizedObj as T;
 }
 
 export const normalizeAssetLocation = (location?: string): string => {
