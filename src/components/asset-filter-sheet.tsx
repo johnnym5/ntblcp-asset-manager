@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview High-Fidelity Filter Engine - Centered Pop-up UI.
- * Converted from Sheet to Dialog for focused workstation parity.
- * Phase 231: Added Condition scope and refined gold-on-black visual language.
+ * Phase 232: Replaced Radix ScrollArea with native custom-scrollbar to fix CSS leak.
+ * Phase 233: Implemented high-visibility scrollbars for long lists.
  */
 
 import React from 'react';
@@ -17,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import type { OptionType } from '@/contexts/app-state-context';
@@ -73,7 +72,8 @@ const FilterSection = ({ title, options, selected, onChange }: {
     <div className="space-y-3">
       <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">{title}</Label>
       <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] overflow-hidden">
-        <ScrollArea className="max-h-[180px]">
+        {/* Native overflow-y-auto with custom-scrollbar class to ensure visible scroll wheel */}
+        <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
           <div className="p-2 space-y-1">
             {options.length > 0 ? (
               options.map((option) => {
@@ -121,7 +121,7 @@ const FilterSection = ({ title, options, selected, onChange }: {
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );
@@ -158,7 +158,7 @@ export function AssetFilterSheet({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
-        <div className="p-10 pb-6 border-b border-white/5 bg-white/[0.02]">
+        <div className="p-10 pb-6 border-b border-white/5 bg-white/[0.02] shrink-0">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Engine</DialogTitle>
             <DialogDescription className="text-[10px] font-black uppercase text-white/40 tracking-widest mt-1">
@@ -167,7 +167,8 @@ export function AssetFilterSheet({
           </DialogHeader>
         </div>
 
-        <ScrollArea className="flex-1 bg-black max-h-[70vh]">
+        {/* Main scrollable content pane with high-visibility scrollbar */}
+        <div className="flex-1 bg-black max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-10">
               {isAdmin && (
@@ -202,9 +203,9 @@ export function AssetFilterSheet({
               </div>
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
-        <div className="p-8 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4">
+        <div className="p-8 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4 shrink-0 pb-safe">
           <Button 
             variant="ghost" 
             onClick={handleClearAll}
@@ -214,7 +215,7 @@ export function AssetFilterSheet({
           </Button>
           <Button 
             onClick={() => onOpenChange(false)}
-            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20"
+            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform active:scale-95"
           >
             Apply Logic Pulse
           </Button>
