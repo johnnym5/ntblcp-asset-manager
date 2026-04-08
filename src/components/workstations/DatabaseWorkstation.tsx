@@ -4,7 +4,7 @@
  * @fileOverview DatabaseWorkstation - Granular Registry Orchestration.
  * Overhauled from raw JSON editing to a structured Management Workstation.
  * Phase 300: Implemented Properties/Logic view modes and high-density explorer UI.
- * Phase 301: Resolved TooltipProvider reference fault.
+ * Phase 305: Implemented maintenance protocol logic (Purge/Wipe/Reset) with feedback pulses.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -43,7 +43,8 @@ import {
   Zap,
   Cpu,
   Hammer,
-  Info
+  Info,
+  RotateCcw
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,12 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
   const [isProcessing, setIsProcessing] = useState(false);
   const [nodeToDelete, setNodeToDelete] = useState<DBNode | null>(null);
   const [editorTab, setEditorTab] = useState<'PROPERTIES' | 'LOGIC'>('PROPERTIES');
+
+  // Maintenance Protocol State
+  const [isPurgeLocalOpen, setIsPurgeLocalOpen] = useState(false);
+  const [isWipeMirrorOpen, setIsWipeMirrorOpen] = useState(false);
+  const [isResetCloudOpen, setIsResetCloudOpen] = useState(false);
+  const [isNuclearOpen, setIsNuclearOpen] = useState(false);
 
   useEffect(() => {
     loadNodes();
@@ -196,6 +203,55 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
       toast({ title: "Batch Purge Complete", description: `Destroyed ${selectedIds.size} records.` });
       setSelectedIds(new Set());
       await refreshRegistry();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Maintenance Handlers
+  const handleLocalPurge = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeLayer('LOCAL');
+      toast({ title: "Local Registry Purged", description: "Device cache and staging queues destroyed." });
+      await refreshRegistry();
+      setIsPurgeLocalOpen(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMirrorWipe = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeLayer('RTDB');
+      toast({ title: "Mirror Standby Wiped", description: "Realtime Database shadow shadow purged." });
+      await refreshRegistry();
+      setIsWipeMirrorOpen(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCloudReset = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeLayer('FIRESTORE');
+      toast({ title: "Cloud Authority Reset", description: "All Firestore registry records destroyed." });
+      await refreshRegistry();
+      setIsResetCloudOpen(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleGlobalNuclearReset = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "Global Reset Complete", description: "Registry destroyed across all storage tiers." });
+      await refreshRegistry();
+      setIsNuclearOpen(false);
     } finally {
       setIsProcessing(false);
     }
@@ -420,38 +476,46 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
           <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
             <div className="p-3 bg-muted rounded-xl w-fit"><Smartphone className="h-6 w-6 text-muted-foreground" /></div>
             <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Purge Local</h4>
+              <h4 className="text-sm font-black uppercase">Local Registry</h4>
               <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Clear all asset records and staging queues on this device only.</p>
             </div>
-            <Button variant="outline" className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">Initialize Purge</Button>
+            <Button variant="outline" onClick={() => setIsPurgeLocalOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+              Execute Local Purge
+            </Button>
           </Card>
 
           <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
             <div className="p-3 bg-muted rounded-xl w-fit"><Activity className="h-6 w-6 text-muted-foreground" /></div>
             <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Wipe Mirror</h4>
+              <h4 className="text-sm font-black uppercase">Mirror Standby</h4>
               <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Destroy all hot-standby records in the Realtime Database shadow.</p>
             </div>
-            <Button variant="outline" className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">Initialize Wipe</Button>
+            <Button variant="outline" onClick={() => setIsWipeMirrorOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+              Execute Mirror Wipe
+            </Button>
           </Card>
 
           <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
             <div className="p-3 bg-muted rounded-xl w-fit"><Cloud className="h-6 w-6 text-muted-foreground" /></div>
             <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Reset Cloud</h4>
+              <h4 className="text-sm font-black uppercase">Cloud Authority</h4>
               <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Permanently clear the authoritative assets collection in Firestore.</p>
             </div>
-            <Button variant="outline" className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">Initialize Reset</Button>
+            <Button variant="outline" onClick={() => setIsResetCloudOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+              Execute Cloud Reset
+            </Button>
           </Card>
 
           <Card className="bg-destructive/5 border-2 border-destructive/20 p-6 space-y-6 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5"><Bomb className="h-20 w-20 text-destructive" /></div>
             <div className="p-3 bg-destructive/10 rounded-xl w-fit"><Hammer className="h-6 w-6 text-destructive" /></div>
             <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase text-destructive">Nuclear Reset</h4>
+              <h4 className="text-sm font-black uppercase text-destructive">Global Pulse</h4>
               <p className="text-[10px] font-medium text-destructive/60 italic leading-relaxed">Destroy all data across Cloud, Mirror, and Local storage tiers instantly.</p>
             </div>
-            <Button className="w-full h-12 rounded-xl bg-destructive text-white font-black uppercase text-[9px] tracking-widest shadow-2xl transition-transform active:scale-95">Execute Global Purge</Button>
+            <Button onClick={() => setIsNuclearOpen(true)} className="w-full h-12 rounded-xl bg-destructive text-white font-black uppercase text-[9px] tracking-widest shadow-2xl transition-transform active:scale-95">
+              Execute Global Reset
+            </Button>
           </Card>
         </div>
       </div>
@@ -576,7 +640,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </div>
           </ScrollArea>
 
-          {/* Footer Controls */}
+          {/* Editor Footer Controls */}
           <div className="p-8 border-t bg-muted/20 shrink-0 flex flex-row items-center justify-between gap-4 pb-safe shadow-3xl">
             <div className="flex items-start gap-4 max-w-md">
               <div className="p-2.5 bg-blue-500/10 rounded-xl shrink-0"><Info className="h-5 w-5 text-blue-600" /></div>
@@ -599,7 +663,101 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         </DialogContent>
       </Dialog>
 
-      {/* Purge Confirmation Dialog */}
+      {/* Destructive Confirmation Dialogs */}
+      
+      {/* 1. Local Purge */}
+      <AlertDialog open={isPurgeLocalOpen} onOpenChange={setIsPurgeLocalOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Smartphone className="h-10 w-10 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Purge Local Registry?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+              This action will destroy all asset records, staging sandboxes, and pending sync queues <strong>on this device only</strong>. Cloud data is preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleLocalPurge} 
+              disabled={isProcessing}
+              className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 2. Mirror Wipe */}
+      <AlertDialog open={isWipeMirrorOpen} onOpenChange={setIsWipeMirrorOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Activity className="h-10 w-10 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Mirror Standby?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+              This will destroy all records in the hot-standby shadow (RTDB). Local and Cloud tiers will remain intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleMirrorWipe} 
+              disabled={isProcessing}
+              className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Wipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 3. Cloud Reset */}
+      <AlertDialog open={isResetCloudOpen} onOpenChange={setIsResetCloudOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Cloud className="h-10 w-10 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Reset Cloud Authority?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+              Permanently clear the entire assets collection from Firestore. <strong>This action is irreversible and affects all users globally.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCloudReset} 
+              disabled={isProcessing}
+              className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 4. Nuclear Reset */}
+      <AlertDialog open={isNuclearOpen} onOpenChange={setIsNuclearOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-black text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-12 w-12 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Global Registry Purge?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
+              You are about to permanently destroy EVERY record in the global registry pulse. This includes Cloud (Firestore), Mirror (RTDB), and all Local device caches. This action is immutable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-10 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 text-white">Abort</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleGlobalNuclearReset} 
+              disabled={isProcessing}
+              className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Commit Global Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Node Purge Confirmation */}
       <AlertDialog open={!!nodeToDelete} onOpenChange={setNodeToDelete}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
