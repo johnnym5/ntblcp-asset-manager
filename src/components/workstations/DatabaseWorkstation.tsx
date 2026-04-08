@@ -41,7 +41,8 @@ import {
   ArrowRight,
   Zap,
   Cpu,
-  Hammer
+  Hammer,
+  Info
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -577,7 +578,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
           <div className="p-8 border-t bg-muted/20 shrink-0 flex flex-row items-center justify-between gap-4 pb-safe shadow-3xl">
             <div className="flex items-start gap-4 max-w-md">
               <div className="p-2.5 bg-blue-500/10 rounded-xl shrink-0"><Info className="h-5 w-5 text-blue-600" /></div>
-              <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
+              <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed italic">
                 Modifications are atomic. Committed changes are broadcast immediately to the {activeLayer} cluster.
               </p>
             </div>
