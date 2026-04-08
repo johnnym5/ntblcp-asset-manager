@@ -3,9 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Overhauled for Selection Pulses & Batch Operational Workflows.
- * Phase 800: Implemented Asset Multi-Selection & Floating Action Bar.
- * Phase 801: Integrated Batch Edit, Merge, and Export for selected records.
- * Phase 802: Context-aware single/batch primary action trigger.
+ * Phase 805: Fully adaptive Mobile/Desktop Floating Action Bar with scrollable stream.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -67,7 +65,7 @@ import { addNotification } from '@/hooks/use-notifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExcelService } from '@/services/excel-service';
 import { AssetDossier } from '@/components/registry/AssetDossier';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,6 +103,7 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/components/category-batch-edit-form';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import type { Asset } from '@/types/domain';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -141,6 +140,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   } = useAppState();
   
   const { userProfile } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -680,47 +680,60 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* 4. Batch Pulse Floating Action Bar */}
+      {/* 4. Batch Pulse Floating Action Bar - Adaptive & Deployment Optimized */}
       <AnimatePresence>
         {(selectedAssetIds.size > 0 || selectedCategories.length > 0) && (
           <motion.div 
-            initial={{ opacity: 0, y: 40 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: 40 }} 
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-3 flex items-center gap-8 shadow-3xl backdrop-blur-3xl"
+            initial={{ opacity: 0, y: 40, x: "-50%" }} 
+            animate={{ opacity: 1, y: 0, x: "-50%" }} 
+            exit={{ opacity: 0, y: 40, x: "-50%" }} 
+            className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-[1.5rem] sm:rounded-2xl p-2.5 sm:p-3 flex items-center shadow-3xl backdrop-blur-3xl"
           >
-            <div className="flex items-center gap-3 pl-3">
-              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px]">
+            {/* Counter Section */}
+            <div className="flex items-center gap-2.5 sm:gap-3 pl-2 sm:pl-3 pr-4 sm:pr-6 border-r border-white/10 shrink-0">
+              <div className="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px] sm:text-[10px] shadow-lg">
                 {showList ? selectedAssetIds.size : selectedCategories.length}
               </div>
-              <span className="text-[10px] font-black uppercase text-white tracking-widest">Selected</span>
+              <span className="text-[9px] font-black uppercase text-white tracking-widest hidden xs:block">
+                {isMobile ? 'PULSE' : 'SELECTED'}
+              </span>
             </div>
             
-            <div className="h-8 w-px bg-white/10" />
+            {/* Action Stream - Scrollable on Mobile */}
+            <ScrollArea className="flex-1 overflow-hidden" scrollHideDelay={500}>
+              <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1">
+                {showList && selectedAssetIds.size === 1 ? (
+                  <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} size="sm" className="h-9 sm:h-11 px-4 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 shadow-xl shrink-0">
+                    <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Edit Record
+                  </Button>
+                ) : (
+                  <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} size="sm" className="h-9 sm:h-11 px-4 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 shadow-xl shrink-0">
+                    <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Batch Edit
+                  </Button>
+                )}
+                
+                <Button variant="outline" onClick={showList ? handleExportAssets : handleExportCategories} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5 shrink-0">
+                  <FileDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Export
+                </Button>
+                
+                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5 shrink-0">
+                  <GitMerge className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Merge
+                </Button>
+                
+                <Button variant="outline" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0">
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Delete
+                </Button>
+              </div>
+              <ScrollBar orientation="horizontal" className="h-1 invisible" />
+            </ScrollArea>
             
-            <div className="flex items-center gap-2">
-              {showList && selectedAssetIds.size === 1 ? (
-                <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl hover:scale-105 transition-all">
-                  <Edit3 className="h-4 w-4" /> Edit Record
-                </Button>
-              ) : (
-                <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl hover:scale-105 transition-all">
-                  <Edit3 className="h-4 w-4" /> Batch Edit
-                </Button>
-              )}
-              
-              <Button variant="outline" onClick={showList ? handleExportAssets : handleExportCategories} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
-                <FileDown className="h-4 w-4" /> Export
-              </Button>
-              <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
-                <GitMerge className="h-4 w-4" /> Merge
-              </Button>
-              <Button variant="outline" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-              
-              <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2 text-white/20 hover:text-white transition-all">
-                <X className="h-5 w-5" />
+            {/* Close Pulse */}
+            <div className="pl-2 border-l border-white/10 shrink-0">
+              <button 
+                onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} 
+                className="p-2 sm:p-2.5 text-white/20 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
           </motion.div>
