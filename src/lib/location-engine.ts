@@ -1,7 +1,7 @@
 /**
  * @fileOverview Location Normalization & Matching Engine.
  * Resolves raw input strings to canonical Nigerian administrative hierarchies.
- * Phase 200: Hardened fuzzy matching for variations like Akwa Ibom/Akwaibom.
+ * Phase 300: Fully integrated getFuzzySignature for absolute naming resilience.
  */
 
 import { NIGERIAN_GEO_DATA, type StateInfo } from '@/lib/nigeria-geo';

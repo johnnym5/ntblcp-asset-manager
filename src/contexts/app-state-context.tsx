@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1105: Integrated Fuzzy Matching into search and filter aggregation.
+ * Phase 1106: Centralized name normalization for locations and assignees.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -236,7 +237,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (selectedLocations.length > 0) {
       const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
       results = results.filter(a => {
-        const assetFuzzy = getFuzzySignature(a.normalizedLocation || a.location);
+        const assetFuzzy = getFuzzySignature(a.location);
         return selectedFuzzy.includes(assetFuzzy);
       });
     }
@@ -278,21 +279,32 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
    */
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
+    const canonicalMap = new Map<string, string>(); // Fuzzy -> Display
+
     assets.forEach(a => { 
       const pulse = LocationEngine.normalize(a.location);
-      const val = pulse.normalized;
-      counts.set(val, (counts.get(val) || 0) + 1); 
+      const display = pulse.normalized;
+      const fuzzy = getFuzzySignature(display);
+      
+      if (!canonicalMap.has(fuzzy)) canonicalMap.set(fuzzy, display);
+      const finalDisplay = canonicalMap.get(fuzzy)!;
+      counts.set(finalDisplay, (counts.get(finalDisplay) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const assigneeOptions = useMemo(() => {
     const counts = new Map<string, number>();
+    const canonicalMap = new Map<string, string>();
+
     assets.forEach(a => { 
       const raw = a.custodian || 'Unassigned';
-      // Basic normalization for people: Title Case + Trim
-      const normalized = raw.trim().replace(/\b\w/g, l => l.toUpperCase());
-      counts.set(normalized, (counts.get(normalized) || 0) + 1); 
+      const display = raw.trim().replace(/\b\w/g, l => l.toUpperCase());
+      const fuzzy = getFuzzySignature(display);
+
+      if (!canonicalMap.has(fuzzy)) canonicalMap.set(fuzzy, display);
+      const finalDisplay = canonicalMap.get(fuzzy)!;
+      counts.set(finalDisplay, (counts.get(finalDisplay) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);

@@ -13,8 +13,8 @@ export function cn(...inputs: ClassValue[]) {
  * Removes all non-alphanumeric characters, spaces, and casing.
  * e.g., "Akwa-Ibom" -> "akwaibom"
  */
-export function getFuzzySignature(input: string | null | undefined): string {
-  if (!input) return "";
+export function getFuzzySignature(input: any): string {
+  if (input === null || input === undefined) return "";
   return String(input)
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")

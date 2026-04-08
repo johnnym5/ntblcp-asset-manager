@@ -3,13 +3,15 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
- * Phase 1002: Deployment Stability Pulse. Hardened metadata key sanitization for line breaks.
+ * Phase 1002: Deployment Stability Pulse. Hardened metadata key sanitization.
+ * Phase 1003: Integrated Centralized Naming Normalization Pulse.
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import { classifyRow } from './classifyRow';
 import { normalizeHeaderName } from '@/lib/registry-utils';
 import { LocationEngine } from '@/services/location-engine';
+import { getFuzzySignature } from '@/lib/utils';
 import type { 
   ParsedAsset, 
   HeaderTemplate,
@@ -35,7 +37,6 @@ export class ParserEngine {
     let pendingGroupLabel: string | null = null;
     let activeGroup: DiscoveredGroup | null = null;
     
-    // Safety check for empty pulse
     if (!data || data.length === 0) return [];
 
     data.forEach((row, idx) => {
@@ -59,7 +60,6 @@ export class ParserEngine {
       }
     });
 
-    // 2. Resolve Group Boundaries
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -136,14 +136,27 @@ export class ParserEngine {
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'model_number': asset.modelNumber = strVal; break;
         default: 
-          // Deterministic key sanitization for Firebase compatibility (Handles newlines and restricted symbols)
           const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]\n\r]/g, '_').trim();
           asset.metadata[safeKey] = val;
       }
     });
 
-    const hasDescription = !!asset.description;
-    const hasIdentification = hasDescription || !!asset.assetIdCode || !!asset.serialNumber;
+    // Integrated Deterministic Normalization
+    if (asset.location) {
+      const pulse = LocationEngine.normalize(asset.location);
+      asset.location = pulse.normalized;
+      asset.normalizedState = pulse.state;
+      asset.normalizedZone = pulse.zone;
+      asset.locationConfidence = pulse.confidence;
+      asset.locationStatus = pulse.status;
+    }
+
+    if (asset.custodian) {
+      // Normalize Assignee: Title Case + Fuzzy Signature check
+      asset.custodian = asset.custodian.trim().replace(/\b\w/g, (l: string) => l.toUpperCase());
+    }
+
+    const hasIdentification = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber;
 
     if (!hasIdentification) {
       asset.validation.isRejected = true;
@@ -153,16 +166,6 @@ export class ParserEngine {
         message: 'Identification pulse missing (No Description, Tag ID, or Serial discovered).',
         rawData: row
       });
-    }
-
-    // Integrated Location Intelligence Pulse
-    if (asset.location) {
-      const pulse = LocationEngine.normalize(asset.location);
-      asset.normalizedLocation = pulse.normalized;
-      asset.normalizedState = pulse.state;
-      asset.normalizedZone = pulse.zone;
-      asset.locationConfidence = pulse.confidence;
-      asset.locationStatus = pulse.status;
     }
 
     return asset as ParsedAsset;

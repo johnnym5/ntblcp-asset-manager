@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Verify Assets - Field Verification Hub.
+ * Phase 40: Integrated Fuzzy Location Scope check for RBAC-aware filtering.
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -31,10 +32,10 @@ import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
+import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { sanitizeSearch } from '@/lib/utils';
 
 export function VerifyWorkstation() {
   const { assets, refreshRegistry, settingsLoaded, appSettings } = useAppState();
@@ -61,15 +62,19 @@ export function VerifyWorkstation() {
 
   const unverified = useMemo(() => {
     let list = assets.filter(a => a.status === 'UNVERIFIED');
+    
+    // Deterministic RBAC Scope Pulse (Fuzzy)
     if (!userProfile?.isAdmin && userProfile?.state) {
-      const userState = userProfile.state.toLowerCase().trim();
-      list = list.filter(a => (a.location || '').toLowerCase().trim() === userState);
+      const userStateFuzzy = getFuzzySignature(userProfile.state);
+      list = list.filter(a => getFuzzySignature(a.location) === userStateFuzzy);
     }
+
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+      const termFuzzy = getFuzzySignature(searchTerm);
       list = list.filter(a => 
-        (a.description || '').toLowerCase().includes(term) || 
-        (a.assetIdCode || '').toLowerCase().includes(term)
+        getFuzzySignature(a.description).includes(termFuzzy) || 
+        getFuzzySignature(a.assetIdCode).includes(termFuzzy) ||
+        getFuzzySignature(a.serialNumber).includes(termFuzzy)
       );
     }
     return list;
@@ -95,7 +100,6 @@ export function VerifyWorkstation() {
 
   return (
     <div className="space-y-8 pb-32">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
