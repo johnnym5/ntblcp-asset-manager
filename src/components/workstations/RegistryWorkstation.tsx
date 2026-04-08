@@ -432,11 +432,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
                 {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
                 
-                <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative", filters.length > 0 && "border-primary/40")}>
-                  <ListFilter className="h-4 w-4" />
-                  {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">{filters.length}</span>}
-                </Button>
-
                 <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
               </div>
             </div>

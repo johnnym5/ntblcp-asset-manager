@@ -10,6 +10,14 @@ import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth";
 import { firebaseConfig as staticConfig } from "@/firebase/config";
 
+/**
+ * ASSETAIN FIREBASE INITIALIZATION PULSE
+ * 
+ * This is the authoritative source for Firebase SDK instances.
+ * Configured for high-latency resilience using Long Polling to bypass
+ * the default 10s stream timeout in restricted networks.
+ */
+
 // Your web app's Firebase configuration is loaded from environment variables with static fallbacks.
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || staticConfig.apiKey,
@@ -20,7 +28,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || staticConfig.appId,
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || staticConfig.databaseURL,
 };
-
 
 // Check if all essential keys are present
 export const isConfigValid = 
@@ -41,7 +48,12 @@ if (typeof window !== 'undefined') {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
       
-      // Use initializeFirestore with long polling to prevent the 10s connection timeout warning
+      /**
+       * RESILIENCE PULSE: Hardened Firestore
+       * We use initializeFirestore instead of getFirestore to enable 
+       * experimentalForceLongPolling. This mitigates the "Backend didn't respond 
+       * within 10 seconds" error encountered in low-bandwidth regional scopes.
+       */
       db = initializeFirestore(app, {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager()
@@ -57,7 +69,6 @@ if (typeof window !== 'undefined') {
       console.error("Firebase initialization error:", e);
     }
   } else {
-    // This warning helps developers who haven't set up their .env file.
     console.warn("Firebase configuration is missing or incomplete. Online features will be disabled.");
   }
 }
