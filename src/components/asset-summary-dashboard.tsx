@@ -3,6 +3,7 @@
 /**
  * @fileOverview Inventory Dashboard - Compact Data Summary.
  * Phase 1100: Switched to filteredAssets for reactive metrics.
+ * Phase 1101: Expanded to 10 Asset Overview and Insight pulses.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -17,7 +18,13 @@ import {
     RefreshCw,
     Activity,
     MousePointer2,
-    TrendingUp
+    TrendingUp,
+    ShieldAlert,
+    Database,
+    Cloud,
+    Fingerprint,
+    MapPin,
+    AlertCircle
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -72,26 +79,38 @@ const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count,
     </button>
 );
 
-const ReadinessPulse = ({ label, count, subLabel, onClick, isDestructive }: any) => (
+const ReadinessPulse = ({ label, count, subLabel, onClick, isDestructive, variant = "default" }: any) => (
     <div className={cn(
-        "flex items-center justify-between p-3 rounded-xl border transition-all group gap-3",
-        isDestructive ? "bg-red-600/5 border-red-600/10 hover:border-red-600/40" : "bg-white/[0.02] border-white/5 hover:border-primary/20"
+        "flex items-center justify-between p-3 rounded-xl border transition-all group gap-3 h-full",
+        isDestructive ? "bg-red-600/5 border-red-600/10 hover:border-red-600/40" : 
+        variant === "blue" ? "bg-blue-600/5 border-blue-600/10 hover:border-blue-600/40" :
+        "bg-white/[0.02] border-white/5 hover:border-primary/20"
     )}>
         <div className="space-y-0.5 flex-1 min-w-0">
             <div className="flex items-center gap-2">
-                <span className={cn("text-xl font-black tracking-tighter", isDestructive ? "text-red-600" : "text-white")}>{count}</span>
-                <span className={cn("text-[8px] font-black uppercase tracking-widest", isDestructive ? "text-red-500" : "text-primary")}>{label}</span>
+                <span className={cn("text-xl font-black tracking-tighter leading-none", 
+                    isDestructive ? "text-red-600" : 
+                    variant === "blue" ? "text-blue-500" :
+                    "text-white"
+                )}>{count}</span>
+                <span className={cn("text-[8px] font-black uppercase tracking-widest", 
+                    isDestructive ? "text-red-500" : 
+                    variant === "blue" ? "text-blue-400" :
+                    "text-primary"
+                )}>{label}</span>
             </div>
             <p className="text-[8px] font-medium text-white/40 leading-relaxed italic truncate">{subLabel}</p>
         </div>
-        <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onClick} 
-            className="h-7 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-white/40"
-        >
-            View
-        </Button>
+        {onClick && (
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onClick} 
+                className="h-7 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-white/40 shrink-0"
+            >
+                View
+            </Button>
+        )}
     </div>
 );
 
@@ -107,16 +126,31 @@ export function AssetSummaryDashboard() {
         const total = filteredAssets.length;
         const verified = filteredAssets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
+        const pending = filteredAssets.filter(a => a.status === 'UNVERIFIED').length;
+        const exceptions = filteredAssets.filter(a => a.status === 'DISCREPANCY').length;
+        const critical = filteredAssets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length;
+        const groups = new Set(filteredAssets.map(a => a.category)).size;
+        const locations = new Set(filteredAssets.map(a => a.location)).size;
         
+        // Fidelity: Average of overallFidelityScore
+        const totalFidelity = filteredAssets.reduce((sum, a) => sum + (a.overallFidelityScore || 0), 0);
+        const fidelity = total > 0 ? Math.round(totalFidelity / total) : 100;
+        
+        // Parity: % of items marked as 'synced'
+        const synced = filteredAssets.filter(a => (a as any).syncStatus === 'synced').length;
+        const parity = total > 0 ? Math.round((synced / total) * 100) : 100;
+
         return {
-            coverage,
             total,
+            coverage,
             verified,
-            pending: filteredAssets.filter(a => a.status === 'UNVERIFIED').length,
-            missingId: filteredAssets.filter(a => !a.assetIdCode).length,
-            critical: filteredAssets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length,
-            exceptions: filteredAssets.filter(a => a.status === 'DISCREPANCY').length,
-            folders: new Set(filteredAssets.map(a => a.category)).size,
+            pending,
+            exceptions,
+            critical,
+            fidelity,
+            parity,
+            groups,
+            locations,
             anomalies: filteredAssets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length
         };
     }, [filteredAssets]);
@@ -157,27 +191,44 @@ export function AssetSummaryDashboard() {
                     <motion.div key="stats" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <QuickStartTile label="Browse Assets" description="Inventory View" icon={Boxes} color="bg-primary" count={metrics.total} onClick={() => setActiveView('REGISTRY')} />
-                            <QuickStartTile label="Categories" description="Folder Tree" icon={FolderOpen} color="bg-blue-600" count={metrics.folders} onClick={() => setActiveView('GROUPS')} />
+                            <QuickStartTile label="Categories" description="Folder Tree" icon={FolderOpen} color="bg-blue-600" count={metrics.groups} onClick={() => setActiveView('GROUPS')} />
                             <QuickStartTile label="Data Errors" description="Quality Issues" icon={SearchCode} color="bg-red-600" count={metrics.anomalies} isDestructive={metrics.anomalies > 0} onClick={() => setActiveView('ANOMALIES')} />
                         </div>
 
-                        <Accordion type="single" collapsible className="w-full">
+                        <Accordion type="single" collapsible className="w-full" defaultValue="readiness">
                             <AccordionItem value="readiness" className="border-none">
                                 <AccordionTrigger className="hover:no-underline p-0 py-2">
                                     <div className="flex items-center justify-between w-full pr-2">
                                         <div className="flex items-center gap-2 px-1">
                                             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Verification Progress</h4>
+                                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Asset Overview & Insights</h4>
                                         </div>
-                                        <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">VIEW ALL</Badge>
+                                        <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">FULL ANALYSIS</Badge>
                                     </div>
                                 </AccordionTrigger>
-                                <AccordionContent className="pt-2 pb-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <ReadinessPulse label="Coverage" count={`${metrics.coverage}%`} subLabel={`${metrics.verified} items verified`} onClick={() => setActiveView('VERIFY')} />
-                                        <ReadinessPulse label="Pending" count={metrics.pending} subLabel="Waiting verification" onClick={() => setActiveView('VERIFY')} />
-                                        <ReadinessPulse label="Critical" count={metrics.critical} isDestructive={metrics.critical > 0} subLabel="Losses/Damage" onClick={() => setActiveView('ALERTS')} />
-                                        <ReadinessPulse label="Errors" count={metrics.anomalies} subLabel="Data gaps" onClick={() => setActiveView('ANOMALIES')} />
+                                <AccordionContent className="pt-4 pb-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {/* Row 1: Primary Anchors */}
+                                        <ReadinessPulse label="Nodes" count={metrics.total} subLabel="Total Registry Assets" icon={Database} type="total" />
+                                        <ReadinessPulse label="Coverage" count={`${metrics.coverage}%`} subLabel="Physically Verified" icon={TrendingUp} type="verified" />
+                                        <ReadinessPulse label="Verified" count={metrics.verified} subLabel="Audit Status: Pass" icon={CheckCircle2} type="verified" />
+                                        <ReadinessPulse label="Pending" count={metrics.pending} subLabel="Audit Status: Open" icon={Activity} type="pending" />
+                                        <ReadinessPulse label="Alerts" count={metrics.exceptions} isDestructive={metrics.exceptions > 0} subLabel="Discrepancy Flags" icon={AlertCircle} type="exceptions" />
+                                        
+                                        {/* Row 2: Fidelity & Structural Anchors */}
+                                        <ReadinessPulse label="Critical" count={metrics.critical} isDestructive={metrics.critical > 0} subLabel="Losses & Damage" icon={ShieldAlert} type="critical" />
+                                        <ReadinessPulse label="Fidelity" count={`${metrics.fidelity}%`} subLabel="Data Integrity Index" icon={Fingerprint} type="fidelity" />
+                                        <ReadinessPulse label="Parity" count={`${metrics.parity}%`} variant="blue" subLabel="Cloud Parity Index" icon={Cloud} type="parity" />
+                                        <ReadinessPulse label="Groups" count={metrics.groups} subLabel="Unique Folders" icon={FolderOpen} type="groups" />
+                                        <ReadinessPulse label="Scopes" count={metrics.locations} subLabel="Regional Scope" icon={MapPin} type="locations" />
+                                    </div>
+                                    
+                                    <div className="mt-6 p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                                        <div className="flex justify-between items-center px-1">
+                                            <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Global Fidelity Pulse</span>
+                                            <span className="text-[9px] font-black text-primary uppercase">{metrics.fidelity}%</span>
+                                        </div>
+                                        <Progress value={metrics.fidelity} className="h-1 bg-white/5" />
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
