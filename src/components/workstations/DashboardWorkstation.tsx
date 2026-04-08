@@ -4,6 +4,7 @@
  * @fileOverview Dashboard Workstation - Unified Command Hub.
  * Phase 1200: Consolidated redundant features into logical Operational Zones.
  * Phase 1201: Grouped Exploration, Integrity, and Reporting tools.
+ * Phase 1202: Gated verification triggers based on appMode.
  */
 
 import React, { useMemo } from 'react';
@@ -22,7 +23,8 @@ import {
   Zap,
   ChevronRight,
   Monitor,
-  AlertTriangle
+  AlertTriangle,
+  ClipboardCheck
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -51,6 +53,7 @@ export function DashboardWorkstation() {
   
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isReportingMode = appSettings?.appMode === 'reporting';
+  const isVerificationMode = appSettings?.appMode === 'verification';
 
   return (
     <div className="space-y-10 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
@@ -148,6 +151,12 @@ export function DashboardWorkstation() {
                   <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
                     <FolderOpen className="h-4 w-4 text-primary" /> Browse All Folders
                   </Button>
+                  
+                  {isVerificationMode && (
+                    <Button onClick={() => setActiveView('VERIFY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 text-green-600 border-green-500/20">
+                      <ClipboardCheck className="h-4 w-4" /> Records to Review
+                    </Button>
+                  )}
                   
                   {isAdmin && (
                     <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 mt-4">

@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
  * Hardened for responsive multi-column layouts and high-speed touch input.
+ * Phase 401: Strict gating for verification fields based on appMode.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -90,6 +91,7 @@ export default function AssetForm({
   });
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isVerificationMode = appSettings?.appMode === 'verification';
   const isManagementMode = appSettings?.appMode === 'management';
 
   useEffect(() => {
@@ -183,8 +185,15 @@ export default function AssetForm({
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
+    
+    // Gating Pulse: If not in verification mode, lock assessment fields for non-admins
+    const verificationFields = ['status', 'condition', 'remarks'];
+    if (!isVerificationMode && verificationFields.includes(fieldName)) return true;
+    
+    // Management Lock: If in management mode, standard users can't edit identity markers
+    if (isManagementMode && !verificationFields.includes(fieldName)) return true;
+
     if ((fieldRules as any)[fieldName] === 'forbidden') return true;
-    if (isManagementMode && ['status', 'condition', 'remarks'].includes(fieldName)) return true;
     return false;
   };
 
@@ -360,7 +369,7 @@ export default function AssetForm({
           </div>
 
           <div className="p-6 sm:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 px-6 sm:px-10 rounded-2xl font-black uppercase text-[9px] masonry-text-white/40 hover:text-white">Discard</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 px-6 sm:px-10 rounded-2xl font-black uppercase text-[9px] text-white/40 hover:text-white">Discard</Button>
             {!externalReadOnly && (
               <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-[9px] sm:text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}

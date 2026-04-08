@@ -2,11 +2,12 @@
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Optimized for maximum content within visual workstation.
  * Phase 5: Implemented Dynamic Header Awareness based on QuickView setting.
+ * Phase 6: Forced lock for Status/Condition in verification mode.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreVertical, Trash2, ChevronDown, Check, Globe, CloudOff } from 'lucide-react';
+import { MoreVertical, Trash2, ChevronDown, Check, Globe, CloudOff, Activity, ShieldCheck, FileText } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -32,10 +33,14 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
   const { userProfile } = useAuth();
 
   const isManagementMode = appSettings?.appMode === 'management';
+  const isVerificationMode = appSettings?.appMode === 'verification';
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   // Identify fields enabled for Quick View in the Header Manager
-  const activeHeaders = globalHeaders.filter(h => h.quickView);
+  let activeHeaders = globalHeaders.filter(h => h.quickView);
+  
+  // FORCE LOCK: In verification mode, always show status, condition, and remark if they exist
+  const forcedFieldNames = ['condition', 'remarks', 'status', 'verified_status'];
   
   // Explicitly separate core description from details for better visual grouping
   const descriptionField = record.fields.find(f => {
@@ -104,8 +109,10 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
         </div>
 
         <div className="divide-y divide-border/40 bg-white/[0.01]">
+          {/* Loop over standard headers */}
           {activeHeaders
             .filter(h => h.normalizedName !== 'asset_description' && h.normalizedName !== 'asset_id_code')
+            .filter(h => isVerificationMode || !forcedFieldNames.includes(h.normalizedName)) // Skip verification fields if not in verification mode
             .slice(0, 4) // Safety limit for card density
             .map((header) => {
               const field = record.fields.find(f => f.headerId === header.id);
@@ -120,16 +127,46 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
                 </div>
               );
             })}
+
+          {/* Verification Mode: Force display of Condition and Remark if not already in activeHeaders */}
+          {isVerificationMode && (
+            <>
+              {forcedFieldNames
+                .filter(name => !activeHeaders.some(h => h.normalizedName === name))
+                .filter(name => name !== 'status' && name !== 'verified_status') // status is in footer
+                .map(name => {
+                  const header = globalHeaders.find(h => h.normalizedName === name);
+                  const field = record.fields.find(f => {
+                    const h = record.headers.find(header => header.id === f.headerId);
+                    return h?.normalizedName === name;
+                  });
+                  if (!header || !field) return null;
+                  return (
+                    <div key={name} className="px-3 py-1.5 flex items-center justify-between gap-4 group/field bg-primary/[0.02]">
+                      <span className="text-[7px] font-black uppercase text-primary opacity-60 shrink-0 group-hover/field:opacity-100 transition-colors">
+                        {header.displayName}
+                      </span>
+                      <p className="text-[9px] font-bold uppercase text-foreground truncate text-right">
+                        {field.displayValue || '---'}
+                      </p>
+                    </div>
+                  );
+                })}
+            </>
+          )}
         </div>
 
-        {(!isManagementMode || isAdmin) && (
+        {isVerificationMode && (
           <div className="px-3 py-1.5 bg-white/[0.02] flex items-center justify-between border-t border-border/20">
             <div className="flex items-center gap-2">
               <div className={cn(
                 "h-1.5 w-1.5 rounded-full shadow-sm",
                 status === 'VERIFIED' ? "bg-green-500" : "bg-white/20"
               )} />
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/40">{status}</span>
+              <span className={cn(
+                "text-[8px] font-black uppercase tracking-widest",
+                status === 'VERIFIED' ? "text-green-500" : "text-white/40"
+              )}>{status}</span>
             </div>
             <ChevronDown className="h-3 w-3 text-white/10" />
           </div>

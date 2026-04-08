@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Phase 1303: Linked header search button directly to Command Palette for unified global search.
+ * Phase 1304: Gated verification views based on appMode.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -139,6 +140,8 @@ export default function SPAHub() {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const isVerificationMode = appSettings?.appMode === 'verification';
+
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -147,13 +150,13 @@ export default function SPAHub() {
       case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return <VerifyWorkstation />;
+      case 'VERIFY': return isVerificationMode ? <VerifyWorkstation /> : <DashboardWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
       case 'REPORTS': return <ReportsWorkstation isEmbedded={true} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
-  }, [activeView]);
+  }, [activeView, isVerificationMode]);
 
   useEffect(() => {
     if (profileSetupComplete) {

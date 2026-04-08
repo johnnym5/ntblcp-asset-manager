@@ -2,6 +2,7 @@
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
  * Optimized for Responsive Stacking and Dynamic Header Awareness.
  * Phase 6: Implemented Dynamic Columns based on TableView setting.
+ * Phase 7: Gated verification columns based on appMode.
  */
 
 import React from 'react';
@@ -25,7 +26,8 @@ import {
   ChevronDown,
   Globe,
   CloudOff,
-  List
+  List,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -63,12 +65,15 @@ export function RegistryTable({
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isManagementMode = appSettings?.appMode === 'management';
+  const isVerificationMode = appSettings?.appMode === 'verification';
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
-  // Dynamically determine columns based on Admin settings
-  const tableHeaders = globalHeaders.filter(h => h.table);
+  // Dynamically determine columns based on Admin settings, filtering out verification fields if not in verification mode
+  const tableHeaders = globalHeaders
+    .filter(h => h.table)
+    .filter(h => isVerificationMode || !VERIFICATION_KEYS.includes(h.normalizedName));
 
   return (
     <div className="space-y-4 pb-40 animate-in fade-in duration-700 w-full overflow-hidden">
@@ -95,7 +100,7 @@ export function RegistryTable({
             </div>
           ))}
           <div className="col-span-2 flex items-center justify-end sm:justify-center gap-2">
-            {!isMobile && (!isManagementMode || isAdmin) && (
+            {!isMobile && isVerificationMode && (
               <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Verification</span>
             )}
           </div>
@@ -162,7 +167,7 @@ export function RegistryTable({
                 </AccordionTrigger>
 
                 <div className="hidden sm:flex w-[140px] shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
-                  {(!isManagementMode || isAdmin) ? (
+                  {isVerificationMode ? (
                     <Select value={status}>
                       <SelectTrigger className={cn(
                         "h-8 sm:h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2 transition-all",
@@ -192,7 +197,7 @@ export function RegistryTable({
                     .filter(f => {
                       const h = record.headers.find(header => header.id === f.headerId);
                       const isVerificationField = h ? VERIFICATION_KEYS.includes(h.normalizedName) : false;
-                      if (isManagementMode && !isAdmin && isVerificationField) return false;
+                      if (!isVerificationMode && isVerificationField) return false;
                       return true;
                     })
                     .map((field) => {
