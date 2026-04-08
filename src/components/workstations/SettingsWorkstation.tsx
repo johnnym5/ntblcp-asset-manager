@@ -5,6 +5,7 @@
  * Phase 1015: Overhauled with pill-shaped UI categories.
  * Phase 1016: Hardened contrast for Light Mode compatibility and disabled versioning.
  * Phase 1017: Fixed TabsList hierarchy error by wrapping workstation in root Tabs.
+ * Phase 1018: Integrated Application Mode switcher into General Settings.
  */
 
 import React, { useState, useRef } from 'react';
@@ -370,7 +371,7 @@ export function SettingsWorkstation() {
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] tracking-widest text-muted-foreground hover:text-foreground">Discard</Button>
         <Button onClick={handleSaveChange} disabled={isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
           Commit All Changes
         </Button>
       </div>

@@ -203,22 +203,11 @@ export default function SPAHub() {
     }
   };
 
-  const handleModeSwitch = async (mode: 'management' | 'verification') => {
-    if (!appSettings || !userProfile?.isAdmin) return;
-    const nextSettings = { ...appSettings, appMode: mode };
-    setAppSettings(nextSettings);
-    await storage.saveSettings(nextSettings);
-    if (isOnline) {
-      await FirestoreService.updateSettings({ appMode: mode });
-    }
-  };
-
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
   const isAdmin = userProfile?.isAdmin || false;
-  const currentMode = appSettings?.appMode || 'management';
 
   return (
     <div className="app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden">
@@ -342,59 +331,6 @@ export default function SPAHub() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden sm:flex items-center bg-muted/30 p-0.5 rounded-lg border border-border mr-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-muted transition-all group">
-                  {currentMode === 'management' ? (
-                    <ShieldCheck className="h-3 w-3 text-primary" />
-                  ) : (
-                    <ClipboardCheck className="h-3 w-3 text-green-500" />
-                  )}
-                  <div className="flex flex-col items-start leading-none">
-                    <span className="text-[7px] font-black uppercase text-muted-foreground tracking-widest">Active Mode</span>
-                    <span className="text-[8px] font-black uppercase text-foreground">{currentMode}</span>
-                  </div>
-                  <ChevronDown className="h-2.5 w-2.5 text-foreground/20 group-hover:text-foreground transition-colors" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-48 bg-card border-border text-card-foreground rounded-lg shadow-3xl p-1">
-                <DropdownMenuLabel className="text-[8px] font-black uppercase tracking-widest text-muted-foreground p-2">Select Workplace</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => handleModeSwitch('management')}
-                  disabled={!isAdmin}
-                  className={cn(
-                    "p-2 rounded-md focus:bg-primary/10 gap-3 m-0.5",
-                    currentMode === 'management' && "bg-muted"
-                  )}
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase">Management Mode</span>
-                    <span className="text-[7px] font-bold text-muted-foreground italic">Oversight & Engineering</span>
-                  </div>
-                  {currentMode === 'management' && <CheckCircle2 className="h-3 w-3 ml-auto text-primary" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleModeSwitch('verification')}
-                  disabled={!isAdmin}
-                  className={cn(
-                    "p-2 rounded-md focus:bg-green-500/10 gap-3 m-0.5",
-                    currentMode === 'verification' && "bg-muted"
-                  )}
-                >
-                  <ClipboardCheck className="h-3.5 w-3.5 text-green-500" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase">Verification Mode</span>
-                    <span className="text-[7px] font-bold text-muted-foreground italic">Field Audit & Assessment</span>
-                  </div>
-                  {currentMode === 'verification' && <CheckCircle2 className="h-3 w-3 ml-auto text-green-500" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
           <div className="hidden sm:flex items-center bg-muted/30 p-0.5 rounded-lg border border-border">
             <TooltipProvider>
               <Tooltip>
