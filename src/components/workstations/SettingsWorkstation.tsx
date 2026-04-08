@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Operational Control Center.
  * Phase 1015: Overhauled with pill-shaped UI categories.
  * Phase 1016: Hardened contrast for Light Mode compatibility and disabled versioning.
+ * Phase 1017: Fixed TabsList hierarchy error by wrapping workstation in root Tabs.
  */
 
 import React, { useState, useRef } from 'react';
@@ -211,7 +212,7 @@ export function SettingsWorkstation() {
   );
 
   return (
-    <div className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
+    <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-6 -mx-1 shrink-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -237,135 +238,133 @@ export function SettingsWorkstation() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
-        <Tabs defaultValue="general" className="w-full">
-          <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
-            <SettingSection title="Visual Identity" description="Environment themes" icon={Palette}>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                  <Sun className="h-4 w-4" /> Light Mode
-                </Button>
-                <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                  <Moon className="h-4 w-4" /> Dark Mode
-                </Button>
+        <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
+          <SettingSection title="Visual Identity" description="Environment themes" icon={Palette}>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
+                <Sun className="h-4 w-4" /> Light Mode
+              </Button>
+              <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
+                <Moon className="h-4 w-4" /> Dark Mode
+              </Button>
+            </div>
+          </SettingSection>
+
+          <SettingSection title="Operational Mode" description="Workstation logic presets" icon={Smartphone}>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'management')}
+                  className={cn(
+                    "p-6 rounded-2xl border-2 text-left transition-all group",
+                    appSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-2 rounded-lg", appSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
+                    {appSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                  </div>
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Management Mode</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Structural Oversight & Registry Engineering. High-level control for project leads.</p>
+                </button>
+
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'verification')}
+                  className={cn(
+                    "p-6 rounded-2xl border-2 text-left transition-all group",
+                    appSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-2 rounded-lg", appSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
+                    {appSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                  </div>
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification Mode</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Field Audit & Physical Assessment. Optimized for high-speed status assessing.</p>
+                </button>
               </div>
-            </SettingSection>
+            </div>
+          </SettingSection>
 
-            <SettingSection title="Operational Mode" description="Workstation logic presets" icon={Smartphone}>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <button 
-                    onClick={() => handleSettingChange('appMode', 'management')}
-                    className={cn(
-                      "p-6 rounded-2xl border-2 text-left transition-all group",
-                      appSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={cn("p-2 rounded-lg", appSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
-                      {appSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
-                    </div>
-                    <h4 className="text-sm font-black uppercase text-foreground mb-1">Management Mode</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Structural Oversight & Registry Engineering. High-level control for project leads.</p>
-                  </button>
-
-                  <button 
-                    onClick={() => handleSettingChange('appMode', 'verification')}
-                    className={cn(
-                      "p-6 rounded-2xl border-2 text-left transition-all group",
-                      appSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={cn("p-2 rounded-lg", appSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
-                      {appSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-                    </div>
-                    <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification Mode</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Field Audit & Physical Assessment. Optimized for high-speed status assessing.</p>
-                  </button>
-                </div>
+          <SettingSection title="Global Rules" description="Registry constraints" icon={Lock}>
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent non-admin deletions and additions</p>
               </div>
-            </SettingSection>
+              <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+            </div>
+          </SettingSection>
+        </TabsContent>
 
-            <SettingSection title="Global Rules" description="Registry constraints" icon={Lock}>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
-                <div className="space-y-0.5">
-                  <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent non-admin deletions and additions</p>
-                </div>
-                <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+        <TabsContent value="groups" className="space-y-10 m-0 outline-none pb-20">
+          <SettingSection title="Project Management" description="Authorized Registers" icon={LayoutGrid}>
+            <div className="space-y-6">
+              <div className="flex gap-2">
+                <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm" />
+                <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Project</Button>
               </div>
-            </SettingSection>
-          </TabsContent>
 
-          <TabsContent value="groups" className="space-y-10 m-0 outline-none pb-20">
-            <SettingSection title="Project Management" description="Authorized Registers" icon={LayoutGrid}>
-              <div className="space-y-6">
-                <div className="flex gap-2">
-                  <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm" />
-                  <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Project</Button>
-                </div>
-
-                <div className="space-y-3">
-                  {appSettings.grants.map((grant) => (
-                    <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", activeGrantId === grant.id ? "border-primary shadow-xl bg-primary/[0.02]" : "border-border bg-muted/10")}>
-                      <div className="p-5 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={cn("p-2 rounded-xl", activeGrantId === grant.id ? "bg-primary text-black" : "bg-muted")}><FolderOpen className="h-5 w-5" /></div>
-                          <div className="space-y-0.5">
-                            <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
-                            <p className="text-[8px] font-mono text-muted-foreground uppercase">UID: {grant.id.split('-')[0]}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {activeGrantId !== grant.id && (
-                            <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] tracking-widest border-2">Set Active</Button>
-                          )}
-                          <Badge variant="outline" className="h-6 px-3 border-border bg-card text-[8px] font-black uppercase">{Object.keys(grant.sheetDefinitions || {}).length} GROUPS</Badge>
+              <div className="space-y-3">
+                {appSettings.grants.map((grant) => (
+                  <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", activeGrantId === grant.id ? "border-primary shadow-xl bg-primary/[0.02]" : "border-border bg-muted/10")}>
+                    <div className="p-5 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("p-2 rounded-xl", activeGrantId === grant.id ? "bg-primary text-black" : "bg-muted")}><FolderOpen className="h-5 w-5" /></div>
+                        <div className="space-y-0.5">
+                          <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
+                          <p className="text-[8px] font-mono text-muted-foreground uppercase">UID: {grant.id.split('-')[0]}</p>
                         </div>
                       </div>
-                      
-                      {activeGrantId === grant.id && (
-                        <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4 animate-in slide-in-from-top-2 duration-500">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                              <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl group transition-all hover:border-primary/20">
-                                <span className="text-[9px] font-black uppercase text-muted-foreground truncate pr-4">{name}</span>
-                                <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest gap-2">
-                              <FileUp className="h-3.5 w-3.5" /> Import Template
-                            </Button>
-                            <Button onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-primary text-black font-black uppercase text-[8px] tracking-widest gap-2">
-                              <ScanSearch className="h-3.5 w-3.5" /> Scan & Import
-                            </Button>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        {activeGrantId !== grant.id && (
+                          <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] tracking-widest border-2">Set Active</Button>
+                        )}
+                        <Badge variant="outline" className="h-6 px-3 border-border bg-card text-[8px] font-black uppercase">{Object.keys(grant.sheetDefinitions || {}).length} GROUPS</Badge>
+                      </div>
+                    </div>
+                    
+                    {activeGrantId === grant.id && (
+                      <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4 animate-in slide-in-from-top-2 duration-500">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
+                            <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl group transition-all hover:border-primary/20">
+                              <span className="text-[9px] font-black uppercase text-muted-foreground truncate pr-4">{name}</span>
+                              <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ))}
                         </div>
-                      )}
-                    </Card>
-                  ))}
-                </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest gap-2">
+                            <FileUp className="h-3.5 w-3.5" /> Import Template
+                          </Button>
+                          <Button onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-primary text-black font-black uppercase text-[8px] tracking-widest gap-2">
+                            <ScanSearch className="h-3.5 w-3.5" /> Scan & Import
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                ))}
               </div>
-            </SettingSection>
-          </TabsContent>
+            </div>
+          </SettingSection>
+        </TabsContent>
 
-          <TabsContent value="users" className="m-0 outline-none pb-20">
-            <SettingSection title="Identity Governance" description="System auditors & regional scopes" icon={Users}>
-              <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
-            </SettingSection>
-          </TabsContent>
+        <TabsContent value="users" className="m-0 outline-none pb-20">
+          <SettingSection title="Identity Governance" description="System auditors & regional scopes" icon={Users}>
+            <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+          </SettingSection>
+        </TabsContent>
 
-          <TabsContent value="history" className="m-0 outline-none pb-20">
-            <AuditLogWorkstation isEmbedded={true} />
-          </TabsContent>
+        <TabsContent value="history" className="m-0 outline-none pb-20">
+          <AuditLogWorkstation isEmbedded={true} />
+        </TabsContent>
 
-          <TabsContent value="health" className="m-0 outline-none space-y-10 pb-20">
-            <DatabaseWorkstation isEmbedded={true} />
-            <ErrorAuditWorkstation isEmbedded={true} />
-          </TabsContent>
-        </Tabs>
+        <TabsContent value="health" className="m-0 outline-none space-y-10 pb-20">
+          <DatabaseWorkstation isEmbedded={true} />
+          <ErrorAuditWorkstation isEmbedded={true} />
+        </TabsContent>
       </div>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
@@ -402,6 +401,6 @@ export function SettingsWorkstation() {
           }}
         />
       )}
-    </div>
+    </Tabs>
   );
 }
