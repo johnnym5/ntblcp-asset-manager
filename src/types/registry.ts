@@ -20,6 +20,7 @@ export interface RegistryHeader {
   visible: boolean;           // show in registry list
   table: boolean;             // specifically show in table/list view
   quickView: boolean;         // specifically show in card/grid view
+  inChecklist: boolean;       // show in the asset fidelity checklist
   editable: boolean;          // can user rename it
   filterable: boolean;        // usable in filters
   sortEnabled: boolean;       // usable in sort

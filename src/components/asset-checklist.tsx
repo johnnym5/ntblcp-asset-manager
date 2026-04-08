@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
- * Phase 400: Dynamic pulse logic driven by folder-specific templates.
+ * Phase 405: Driven by Global Header Settings for real-time validation pulses.
  */
 
 import React from 'react';
@@ -10,12 +10,7 @@ import {
   CheckCircle2, 
   XCircle, 
   FileText, 
-  User, 
-  ShieldCheck, 
-  ListTree, 
-  Hash, 
   MapPin, 
-  Building, 
   Tag,
   Info
 } from 'lucide-react';
@@ -56,60 +51,56 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
 );
 
 export function AssetChecklist({ values }: AssetChecklistProps) {
-  const { appSettings } = useAppState();
+  const { headers } = useAppState();
 
-  // Determine active checklist items based on the folder's template
-  const sheetDef = appSettings?.grants
-    .find(g => g.id === values.grantId)
-    ?.sheetDefinitions[values.category || ''];
+  // Filter headers that are enabled for the checklist view
+  const checklistHeaders = React.useMemo(() => {
+    return headers.filter(h => h.inChecklist);
+  }, [headers]);
 
-  const checklistFields = React.useMemo(() => {
-    if (!sheetDef) return [];
-    return sheetDef.displayFields.filter(f => f.inChecklist);
-  }, [sheetDef]);
+  // Map headers to checklist items
+  const items = checklistHeaders.map(header => {
+    let val: any = "";
+    switch(header.normalizedName) {
+      case "sn": val = values.sn; break;
+      case "location": val = values.location; break;
+      case "asset_description": val = values.description; break;
+      case "asset_id_code": val = values.assetIdCode; break;
+      case "asset_class": val = values.category; break;
+      case "condition": val = values.condition; break;
+      default:
+        val = (values.metadata as any)?.[header.rawName] || (values.metadata as any)?.[header.normalizedName];
+    }
 
-  const defaultItems = [
-    { label: 'Category', completed: !!values.category, icon: ListTree },
-    { label: 'Description', completed: !!values.description, icon: FileText },
-    { label: 'Location', completed: !!values.location, icon: MapPin },
-  ];
-
-  const templateItems = checklistFields.map(field => ({
-    label: field.label,
-    completed: !!(values as any)[field.key] && (values as any)[field.key] !== 'N/A',
-    icon: Info
-  }));
+    return {
+      label: header.displayName,
+      completed: val !== undefined && val !== null && String(val).trim() !== "" && String(val).trim() !== "---",
+      icon: Info
+    };
+  });
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="space-y-2">
-        <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Fidelity Checklist</h3>
-        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground opacity-60">Validation pulse per folder template</p>
+        <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Fidelity Audit</h3>
+        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground opacity-60">Global registry validation pulse</p>
       </div>
 
       <div className="space-y-8">
         <div className="space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Required Anchors</h4>
           <div className="space-y-3.5">
-            {defaultItems.map((item) => (
-              <ChecklistItem key={item.label} {...item} />
-            ))}
+            {items.length > 0 ? (
+              items.map((item) => (
+                <ChecklistItem key={item.label} {...item} />
+              ))
+            ) : (
+              <div className="p-4 rounded-xl border-2 border-dashed border-border/40 text-center">
+                <p className="text-[8px] font-black uppercase text-muted-foreground opacity-40 italic">No fidelity markers configured</p>
+              </div>
+            )}
           </div>
         </div>
-
-        {templateItems.length > 0 && (
-          <>
-            <div className="w-full h-px bg-border/40" />
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Folder Parameters</h4>
-              <div className="space-y-3.5">
-                {templateItems.map((item) => (
-                  <ChecklistItem key={item.label} {...item} />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );

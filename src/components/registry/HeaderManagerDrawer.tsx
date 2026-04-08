@@ -2,9 +2,8 @@
 
 /**
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
- * Phase 35: Removed redundant manual close button.
- * Phase 36: Converted to centered Dialog pop-up window.
- * Phase 37: Admin-Locked Governance & Real-Time Sync pulse.
+ * Phase 38: Implemented Triple-View Toggles (Card, List, Check).
+ * Phase 39: Converted to focused Dialog window with vertical group stacking.
  */
 
 import React, { useState } from 'react';
@@ -18,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -34,10 +32,12 @@ import {
   Info,
   Lock,
   Eye,
-  List
+  List,
+  ClipboardCheck,
+  CheckCircle2
 } from 'lucide-react';
-import type { RegistryHeader, RegistryPreset } from '@/types/registry';
-import { REGISTRY_PRESETS, DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
+import type { RegistryHeader } from '@/types/registry';
+import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { useAuth } from '@/contexts/auth-context';
@@ -72,14 +72,14 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
   const [search, setSearch] = useState("");
   const [localHeaders, setLocalHeaders] = useState<RegistryHeader[]>(headers);
 
-  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const groups = ["Identity", "Location", "Classification", "Procurement", "Condition", "Metadata", "Hierarchy"] as const;
 
   React.useEffect(() => {
     if (isOpen) setLocalHeaders(headers);
   }, [isOpen, headers]);
 
-  const toggleFlag = (id: string, key: 'visible' | 'table' | 'quickView') => {
+  const toggleFlag = (id: string, key: 'visible' | 'table' | 'quickView' | 'inChecklist') => {
     if (!isAdmin) return;
     setLocalHeaders(prev => prev.map(h => h.id === id ? { ...h, [key]: !h[key] } : h));
   };
@@ -105,7 +105,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       setAppSettings(updatedSettings);
       onUpdateHeaders(localHeaders);
-      addNotification({ title: "Header Arrangement Synchronized", variant: "success" });
+      addNotification({ title: "Registry Schema Synchronized", variant: "success" });
       onOpenChange(false);
     } catch (e) {
       addNotification({ title: "Commit Failure", variant: "destructive" });
@@ -114,7 +114,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-2xl bg-background overflow-hidden">
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-3xl bg-background overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
           <DialogHeader>
             <div className="flex items-center justify-between">
@@ -145,16 +145,17 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
             />
           </div>
           <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest opacity-40">
-            <span>Field Metadata</span>
+            <span>Registry Parameter</span>
             <div className="flex gap-10 pr-4">
               <span className="flex items-center gap-1.5"><Eye className="h-2.5 w-2.5" /> Card</span>
               <span className="flex items-center gap-1.5"><List className="h-2.5 w-2.5" /> List</span>
+              <span className="flex items-center gap-1.5"><ClipboardCheck className="h-2.5 w-2.5" /> Check</span>
             </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
-          <div className="p-8 space-y-10">
+          <div className="p-8 space-y-10 pb-32">
             {groups.map(groupName => {
               const groupHeaders = localHeaders.filter(h => 
                 h.group === groupName && 
@@ -182,8 +183,32 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                         </div>
                         
                         <div className="flex items-center gap-8 pl-4">
-                          <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
-                          <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                              </TooltipTrigger>
+                              <TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                              </TooltipTrigger>
+                              <TooltipContent className="text-[8px] font-black uppercase">Table View</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Switch checked={header.inChecklist} onCheckedChange={() => toggleFlag(header.id, 'inChecklist')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                              </TooltipTrigger>
+                              <TooltipContent className="text-[8px] font-black uppercase">Fidelity Check</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     ))}
@@ -198,10 +223,10 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
           {isAdmin ? (
             <>
               <Button variant="ghost" onClick={handleReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
-                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset to Default
+                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset Default
               </Button>
               <Button onClick={handleCommit} className="flex-[2] h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-                Commit Arrangement Pulse
+                <CheckCircle2 className="mr-2 h-4 w-4" /> Commit Arrangement Pulse
               </Button>
             </>
           ) : (
@@ -214,3 +239,5 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
     </Dialog>
   );
 }
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

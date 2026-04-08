@@ -2,10 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1105: Integrated Fuzzy Matching into search and filter aggregation.
- * Phase 1106: Centralized name normalization for locations and assignees.
- * Phase 1107: Integrated Global Command Palette state for mobile accessibility.
  * Phase 1108: Centralized Header management in AppSettings for real-time synchronization.
+ * Phase 1109: Hardened initial header pulse with default mapping fallback.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -130,7 +128,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
-  const [headers, setHeaders] = useState<RegistryHeader[]>([]);
+  
+  // Header state initialized with authoritative defaults
+  const [headers, setHeaders] = useState<RegistryHeader[]>(
+    DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[]
+  );
+  
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
@@ -161,8 +164,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       if (localSettings) {
         setAppSettings(localSettings);
         setSettingsLoaded(true);
-        // Sync local headers from settings
-        if (localSettings.globalHeaders) {
+        if (localSettings.globalHeaders && localSettings.globalHeaders.length > 0) {
           setHeaders(localSettings.globalHeaders);
         }
       }
@@ -208,7 +210,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       if (local) { 
         setAppSettings(local); 
         setSettingsLoaded(true); 
-        if (local.globalHeaders) setHeaders(local.globalHeaders);
+        if (local.globalHeaders && local.globalHeaders.length > 0) setHeaders(local.globalHeaders);
       }
     });
     if (db && isOnline) {
@@ -217,7 +219,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (snapshot.exists()) {
           const remoteSettings = snapshot.data() as AppSettings;
           setAppSettings(remoteSettings);
-          if (remoteSettings.globalHeaders) setHeaders(remoteSettings.globalHeaders);
+          if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) {
+            setHeaders(remoteSettings.globalHeaders);
+          }
           storage.saveSettings(remoteSettings);
           setSettingsLoaded(true);
         } else setSettingsLoaded(true);
@@ -334,7 +338,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const remoteSettings = await FirestoreService.getSettings();
       if (remoteSettings) {
         setAppSettings(remoteSettings);
-        if (remoteSettings.globalHeaders) setHeaders(remoteSettings.globalHeaders);
+        if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) setHeaders(remoteSettings.globalHeaders);
         await storage.saveSettings(remoteSettings);
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
