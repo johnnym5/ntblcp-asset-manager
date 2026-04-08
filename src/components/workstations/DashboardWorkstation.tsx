@@ -3,28 +3,19 @@
 /**
  * @fileOverview Dashboard - Main Overview Hub.
  * Phase 1302: Implemented background color adaptation for themes.
+ * Phase 1303: Overhauled contrast for Light Mode legibility.
  */
 
 import React, { useState, useMemo } from 'react';
 import { 
   LayoutDashboard,
-  Boxes,
-  ShieldCheck,
-  Activity,
-  FileText,
-  History,
-  FolderOpen,
-  SearchCode,
-  Zap,
-  ArrowRight,
-  FileUp,
-  PlusCircle,
-  ScanSearch,
+  RefreshCw,
+  ListFilter,
   DatabaseZap,
   Settings,
   ChevronDown,
-  RefreshCw,
-  ListFilter
+  FolderOpen,
+  SearchCode
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -49,7 +40,7 @@ import {
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, setIsExplored, setSelectedCategories, activeFilterCount } = useAppState();
+  const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, activeFilterCount } = useAppState();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
@@ -64,7 +55,7 @@ export function DashboardWorkstation() {
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
       
       {/* STICKY CONTROL HUB */}
-      <div className="sticky top-[-1rem] z-50 bg-background pt-1 pb-3 px-1 border-b border-border mb-4 -mx-1 shrink-0">
+      <div className="sticky top-[-1rem] z-50 bg-background/95 backdrop-blur-xl pt-1 pb-3 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
             <div className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
@@ -99,7 +90,7 @@ export function DashboardWorkstation() {
                 onClick={() => setIsFilterOpen(true)} 
                 className={cn(
                   "h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative",
-                  activeFilterCount > 0 && "border-primary/40 shadow-lg shadow-primary/5"
+                  activeFilterCount > 0 && "border-primary/40 shadow-lg"
                 )}
               >
                 <ListFilter className="h-4 w-4" />
@@ -115,7 +106,7 @@ export function DashboardWorkstation() {
                 size="icon" 
                 onClick={manualDownload} 
                 disabled={isSyncing || !isOnline}
-                className="rounded-lg h-10 w-10 bg-muted border border-border text-foreground/40 hover:text-primary shrink-0"
+                className="rounded-lg h-10 w-10 bg-muted border border-border text-muted-foreground hover:text-primary shrink-0"
               >
                 <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
               </Button>
@@ -164,7 +155,7 @@ export function DashboardWorkstation() {
                   <h3 className="text-base font-black uppercase text-foreground tracking-tight">Asset Folders</h3>
                 </div>
                 <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
-                  <Badge variant="outline" className="border-border text-foreground/40 uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-muted gap-1.5">
+                  <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-muted gap-1.5">
                     Explore <ChevronDown className="h-2.5 w-2.5" />
                   </Badge>
                 </AccordionTrigger>
@@ -187,7 +178,7 @@ export function DashboardWorkstation() {
                     </Badge>
                   )}
                   <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
-                    <Badge variant="outline" className="border-border text-foreground/40 uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-muted gap-1.5">
+                    <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-muted gap-1.5">
                       Review <ChevronDown className="h-2.5 w-2.5" />
                     </Badge>
                   </AccordionTrigger>
@@ -203,7 +194,7 @@ export function DashboardWorkstation() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <FileText className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/40">Reporting</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting</h3>
               </div>
               <ReportsWorkstation isEmbedded={true} />
             </div>
@@ -211,7 +202,7 @@ export function DashboardWorkstation() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <Activity className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/40">Sync Status</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Sync Status</h3>
               </div>
               <SyncQueueWorkstation isEmbedded={true} />
             </div>

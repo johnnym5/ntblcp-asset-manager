@@ -3,9 +3,10 @@
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
  * Phase 1209: Integrated theme-responsive backgrounds.
+ * Phase 1210: Refined Light Mode contrast and semantic styling.
  */
 
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
@@ -18,13 +19,10 @@ import {
   Search,
   ArrowUpDown,
   ChevronRight,
-  FolderOpen,
   Plus,
   MoreVertical,
   Type,
-  Upload,
   RefreshCw,
-  AlertTriangle,
   ListFilter,
   Filter,
   Eye
@@ -39,7 +37,6 @@ import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
-import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
@@ -278,7 +275,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
                     <Input ref={searchInputRef} placeholder="Find assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus:border-primary" />
-                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground/20 hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -293,7 +290,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 onClick={() => setIsFilterOpen(true)} 
                 className={cn(
                   "h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative",
-                  activeFilterCount > 0 && "border-primary/40 shadow-lg shadow-primary/5"
+                  activeFilterCount > 0 && "border-primary/40 shadow-lg"
                 )}
               >
                 <Filter className="h-4 w-4" />
@@ -323,7 +320,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 key={cat} 
                 onClick={() => handleToggleCategorySelection(cat)}
                 className={cn(
-                  "bg-card border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6 relative cursor-pointer", 
+                  "bg-card border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-xl flex flex-col p-6 relative cursor-pointer", 
                   selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border"
                 )}
               >
@@ -333,7 +330,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <div className="flex justify-between items-start mb-8 pl-8">
                   <h3 className="text-sm font-black uppercase text-foreground tracking-tight leading-none truncate pr-4">{cat}</h3>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-foreground/20 hover:text-foreground" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-muted-foreground/40 hover:text-foreground" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-card border-border text-foreground p-1">
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename Folder</span></DropdownMenuItem>
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Open Folder</span></DropdownMenuItem>
@@ -381,7 +378,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="flex items-center gap-3 pl-3"><div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-foreground tracking-widest">Folders Selected</span></div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="sm" onClick={() => setIsExplored(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10"><Eye className="h-3.5 w-3.5" /> View Assets</Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-foreground/60 hover:text-foreground"><X className="h-3.5 w-3.5" /> Deselect</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /> Deselect</Button>
               {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Delete Folders</Button>}
             </div>
           </motion.div>
@@ -399,7 +396,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 bg-muted/50 border-border rounded-xl font-black uppercase text-sm" />
           </div>
           <DialogFooter className="gap-3">
-            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] text-foreground/40">Cancel</Button>
+            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] text-muted-foreground">Cancel</Button>
             <Button onClick={handleRenameCommit} disabled={isProcessing || !newCategoryName.trim()} className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Save Rename</Button>
           </DialogFooter>
         </DialogContent>
@@ -408,20 +405,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background p-10">
           <AlertDialogHeader className="space-y-4">
-            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><AlertTriangle className="h-10 w-10 text-destructive" /></div>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><X className="h-10 w-10 text-destructive" /></div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">This will permanently delete {categoriesToPurge.length} folders and all records within them from both local and cloud storage. This action is irreversible.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm Deletion</AlertDialogAction>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
-      <HeaderManagerDrawer isOpen={false} onOpenChange={() => {}} headers={headers} onUpdateHeaders={setAppSettings as any} onReset={() => {}} />
     </div>
   );
 

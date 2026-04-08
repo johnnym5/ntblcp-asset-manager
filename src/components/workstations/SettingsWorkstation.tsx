@@ -3,8 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Operational Control Center.
  * Phase 1015: Overhauled with pill-shaped UI categories.
- * Enabled Project/User/History access for standard Admins.
- * Integrated Mode descriptions into General settings.
+ * Phase 1016: Hardened contrast for Light Mode compatibility and disabled versioning.
  */
 
 import React, { useState, useRef } from 'react';
@@ -105,10 +104,6 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   
-  const [isPassphraseDialogOpen, setIsPassphraseDialogOpen] = useState(false);
-  const [newPassphrase, setNewPassphrase] = useState('');
-  const [confirmPassphrase, setConfirmPassphrase] = useState('');
-
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
@@ -227,7 +222,7 @@ export function SettingsWorkstation() {
                 <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Configuration Pulse</p>
               </div>
             </div>
-            <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-5 w-5 text-foreground/40" /></button>
+            <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
@@ -334,7 +329,7 @@ export function SettingsWorkstation() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
                               <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl group transition-all hover:border-primary/20">
-                                <span className="text-[9px] font-black uppercase text-foreground/60 truncate pr-4">{name}</span>
+                                <span className="text-[9px] font-black uppercase text-muted-foreground truncate pr-4">{name}</span>
                                 <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
                               </div>
                             ))}
@@ -374,9 +369,9 @@ export function SettingsWorkstation() {
       </div>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] tracking-widest text-foreground/40 hover:text-foreground">Discard</Button>
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] tracking-widest text-muted-foreground hover:text-foreground">Discard</Button>
         <Button onClick={handleSaveChange} disabled={isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-5 w-5 mr-3" />}
+          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
           Commit All Changes
         </Button>
       </div>
