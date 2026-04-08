@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
  * Phase 1303: Expanded floating action bar with Bulk Pulse, Sync Pulse, and Structural tools.
+ * Phase 1304: Fixed missing icon imports (ChevronDown, ClipboardCheck).
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -18,6 +19,8 @@ import {
   Search,
   ArrowUpDown,
   ChevronRight,
+  ChevronDown,
+  ClipboardCheck,
   Plus,
   MoreVertical,
   Type,
