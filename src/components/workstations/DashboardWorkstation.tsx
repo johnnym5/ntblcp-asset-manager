@@ -1,8 +1,10 @@
+
 'use client';
 
 /**
  * @fileOverview Dashboard - Main Overview Hub.
  * Phase 1305: Integrated Audit Log into the main Accordion pulse.
+ * Phase 1306: Linked 'Asset Hub' to the full Registry workstation.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -19,7 +21,6 @@ import {
   Activity,
   History
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
@@ -40,12 +41,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-type DashboardTab = 'overview' | 'inventory';
-
 export function DashboardWorkstation() {
   const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, activeFilterCount } = useAppState();
   const { userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
   const isAdvanced = appSettings?.uxMode === 'advanced';
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -55,7 +53,7 @@ export function DashboardWorkstation() {
   }, [filteredAssets]);
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
       
       {/* STICKY CONTROL HUB */}
       <div className="sticky top-[-1rem] z-50 bg-background/95 backdrop-blur-xl pt-1 pb-3 px-1 border-b border-border mb-4 -mx-1 shrink-0">
@@ -76,14 +74,23 @@ export function DashboardWorkstation() {
 
           <div className="flex items-center gap-2">
             <div className="w-full lg:w-auto bg-muted/30 p-0.5 rounded-lg border border-border flex items-center shrink-0">
-              <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
-                <TabsTrigger value="overview" className="px-6 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">
+              <div className="flex items-center gap-0.5">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest bg-background text-foreground shadow-sm"
+                >
                   Summary
-                </TabsTrigger>
-                <TabsTrigger value="inventory" className="px-6 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setActiveView('REGISTRY')}
+                  className="px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest text-muted-foreground hover:text-foreground transition-all"
+                >
                   Asset Hub
-                </TabsTrigger>
-              </TabsList>
+                </Button>
+              </div>
             </div>
             
             <div className="flex items-center gap-1.5">
@@ -119,7 +126,7 @@ export function DashboardWorkstation() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <TabsContent value="overview" className="m-0 space-y-10 sm:space-y-12 animate-in fade-in slide-in-from-bottom-1 duration-500 outline-none pb-20">
+        <div className="space-y-10 sm:space-y-12 animate-in fade-in slide-in-from-bottom-1 duration-500 pb-20">
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-8">
@@ -227,12 +234,8 @@ export function DashboardWorkstation() {
               <SyncQueueWorkstation isEmbedded={true} />
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="inventory" className="m-0 animate-in fade-in slide-in-from-bottom-1 duration-500 outline-none pb-20">
-          <RegistryWorkstation viewAll />
-        </TabsContent>
+        </div>
       </div>
-    </Tabs>
+    </div>
   );
 }
