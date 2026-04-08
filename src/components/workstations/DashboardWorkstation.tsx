@@ -1,10 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Dashboard - Main Overview Hub.
- * Phase 1305: Integrated Audit Log into the main Accordion pulse.
- * Phase 1306: Linked 'Asset Hub' to the full Registry workstation.
+ * Hardened for responsive stacking and workstation navigation pulses.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -24,7 +22,6 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
-import { RegistryWorkstation } from './RegistryWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
@@ -40,6 +37,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DashboardWorkstation() {
   const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, activeFilterCount } = useAppState();
@@ -66,19 +64,19 @@ export function DashboardWorkstation() {
               <h2 className="text-base sm:text-lg font-black uppercase text-foreground tracking-tight leading-none">
                 Dashboard
               </h2>
-              <p className="text-[7px] font-bold text-muted-foreground uppercase tracking-[0.25em] leading-none">
+              <p className="text-[7px] font-bold text-muted-foreground uppercase tracking-[0.25em] leading-none text-nowrap">
                 {isAdvanced ? 'SYSTEM OVERVIEW' : 'ASSET STATUS'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="w-full lg:w-auto bg-muted/30 p-0.5 rounded-lg border border-border flex items-center shrink-0">
-              <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="flex-1 lg:flex-none bg-muted/30 p-0.5 rounded-lg border border-border flex items-center shrink-0">
+              <div className="flex items-center gap-0.5 w-full">
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest bg-background text-foreground shadow-sm"
+                  className="flex-1 lg:flex-none px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest bg-background text-foreground shadow-sm"
                 >
                   Summary
                 </Button>
@@ -86,14 +84,14 @@ export function DashboardWorkstation() {
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setActiveView('REGISTRY')}
-                  className="px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest text-muted-foreground hover:text-foreground transition-all"
+                  className="flex-1 lg:flex-none px-6 h-7 rounded-md font-black uppercase text-[8px] tracking-widest text-muted-foreground hover:text-foreground transition-all"
                 >
                   Asset Hub
                 </Button>
               </div>
             </div>
             
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button 
                 variant="outline" 
                 size="icon" 

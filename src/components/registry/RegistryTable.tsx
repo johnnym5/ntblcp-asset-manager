@@ -1,8 +1,6 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
  * Optimized for Responsive Stacking and High-Density Registry Pulse.
- * Phase 406: Added Sync Status icons to list view.
- * Phase 407: Standardized Select All checkbox logic.
  */
 
 import React from 'react';
@@ -69,7 +67,7 @@ export function RegistryTable({
   const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
   return (
-    <div className="space-y-4 pb-40 animate-in fade-in duration-700">
+    <div className="space-y-4 pb-40 animate-in fade-in duration-700 w-full overflow-hidden">
       {/* 1. Protocol Header - Adapts to Mobile */}
       <div className="flex items-center px-4 sm:px-8 py-4 sm:py-5 bg-card rounded-2xl border border-border mb-6 sticky top-0 z-30 shadow-2xl">
         <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center">
@@ -138,7 +136,7 @@ export function RegistryTable({
                                 {syncStatus === 'synced' ? <Globe className="h-2.5 w-2.5" /> : <CloudOff className="h-2.5 w-2.5" />}
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent className="text-[9px] font-black uppercase">
+                            <TooltipContent className="text-[8px] font-black uppercase">
                               {syncStatus === 'synced' ? 'Synced to Cloud' : 'Stored on Device (Offline)'}
                             </TooltipContent>
                           </Tooltip>

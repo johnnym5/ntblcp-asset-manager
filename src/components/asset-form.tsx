@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
- * Phase 651: Removed redundant manual close button.
+ * Hardened for responsive multi-column layouts and high-speed touch input.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -199,7 +199,7 @@ export default function AssetForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1100px] w-[100vw] h-[100vh] sm:w-[95vw] sm:h-[85vh] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 rounded-none sm:rounded-[2.5rem] shadow-3xl">
+      <DialogContent className="max-w-[1100px] w-full h-[100dvh] sm:h-[85vh] sm:w-[95vw] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 sm:rounded-[2.5rem] shadow-3xl">
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">

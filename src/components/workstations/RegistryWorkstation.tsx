@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
- * Phase 1303: Expanded floating action bar with Bulk Pulse, Sync Pulse, and Structural tools.
- * Phase 1304: Fixed missing icon imports (ChevronDown, ClipboardCheck).
+ * Hardened for responsive grids and high-fidelity navigation.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -327,8 +326,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
     setIsProcessing(true);
     try {
-      // In a real app, this would be a filtered fetch/push.
-      // Here we trigger a standard sync but with a logic pulse notification.
       await manualDownload();
       addNotification({ title: "Unverified Pulse Reconciled", description: "Updated regional unverified records." });
     } finally {
@@ -398,7 +395,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
             {!showList && (
               <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
                 <Checkbox id="sel-all-hub" checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => setSelectedCategories(c ? categories : [])} className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
@@ -406,68 +403,68 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </div>
             )}
 
-            <div className="flex items-center justify-end flex-1 min-w-0">
+            <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
               <AnimatePresence mode="wait">
                 {!isSearchExpanded ? (
                   <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
                 ) : (
-                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
+                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "220px", sm: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
                     <Input ref={searchInputRef} placeholder="Find assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus:border-primary" />
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-            
-            <div className="flex items-center gap-1.5 shrink-0">
-              {showList && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
-                        <Settings2 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
               
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => setIsFilterOpen(true)} 
-                className={cn(
-                  "h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative",
-                  activeFilterCount > 0 && "border-primary/40 shadow-lg"
+              <div className="flex items-center gap-1.5 shrink-0">
+                {showList && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
-              >
-                <Filter className="h-4 w-4" />
-                {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </Button>
 
-              <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative", filters.length > 0 && "border-primary/40")}>
-                <ListFilter className="h-4 w-4" />
-                {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">{filters.length}</span>}
-              </Button>
+                {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
+                
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setIsFilterOpen(true)} 
+                  className={cn(
+                    "h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative",
+                    activeFilterCount > 0 && "border-primary/40 shadow-lg"
+                  )}
+                >
+                  <Filter className="h-4 w-4" />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
 
-              <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative", filters.length > 0 && "border-primary/40")}>
+                  <ListFilter className="h-4 w-4" />
+                  {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">{filters.length}</span>}
+                </Button>
+
+                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* 2. Workstation Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-1 pt-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-1 pt-4 pb-safe">
         {!showList ? (
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             {categories.map(cat => (
               <Card 
                 key={cat} 
@@ -528,21 +525,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       {/* 3. Floating Action Bar - Expanded Operational Command Pulse */}
       <AnimatePresence>
         {selectedCategories.length > 0 && !showList && (
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex flex-wrap items-center justify-center gap-4 sm:gap-6 shadow-3xl backdrop-blur-3xl w-[90vw] sm:w-auto">
             <div className="flex items-center gap-3 pl-3">
               <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div>
-              <span className="text-[9px] font-black uppercase text-foreground tracking-widest">Folders Selected</span>
+              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden sm:inline">Folders Selected</span>
             </div>
             
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="sm" onClick={() => setIsExplored(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10">
-                <Eye className="h-3.5 w-3.5" /> View
+                <Eye className="h-3.5 w-3.5" /> <span className="hidden xs:inline">View</span>
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-foreground hover:bg-muted">
-                    <Edit3 className="h-3.5 w-3.5" /> Bulk Pulse <ChevronDown className="h-3 w-3" />
+                    <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Bulk</span> <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-56 bg-card border-border text-foreground p-1">
@@ -555,7 +552,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-foreground hover:bg-muted">
-                    <RefreshCw className="h-3.5 w-3.5" /> Sync Pulse <ChevronDown className="h-3 w-3" />
+                    <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Sync</span> <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-56 bg-card border-border text-foreground p-1">
@@ -567,7 +564,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-foreground hover:bg-muted">
-                    <LayoutGrid className="h-3.5 w-3.5" /> Structure <ChevronDown className="h-3 w-3" />
+                    <LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Structure</span> <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-56 bg-card border-border text-foreground p-1">
@@ -578,10 +575,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </DropdownMenu>
 
               <Button variant="ghost" size="sm" onClick={handleExportCategories} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-green-600 hover:bg-green-500/10">
-                <FileDown className="h-3.5 w-3.5" /> Export Excel
+                <FileDown className="h-3.5 w-3.5" /> <span className="hidden lg:inline">Excel</span>
               </Button>
 
-              <div className="w-px h-6 bg-border mx-2" />
+              <div className="w-px h-6 bg-border mx-2 hidden sm:block" />
 
               <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -619,7 +616,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsMergeDialogOpen(false)} className="font-bold uppercase text-[10px]">Cancel</Button>
             <Button onClick={handleMergeCategories} disabled={!targetMergeCategory || isProcessing} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest">
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <GitMerge className="h-4 w-4 mr-2" />}
+              {isProcessing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <GitMerge className="h-4 w-4 mr-2" />}
               Commit Merge
             </Button>
           </DialogFooter>

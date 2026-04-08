@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Professional Workstation.
- * Phase 1300: Overhauled with persistent vertical scrollbars and independent dual-pane scrolling.
- * Phase 1301: Theme-aware scroll pulse implementation.
- * Phase 1302: Replaced Radix ScrollArea with native overflow to fix CSS injection leak.
+ * Hardened for responsive stacking and dual-pane vertical scrollbars.
  */
 
 import React from 'react';
@@ -75,7 +73,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1200px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-background text-foreground border-border rounded-[2.5rem] shadow-3xl">
+      <DialogContent className="max-w-[1200px] w-full h-[100dvh] sm:h-[85vh] sm:w-[95vw] p-0 overflow-hidden bg-background text-foreground border-border sm:rounded-[2.5rem] shadow-3xl">
         <motion.div 
           className="flex flex-col h-full"
           initial={{ opacity: 0, scale: 0.98 }}
@@ -96,7 +94,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                     Dossier Analysis
                   </DialogDescription>
                   <div className="h-1 w-1 rounded-full bg-border" />
-                  <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase truncate">UUID: {record.id.split('-')[0]}</span>
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase truncate hidden sm:inline">UUID: {record.id.split('-')[0]}</span>
                 </div>
               </div>
             </div>
