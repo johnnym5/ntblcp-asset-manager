@@ -4,6 +4,7 @@
  * @fileOverview AssetDetailSheet - High-Fidelity Professional Workstation.
  * Phase 1300: Overhauled with persistent vertical scrollbars and independent dual-pane scrolling.
  * Phase 1301: Theme-aware scroll pulse implementation.
+ * Phase 1302: Replaced Radix ScrollArea with native overflow to fix CSS injection leak.
  */
 
 import React from 'react';
@@ -16,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -125,7 +125,8 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                 )}
               </div>
 
-              <ScrollArea className="flex-1 custom-scrollbar">
+              {/* dossier Scroll Surface */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="flex flex-col">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-b border-border/40">
                     {record.fields
@@ -165,14 +166,13 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                   )}
                   <div className="h-32 shrink-0" />
                 </div>
-                {/* Side Scroll Wheel Experience */}
-                <ScrollBar orientation="vertical" className="bg-muted/30" />
-              </ScrollArea>
+              </div>
             </div>
 
             {/* Sidebar Pane */}
             <div className="w-full md:w-[320px] lg:w-[380px] bg-card/30 flex flex-col shrink-0 border-t md:border-t-0 border-border min-h-0 overflow-hidden relative shadow-2xl">
-              <ScrollArea className="flex-1 custom-scrollbar">
+              {/* Sidebar Scroll Surface */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="p-8 space-y-12 pb-24">
                   <div className="flex items-center gap-4 text-primary">
                     <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><ClipboardCheck className="h-5 w-5" /></div>
@@ -202,9 +202,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                     </div>
                   </div>
                 </div>
-                {/* Right Scroll Wheel for Sidebar */}
-                <ScrollBar orientation="vertical" className="bg-muted/30" />
-              </ScrollArea>
+              </div>
             </div>
           </div>
 

@@ -4,6 +4,7 @@
  * @fileOverview Asset Hub - Main Registry Browser.
  * Phase 1300: Implemented context-aware headers with Project/Folder counts.
  * Phase 1301: Integrated Field Setup (Header Manager) pulse into list view.
+ * Phase 1302: Replaced ScrollArea with native overflow to ensure visible scrollbars.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -359,7 +360,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </div>
 
       {/* 2. Workstation Content */}
-      <div className="flex-1 min-h-0 px-1 pt-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-1 pt-4">
         {!showList ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             {categories.map(cat => (
