@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
+ * Phase 1300: Added Application Mode toggle and User Greeting.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -26,7 +27,11 @@ import {
   ChevronLeft,
   Activity,
   History,
-  LayoutDashboard
+  LayoutDashboard,
+  ShieldCheck,
+  ClipboardCheck,
+  User as UserIcon,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -61,6 +66,7 @@ import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { storage } from '@/offline/storage';
+import { FirestoreService } from '@/services/firebase/firestore';
 
 function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
@@ -143,7 +149,7 @@ export default function SPAHub() {
       case 'IMPORT': return <ImportWorkstation />;
       case 'VERIFY': return <VerifyWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
-      case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />;
+      case 'REPORTS': return <ReportsWorkstation isEmbedded={true} />; // Reports is usually small enough
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
@@ -197,11 +203,22 @@ export default function SPAHub() {
     }
   };
 
+  const handleModeSwitch = async (mode: 'management' | 'verification') => {
+    if (!appSettings || !userProfile?.isAdmin) return;
+    const nextSettings = { ...appSettings, appMode: mode };
+    setAppSettings(nextSettings);
+    await storage.saveSettings(nextSettings);
+    if (isOnline) {
+      await FirestoreService.updateSettings({ appMode: mode });
+    }
+  };
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.isAdmin || false;
+  const currentMode = appSettings?.appMode || 'management';
 
   return (
     <div className="app-container bg-black font-sans text-white h-screen flex flex-col overflow-hidden">
@@ -231,7 +248,7 @@ export default function SPAHub() {
       />
       
       <header className="h-11 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-6">
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.button
@@ -252,14 +269,22 @@ export default function SPAHub() {
                 <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-all text-primary group tactile-pulse">
                   <Boxes className="h-3.5 w-3.5" />
                   <div className="flex flex-col text-left">
-                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Asset Manager</h1>
-                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Dashboard</span>
+                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
+                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Manager</span>
                   </div>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Home</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* User Greeting Pulse */}
+          <div className="hidden lg:flex items-center gap-2.5 pl-4 border-l border-white/5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Welcome,</span>
+            <span className="text-[10px] font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-white to-primary/60 tracking-tight">
+              {userProfile?.displayName}
+            </span>
+          </div>
         </div>
 
         <div className="flex-1 flex items-center justify-center mx-2 sm:mx-8">
@@ -274,7 +299,7 @@ export default function SPAHub() {
                 className="flex items-center gap-3 px-3 py-1 bg-white/[0.03] border border-white/5 rounded-lg text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
               >
                 <Search className="h-3 w-3" />
-                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Assets</span>
+                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Registry</span>
               </motion.button>
             ) : (
               <motion.div
@@ -318,13 +343,81 @@ export default function SPAHub() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Application Mode Switcher */}
+          <div className="hidden sm:flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/5 mr-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-white/5 transition-all group">
+                  {currentMode === 'management' ? (
+                    <ShieldCheck className="h-3 w-3 text-primary" />
+                  ) : (
+                    <ClipboardCheck className="h-3 w-3 text-green-500" />
+                  )}
+                  <div className="flex flex-col items-start leading-none">
+                    <span className="text-[7px] font-black uppercase text-white/40 tracking-widest">Active Mode</span>
+                    <span className="text-[8px] font-black uppercase text-white">{currentMode}</span>
+                  </div>
+                  <ChevronDown className="h-2.5 w-2.5 text-white/20 group-hover:text-white transition-colors" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-48 bg-black border-white/10 text-white rounded-lg shadow-3xl p-1">
+                <DropdownMenuLabel className="text-[8px] font-black uppercase tracking-widest text-white/40 p-2">Select Workplace</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem 
+                  onClick={() => handleModeSwitch('management')}
+                  disabled={!isAdmin}
+                  className={cn(
+                    "p-2 rounded-md focus:bg-primary/10 gap-3 m-0.5",
+                    currentMode === 'management' && "bg-white/5 border border-white/5"
+                  )}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase">Management Mode</span>
+                    <span className="text-[7px] font-bold text-white/40 italic">Oversight & Engineering</span>
+                  </div>
+                  {currentMode === 'management' && <CheckCircle2 className="h-3 w-3 ml-auto text-primary" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleModeSwitch('verification')}
+                  disabled={!isAdmin}
+                  className={cn(
+                    "p-2 rounded-md focus:bg-green-500/10 gap-3 m-0.5",
+                    currentMode === 'verification' && "bg-white/5 border border-white/5"
+                  )}
+                >
+                  <ClipboardCheck className="h-3.5 w-3.5 text-green-500" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase">Verification Mode</span>
+                    <span className="text-[7px] font-bold text-white/40 italic">Field Audit & Assessment</span>
+                  </div>
+                  {currentMode === 'verification' && <CheckCircle2 className="h-3 w-3 ml-auto text-green-500" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <div className="hidden sm:flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/5">
-            <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
-              <Download className="h-2.5 w-2.5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
-              <Upload className="h-2.5 w-2.5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+                    <Download className="h-2.5 w-2.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Download</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+                    <Upload className="h-2.5 w-2.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Upload</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 group tactile-pulse px-1 sm:px-2">
@@ -358,7 +451,7 @@ export default function SPAHub() {
                 <p className="text-[7px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary focus:text-black m-0.5">
+              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary/10 focus:text-primary m-0.5">
                 <SettingsIcon className="mr-2 h-2.5 w-2.5" />
                 <span className="text-[8px] font-black uppercase">App Settings</span>
               </DropdownMenuItem>
