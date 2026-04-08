@@ -1,10 +1,11 @@
 /**
  * @fileOverview RBAC (Role-Based Access Control) Engine.
- * Phase 180: Hardened Zonal Administrator scope inheritance logic.
+ * Phase 181: Implemented Deterministic Fuzzy Matching for scope enforcement.
  */
 
 import type { AuthorizedUser, Asset, UserRole } from '@/types/domain';
-import { NIGERIAN_GEO_DATA } from '@/lib/nigeria-geo';
+import { LocationEngine } from '@/services/location-engine';
+import { getFuzzySignature } from '@/lib/utils';
 
 /**
  * Checks if a user has the base permission for an action.
@@ -31,7 +32,7 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
     case 'VIEW_REGISTRY':
     case 'VERIFY_ASSET':
     case 'EXPORT_REPORTS':
-      return true; // Everyone can view/verify within their scope
+      return true;
 
     default:
       return false;
@@ -40,24 +41,29 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
 
 /**
  * Validates if an operation on a specific asset is within the user's regional scope.
+ * Uses normalized fuzzy matching to handle naming variations.
  */
 export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
-  // 1. SuperAdmins and Admins bypass regional checks for Asset data
+  // 1. SuperAdmins and Admins bypass regional checks
   if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All')) {
     return true;
   }
 
-  const assetState = (asset.normalizedState || '').trim();
-  const assetZone = (asset.normalizedZone || '').trim();
+  // 2. Resolve Asset Identity Fingerprints
+  const assetLocationPulse = LocationEngine.normalize(asset.location);
+  const assetStateFuzzy = getFuzzySignature(assetLocationPulse.state);
+  const assetZoneFuzzy = getFuzzySignature(assetLocationPulse.zone);
   
-  // 2. Direct State Match
-  if (user.states.some(s => s === assetState)) {
+  // 3. Directly Match User States (Fuzzy)
+  const userStatesFuzzy = user.states.map(s => getFuzzySignature(s));
+  if (userStatesFuzzy.includes(assetStateFuzzy)) {
     return true;
   }
 
-  // 3. Zonal Administrator Check
+  // 4. Zonal Administrator Check (Fuzzy)
   if (user.isZonalAdmin && user.assignedZone) {
-    if (assetZone === user.assignedZone) {
+    const userZoneFuzzy = getFuzzySignature(user.assignedZone);
+    if (assetZoneFuzzy === userZoneFuzzy) {
       return true;
     }
   }

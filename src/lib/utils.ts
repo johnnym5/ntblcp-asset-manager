@@ -9,6 +9,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Creates a "Fuzzy Fingerprint" of a string for resilient matching.
+ * Removes all non-alphanumeric characters, spaces, and casing.
+ * e.g., "Akwa-Ibom" -> "akwaibom"
+ */
+export function getFuzzySignature(input: string | null | undefined): string {
+  if (!input) return "";
+  return String(input)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+/**
  * Sanitizes search input to prevent regex breaks and ensure clean data pulse.
  */
 export function sanitizeSearch(query: string): string {
@@ -18,14 +31,10 @@ export function sanitizeSearch(query: string): string {
 /**
  * Recursively removes undefined fields, converts Date objects to Firestore Timestamps,
  * and sanitizes keys for Firebase compatibility (RTDB/Firestore).
- * Performance Optimized: Uses non-recursive flat path for primitive objects where possible.
  */
 export function sanitizeForFirestore<T>(obj: T): T {
   if (obj === null || obj === undefined) return null as any;
-  
-  // High-speed pass for common primitives
   if (typeof obj !== 'object') return obj;
-  
   if (obj instanceof Date) return Timestamp.fromDate(obj) as any;
   if (obj instanceof Timestamp) return obj as any;
   
@@ -36,16 +45,10 @@ export function sanitizeForFirestore<T>(obj: T): T {
   const sanitizedObj: { [key: string]: any } = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      if (key === 'previousState') continue; // Skip undo buffer for Firestore
-      
+      if (key === 'previousState') continue;
       const value = (obj as any)[key];
-      
-      // Sanitize the key for Firebase compatibility (RTDB/Firestore)
-      // Restricted characters: . $ # [ ] / and control characters/newlines
       const safeKey = key.replace(/[.#$/[\]\n\r]/g, '_').trim();
-      
       if (value !== undefined) {
-        // Only recurse if value is an object or array
         if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Timestamp)) {
           sanitizedObj[safeKey] = sanitizeForFirestore(value);
         } else if (value instanceof Date) {
@@ -65,8 +68,14 @@ export const normalizeAssetLocation = (location?: string): string => {
     if (!originalLocation) return '';
 
     const lowerCaseLocation = originalLocation.toLowerCase();
+    const fuzzyInput = getFuzzySignature(originalLocation);
 
-    const matchedState = NIGERIAN_STATES.find(state => lowerCaseLocation.includes(state.toLowerCase()));
+    // Try fuzzy match against canonical states first
+    const matchedState = NIGERIAN_STATES.find(state => 
+      getFuzzySignature(state) === fuzzyInput || 
+      lowerCaseLocation.includes(state.toLowerCase())
+    );
+    
     if (matchedState) return matchedState;
 
     for (const state in NIGERIAN_STATE_CAPITALS) {

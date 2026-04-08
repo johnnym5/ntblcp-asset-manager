@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1100: Centralized Filter Engine implementation.
- * Phase 1101: Added isExplored state for Folder Grid vs List View logic.
- * Phase 1102: Implemented deterministic boot pulse to ensure data persistence on refresh.
+ * Phase 1105: Integrated Fuzzy Matching into search and filter aggregation.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -15,6 +13,8 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
+import { LocationEngine } from '@/services/location-engine';
+import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
 import type { 
   Asset, 
   AppSettings, 
@@ -22,8 +22,7 @@ import type {
   AuthorityNode, 
   WorkstationView, 
   OptionType, 
-  SortConfig, 
-  DataActions 
+  SortConfig 
 } from '@/types/domain';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
@@ -144,10 +143,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  /**
-   * Deterministic Registry Pulse:
-   * Replays the local storage state into the application memory.
-   */
   const refreshRegistry = useCallback(async () => {
     try {
       const [localAssets, localSandbox, localSettings] = await Promise.all([
@@ -162,9 +157,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
       
       const currentGrantId = localSettings?.activeGrantId || null;
-      const filtered = currentGrantId 
-        ? (localAssets || []).filter(a => a.grantId === currentGrantId) 
-        : (localAssets || []);
+      const filtered = (localAssets || []).filter(a => !currentGrantId || a.grantId === currentGrantId);
         
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
@@ -180,10 +173,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
   }, []);
 
-  /**
-   * INITIALIZATION PULSE:
-   * Automatically re-loads the registry whenever the app boots or hydration completes.
-   */
   useEffect(() => {
     if (isHydrated) {
       refreshRegistry();
@@ -235,32 +224,76 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   }, [selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
 
+  /**
+   * CENTRALIZED SEARCH & FILTER ENGINE
+   * Uses fuzzy matching to handle naming variations across registry fields.
+   */
   const filteredAssets = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     let results = [...source];
 
-    if (selectedLocations.length > 0) results = results.filter(a => selectedLocations.includes(a.location));
-    if (selectedAssignees.length > 0) results = results.filter(a => selectedAssignees.includes(a.custodian));
+    // 1. Fuzzy Scope Matching
+    if (selectedLocations.length > 0) {
+      const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
+      results = results.filter(a => {
+        const assetFuzzy = getFuzzySignature(a.normalizedLocation || a.location);
+        return selectedFuzzy.includes(assetFuzzy);
+      });
+    }
+
+    // 2. Fuzzy Assignee Matching
+    if (selectedAssignees.length > 0) {
+      const selectedFuzzy = selectedAssignees.map(a => getFuzzySignature(a));
+      results = results.filter(a => {
+        const assetFuzzy = getFuzzySignature(a.custodian);
+        return selectedFuzzy.includes(assetFuzzy);
+      });
+    }
+
     if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
     if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
+    // 3. Intelligent Fuzzy Search
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      results = results.filter(a => (a.description || '').toLowerCase().includes(term) || (a.assetIdCode || '').toLowerCase().includes(term));
+      const fuzzySearch = getFuzzySignature(searchTerm);
+      results = results.filter(a => {
+        const fieldsToSearch = [
+          a.description,
+          a.assetIdCode,
+          a.serialNumber,
+          a.location,
+          a.custodian,
+          a.category
+        ];
+        return fieldsToSearch.some(f => getFuzzySignature(f).includes(fuzzySearch));
+      });
     }
     return results;
   }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter]);
 
+  /**
+   * CANONICAL OPTION AGGREGATION
+   * Groups naming variations together in the filter UI.
+   */
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { const val = a.location || 'Unknown'; counts.set(val, (counts.get(val) || 0) + 1); });
+    assets.forEach(a => { 
+      const pulse = LocationEngine.normalize(a.location);
+      const val = pulse.normalized;
+      counts.set(val, (counts.get(val) || 0) + 1); 
+    });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const assigneeOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { const val = a.custodian || 'Unassigned'; counts.set(val, (counts.get(val) || 0) + 1); });
+    assets.forEach(a => { 
+      const raw = a.custodian || 'Unassigned';
+      // Basic normalization for people: Title Case + Trim
+      const normalized = raw.trim().replace(/\b\w/g, l => l.toUpperCase());
+      counts.set(normalized, (counts.get(normalized) || 0) + 1); 
+    });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
@@ -302,8 +335,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           let nextAssets;
           const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
           if (stateScopes) {
-            const scopeSet = new Set(stateScopes.map(s => s.toLowerCase()));
-            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || !scopeSet.has((a.location || '').toLowerCase()));
+            const scopeSet = new Set(stateScopes.map(s => getFuzzySignature(s)));
+            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || !scopeSet.has(getFuzzySignature(a.location)));
             nextAssets = [...otherAssets, ...taggedRemote];
           } else {
             const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
