@@ -3,6 +3,7 @@
 /**
  * @fileOverview DatabaseWorkstation - Granular Database Explorer & Management.
  * Phase 200: Implemented high-density document explorer with CRUD and Multi-select.
+ * Phase 201: Fixed ReferenceError by adding missing Table component imports.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,7 +29,8 @@ import {
   Cloud,
   Check,
   ChevronDown,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ShieldCheck
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +38,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
