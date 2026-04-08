@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1300: Added Application Mode toggle and User Greeting.
+ * Phase 1301: Implemented Light/Dark theme background adaptation.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -78,9 +78,9 @@ function NotificationToast({ notification }: { notification: Notification }) {
       exit={{ opacity: 0, scale: 0.95, y: -5 }}
       className={cn(
         "absolute top-full right-0 mt-2 w-56 p-2 rounded-lg border shadow-2xl z-[100] flex items-center gap-2 backdrop-blur-xl",
-        notification.variant === 'destructive' ? "bg-red-600 border-red-500 text-white" :
+        notification.variant === 'destructive' ? "bg-destructive border-destructive text-destructive-foreground" :
         notification.variant === 'success' ? "bg-green-600 border-green-500 text-white" :
-        "bg-[#0A0A0A] border-white/10 text-white"
+        "bg-card border-border text-foreground"
       )}
     >
       <div className="shrink-0">
@@ -149,7 +149,7 @@ export default function SPAHub() {
       case 'IMPORT': return <ImportWorkstation />;
       case 'VERIFY': return <VerifyWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
-      case 'REPORTS': return <ReportsWorkstation isEmbedded={true} />; // Reports is usually small enough
+      case 'REPORTS': return <ReportsWorkstation isEmbedded={true} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
@@ -213,7 +213,7 @@ export default function SPAHub() {
     }
   };
 
-  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
@@ -221,7 +221,7 @@ export default function SPAHub() {
   const currentMode = appSettings?.appMode || 'management';
 
   return (
-    <div className="app-container bg-black font-sans text-white h-screen flex flex-col overflow-hidden">
+    <div className="app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden">
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
@@ -247,7 +247,7 @@ export default function SPAHub() {
         setMissingFieldFilter={setMissingFieldFilter}
       />
       
-      <header className="h-11 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
+      <header className="h-11 border-b border-border flex items-center justify-between px-4 sm:px-6 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-6">
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
@@ -256,7 +256,7 @@ export default function SPAHub() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 onClick={goBack}
-                className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-lg text-white/40 hover:text-primary transition-all border border-white/5 tactile-pulse"
+                className="h-8 w-8 flex items-center justify-center bg-muted/50 rounded-lg text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse"
               >
                 <ChevronLeft className="h-4 w-4" />
               </motion.button>
@@ -269,7 +269,7 @@ export default function SPAHub() {
                 <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-all text-primary group tactile-pulse">
                   <Boxes className="h-3.5 w-3.5" />
                   <div className="flex flex-col text-left">
-                    <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Assetain</h1>
+                    <h1 className="text-[10px] font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
                     <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Manager</span>
                   </div>
                 </button>
@@ -278,10 +278,9 @@ export default function SPAHub() {
             </Tooltip>
           </TooltipProvider>
 
-          {/* User Greeting Pulse */}
-          <div className="hidden lg:flex items-center gap-2.5 pl-4 border-l border-white/5">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Welcome,</span>
-            <span className="text-[10px] font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-white to-primary/60 tracking-tight">
+          <div className="hidden lg:flex items-center gap-2.5 pl-4 border-l border-border">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Welcome,</span>
+            <span className="text-[10px] font-black uppercase text-foreground tracking-tight">
               {userProfile?.displayName}
             </span>
           </div>
@@ -296,7 +295,7 @@ export default function SPAHub() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 onClick={() => setIsSearchExpanded(true)}
-                className="flex items-center gap-3 px-3 py-1 bg-white/[0.03] border border-white/5 rounded-lg text-white/40 hover:text-primary hover:border-primary/20 transition-all group"
+                className="flex items-center gap-3 px-3 py-1 bg-muted/30 border border-border rounded-lg text-foreground/40 hover:text-primary hover:border-primary/20 transition-all group"
               >
                 <Search className="h-3 w-3" />
                 <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Registry</span>
@@ -315,7 +314,7 @@ export default function SPAHub() {
                   autoFocus
                   type="text"
                   placeholder="Quick Search..."
-                  className="w-full h-7 bg-white/[0.05] border-2 border-primary/20 rounded-lg pl-8 pr-16 text-[9px] font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
+                  className="w-full h-7 bg-muted/50 border-2 border-primary/20 rounded-lg pl-8 pr-16 text-[9px] font-bold focus:outline-none focus:border-primary transition-all placeholder:text-muted-foreground/30"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                   onBlur={() => !searchTerm && setIsSearchExpanded(false)}
@@ -326,14 +325,14 @@ export default function SPAHub() {
                     size="icon" 
                     onClick={() => setIsFilterOpen(true)}
                     className={cn(
-                      "h-5 w-5 rounded-md text-white/20 hover:text-primary relative", 
+                      "h-5 w-5 rounded-md text-foreground/20 hover:text-primary relative", 
                       activeFilterCount > 0 && "text-primary"
                     )}
                   >
                     <Filter className="h-2.5 w-2.5" />
                     {activeFilterCount > 0 && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-primary rounded-full" />}
                   </Button>
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-md text-white/20 hover:text-white">
+                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-md text-foreground/20 hover:text-foreground">
                     <X className="h-2.5 w-2.5" />
                   </button>
                 </div>
@@ -343,38 +342,37 @@ export default function SPAHub() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Application Mode Switcher */}
-          <div className="hidden sm:flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/5 mr-2">
+          <div className="hidden sm:flex items-center bg-muted/30 p-0.5 rounded-lg border border-border mr-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-white/5 transition-all group">
+                <button className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-muted transition-all group">
                   {currentMode === 'management' ? (
                     <ShieldCheck className="h-3 w-3 text-primary" />
                   ) : (
                     <ClipboardCheck className="h-3 w-3 text-green-500" />
                   )}
                   <div className="flex flex-col items-start leading-none">
-                    <span className="text-[7px] font-black uppercase text-white/40 tracking-widest">Active Mode</span>
-                    <span className="text-[8px] font-black uppercase text-white">{currentMode}</span>
+                    <span className="text-[7px] font-black uppercase text-muted-foreground tracking-widest">Active Mode</span>
+                    <span className="text-[8px] font-black uppercase text-foreground">{currentMode}</span>
                   </div>
-                  <ChevronDown className="h-2.5 w-2.5 text-white/20 group-hover:text-white transition-colors" />
+                  <ChevronDown className="h-2.5 w-2.5 text-foreground/20 group-hover:text-foreground transition-colors" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-48 bg-black border-white/10 text-white rounded-lg shadow-3xl p-1">
-                <DropdownMenuLabel className="text-[8px] font-black uppercase tracking-widest text-white/40 p-2">Select Workplace</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuContent align="center" className="w-48 bg-card border-border text-card-foreground rounded-lg shadow-3xl p-1">
+                <DropdownMenuLabel className="text-[8px] font-black uppercase tracking-widest text-muted-foreground p-2">Select Workplace</DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={() => handleModeSwitch('management')}
                   disabled={!isAdmin}
                   className={cn(
                     "p-2 rounded-md focus:bg-primary/10 gap-3 m-0.5",
-                    currentMode === 'management' && "bg-white/5 border border-white/5"
+                    currentMode === 'management' && "bg-muted"
                   )}
                 >
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black uppercase">Management Mode</span>
-                    <span className="text-[7px] font-bold text-white/40 italic">Oversight & Engineering</span>
+                    <span className="text-[7px] font-bold text-muted-foreground italic">Oversight & Engineering</span>
                   </div>
                   {currentMode === 'management' && <CheckCircle2 className="h-3 w-3 ml-auto text-primary" />}
                 </DropdownMenuItem>
@@ -383,13 +381,13 @@ export default function SPAHub() {
                   disabled={!isAdmin}
                   className={cn(
                     "p-2 rounded-md focus:bg-green-500/10 gap-3 m-0.5",
-                    currentMode === 'verification' && "bg-white/5 border border-white/5"
+                    currentMode === 'verification' && "bg-muted"
                   )}
                 >
                   <ClipboardCheck className="h-3.5 w-3.5 text-green-500" />
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black uppercase">Verification Mode</span>
-                    <span className="text-[7px] font-bold text-white/40 italic">Field Audit & Assessment</span>
+                    <span className="text-[7px] font-bold text-muted-foreground italic">Field Audit & Assessment</span>
                   </div>
                   {currentMode === 'verification' && <CheckCircle2 className="h-3 w-3 ml-auto text-green-500" />}
                 </DropdownMenuItem>
@@ -397,11 +395,11 @@ export default function SPAHub() {
             </DropdownMenu>
           </div>
 
-          <div className="hidden sm:flex items-center bg-white/[0.03] p-0.5 rounded-lg border border-white/5">
+          <div className="hidden sm:flex items-center bg-muted/30 p-0.5 rounded-lg border border-border">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-foreground/40 hover:text-primary">
                     <Download className="h-2.5 w-2.5" />
                   </Button>
                 </TooltipTrigger>
@@ -411,7 +409,7 @@ export default function SPAHub() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-white/40 hover:text-primary">
+                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-foreground/40 hover:text-primary">
                     <Upload className="h-2.5 w-2.5" />
                   </Button>
                 </TooltipTrigger>
@@ -421,18 +419,18 @@ export default function SPAHub() {
           </div>
 
           <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 group tactile-pulse px-1 sm:px-2">
-            <div className={cn("h-1 w-1 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+            <div className={cn("h-1 w-1 rounded-full", isOnline ? "bg-green-500" : "bg-red-500")} />
             <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </button>
           
-          <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-white/5 rounded-md text-white/40 hover:text-primary transition-all">
+          <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-muted rounded-md text-foreground/40 hover:text-primary transition-all">
             <HelpCircle className="h-3 w-3" />
           </button>
 
           <div className="relative">
-            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-1.5 bg-white/5 rounded-md text-white/40 hover:text-white transition-all">
+            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-1.5 bg-muted rounded-md text-foreground/40 hover:text-foreground transition-all">
               <Bell className="h-3 w-3" />
-              {unreadCount > 0 && <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-600 rounded-full border border-black" />}
+              {unreadCount > 0 && <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-600 rounded-full border border-background" />}
             </button>
             <AnimatePresence>
               {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
@@ -445,17 +443,17 @@ export default function SPAHub() {
                 {userProfile?.displayName?.[0] || 'U'}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 bg-black border-white/10 text-white rounded-lg shadow-3xl p-1">
+            <DropdownMenuContent align="end" className="w-44 bg-card border-border text-card-foreground rounded-lg shadow-3xl p-1">
               <DropdownMenuLabel className="p-2">
                 <p className="text-[9px] font-black uppercase">{userProfile?.displayName}</p>
-                <p className="text-[7px] font-bold text-white/40 uppercase mt-0.5">{userProfile?.role}</p>
+                <p className="text-[7px] font-bold text-muted-foreground uppercase mt-0.5">{userProfile?.role}</p>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary/10 focus:text-primary m-0.5">
                 <SettingsIcon className="mr-2 h-2.5 w-2.5" />
                 <span className="text-[8px] font-black uppercase">App Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="p-1.5 rounded-md focus:bg-red-600 focus:text-white m-0.5 text-red-500">
                 <LogOut className="mr-2 h-2.5 w-2.5" />
                 <span className="text-[8px] font-black uppercase">Sign Out</span>
@@ -465,8 +463,8 @@ export default function SPAHub() {
         </div>
       </header>
 
-      <div className="flex-1 relative flex flex-col p-2 sm:p-2 overflow-hidden bg-black">
-        <div className="flex-1 flex flex-col border border-white/10 rounded-xl bg-[#050505]/50 overflow-hidden relative">
+      <div className="flex-1 relative flex flex-col p-2 sm:p-2 overflow-hidden bg-background">
+        <div className="flex-1 flex flex-col border border-border rounded-xl bg-card/30 overflow-hidden relative">
           <ErrorBoundary module={activeView}>
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">

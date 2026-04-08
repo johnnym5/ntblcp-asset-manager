@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview App Settings - Configuration Hub.
+ * Phase 1014: Disabled Version Control increment pulse. Integrated direct save logic.
  */
 
 import React, { useState, useRef } from 'react';
@@ -132,13 +133,14 @@ export function SettingsWorkstation() {
     if (!appSettings) return;
     setIsSaving(true);
     try {
-      const nextVersion = (appSettings.version || 0) + 1;
-      const updatedSettings = { ...appSettings, version: nextVersion };
+      // Version control build disabled as requested. 
+      // Broadcasting changes directly to all users.
+      const updatedSettings = { ...appSettings };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      addNotification({ title: `Settings v${nextVersion} Saved`, variant: "success" });
+      addNotification({ title: `Settings Synchronized`, variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -198,30 +200,30 @@ export function SettingsWorkstation() {
     <div className="space-y-1 px-1 mb-4">
       <div className="flex items-center gap-2.5">
         <Icon className="h-4 w-4 text-primary" />
-        <h3 className="text-base font-black uppercase text-white tracking-tight leading-none">{title}</h3>
+        <h3 className="text-base font-black uppercase text-foreground tracking-tight leading-none">{title}</h3>
       </div>
-      <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{description}</p>
+      <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{description}</p>
     </div>
   );
 
   return (
     <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative">
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-white/5 mb-2 -mx-1 shrink-0">
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-2 -mx-1 shrink-0">
         <div className="flex flex-col gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
-              <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest">Configuration Center</p>
+              <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Settings</h2>
+              <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Configuration Center</p>
             </div>
-            <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all"><X className="h-4 w-4 text-white/40" /></button>
+            <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-4 w-4 text-foreground/40" /></button>
           </div>
-          <div className="bg-[#080808] p-0.5 rounded-xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
+          <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center w-full min-max-content">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><SettingsIcon className="h-3 w-3" /> General</TabsTrigger>
-              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><LayoutGrid className="h-3 w-3" /> Projects</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><Users className="h-3 w-3" /> Users</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><HeartPulse className="h-3 w-3" /> Health</TabsTrigger>}
-              <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><History className="h-3 w-3" /> History</TabsTrigger>
+              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><SettingsIcon className="h-3 w-3" /> General</TabsTrigger>
+              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><LayoutGrid className="h-3 w-3" /> Projects</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><Users className="h-3 w-3" /> Users</TabsTrigger>}
+              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><HeartPulse className="h-3 w-3" /> Health</TabsTrigger>}
+              <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><History className="h-3 w-3" /> History</TabsTrigger>
             </TabsList>
           </div>
         </div>
@@ -230,66 +232,73 @@ export function SettingsWorkstation() {
       <div className="flex-1 min-h-0 pt-2 overflow-y-auto custom-scrollbar pb-20 px-1">
         <TabsContent value="general" className="space-y-8 m-0 outline-none">
           <section>
-            <SectionTitle title="Build Version" description="Current software state" icon={Database} />
-            <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-white">System Index</span>
-                <span className="text-2xl font-black text-primary tracking-tighter">v{appSettings.version || 1}.0</span>
+            <SectionTitle title="Visual Identity" description="Choose your environment theme" icon={Palette} />
+            <Card className="bg-card border-border rounded-xl p-4 shadow-xl">
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-12 rounded-lg font-black uppercase text-[9px] gap-2">
+                  <Sun className="h-4 w-4" /> Light Mode
+                </Button>
+                <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-12 rounded-lg font-black uppercase text-[9px] gap-2">
+                  <Moon className="h-4 w-4" /> Dark Mode
+                </Button>
               </div>
             </Card>
           </section>
 
           <section>
             <SectionTitle title="Security" description="Password Management" icon={Lock} />
-            <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl text-right">
-              <Button onClick={() => setIsPassphraseDialogOpen(true)} variant="outline" className="h-9 px-6 rounded-lg border-white/10 text-white font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5">
+            <Card className="bg-card border-border rounded-xl p-4 shadow-xl text-right">
+              <Button onClick={() => setIsPassphraseDialogOpen(true)} variant="outline" className="h-9 px-6 rounded-lg border-border text-foreground font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-muted">
                 <KeyRound className="h-3.5 w-3.5 text-primary" /> Update Password
               </Button>
             </Card>
           </section>
 
           <section>
-            <SectionTitle title="App Theme" description="Visual Identity" icon={Palette} />
-            <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
-              <div className="flex wrap gap-2">
-                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-10 rounded-lg font-black uppercase text-[9px]">Light</Button>
-                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="flex-1 h-10 rounded-lg font-black uppercase text-[9px]">Dark</Button>
+            <SectionTitle title="System Rules" description="Operational Constraints" icon={Smartphone} />
+            <Card className="bg-card border-border rounded-xl p-4 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-black uppercase">Lock Asset List</Label>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Prevent accidental deletions</p>
+                </div>
+                <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
               </div>
             </Card>
           </section>
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none space-y-8">
-          <div className="space-y-4">
-            <h3 className="text-lg font-black uppercase text-white tracking-tight leading-none px-1">Project Management</h3>
+          <div className="space-y-4 px-1">
+            <h3 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">Project Management</h3>
             <div className="flex gap-2">
-              <Input placeholder="Enter project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-9 bg-black border-white/10 rounded-lg font-medium text-xs text-white" />
-              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest">Create Project</Button>
+              <Input placeholder="Enter project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-10 bg-background border-border rounded-lg font-medium text-xs text-foreground" />
+              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-10 px-6 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest">Create Project</Button>
             </div>
           </div>
 
           <Accordion type="single" collapsible className="space-y-3">
             {appSettings.grants.map((grant) => (
-              <AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-black transition-all", activeGrantId === grant.id ? "border-primary/40 shadow-xl" : "border-white/5")}>
+              <AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-card transition-all", activeGrantId === grant.id ? "border-primary/40 shadow-xl" : "border-border")}>
                 <AccordionTrigger className="hover:no-underline p-4 border-none flex-1 justify-start gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={cn("p-1.5 rounded-lg", activeGrantId === grant.id ? "bg-primary/10 text-primary" : "bg-white/5 text-white/20")}><FolderOpen className="h-4 w-4" /></div>
-                    <span className="text-sm font-black uppercase text-white tracking-tight leading-none">{grant.name}</span>
+                    <div className={cn("p-1.5 rounded-lg", activeGrantId === grant.id ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}><FolderOpen className="h-4 w-4" /></div>
+                    <span className="text-sm font-black uppercase text-foreground tracking-tight leading-none">{grant.name}</span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-6 space-y-8 animate-in slide-in-from-top-2 duration-500">
+                <AccordionContent className="bg-background/50 border-t border-border p-6 space-y-8 animate-in slide-in-from-top-2 duration-500">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                      <div key={name} className="flex items-center justify-between p-4 bg-black/40 border border-white/10 rounded-xl group transition-all hover:border-primary/20">
-                        <span className="text-[10px] font-black uppercase text-white/80 truncate pr-4">{name}</span>
+                      <div key={name} className="flex items-center justify-between p-4 bg-muted/30 border border-border rounded-xl group transition-all hover:border-primary/20">
+                        <span className="text-[10px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
                         <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2 pt-4 border-t border-white/5">
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest">Add Category</Button>
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest" onClick={() => fileInputRef.current?.click()}>Import Template</Button>
-                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest text-primary">Import Assets</Button>
+                  <div className="flex gap-2 pt-4 border-t border-border">
+                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest">Add Category</Button>
+                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest" onClick={() => fileInputRef.current?.click()}>Import Template</Button>
+                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest text-primary">Import Assets</Button>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -311,8 +320,8 @@ export function SettingsWorkstation() {
         </TabsContent>
       </div>
 
-      <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-[#0A0A0A] text-white/60 font-black uppercase text-[9px] tracking-widest">Discard</Button>
+      <div className="mt-2 pt-4 border-t border-border flex items-center justify-between px-1 shrink-0 pb-10">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-muted text-foreground/60 font-black uppercase text-[9px] tracking-widest">Discard</Button>
         <Button onClick={handleSaveChange} disabled={isSaving} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
           Save Changes
