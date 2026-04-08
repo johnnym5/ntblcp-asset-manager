@@ -6,9 +6,10 @@
  * Phase 1016: Hardened contrast for Light Mode compatibility and disabled versioning.
  * Phase 1017: Fixed TabsList hierarchy error by wrapping workstation in root Tabs.
  * Phase 1018: Integrated Application Mode switcher into General Settings.
+ * Phase 1019: Implemented Dirty Check logic for Save Changes pulse.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -105,6 +106,7 @@ export function SettingsWorkstation() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -116,25 +118,29 @@ export function SettingsWorkstation() {
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
 
-  const handleSettingChange = async (key: keyof AppSettings, value: any) => {
-    if (!appSettings) return;
-    setIsSaving(true);
-    try {
-      const updatedSettings = { ...appSettings, [key]: value };
-      if (isOnline) await FirestoreService.updateSettings({ [key]: value });
-      await storage.saveSettings(updatedSettings);
-      setAppSettings(updatedSettings);
-      addNotification({ title: "Configuration Updated", variant: "success" });
-    } finally {
-      setIsSaving(false);
+  // Synchronize draft when settings load
+  useEffect(() => {
+    if (appSettings) {
+      setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
     }
+  }, [appSettings]);
+
+  // Dirty Check: Compare draft to authoritative settings
+  const hasChanges = useMemo(() => {
+    if (!appSettings || !draftSettings) return false;
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+  }, [appSettings, draftSettings]);
+
+  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    if (!draftSettings) return;
+    setDraftSettings({ ...draftSettings, [key]: value });
   };
 
   const handleSaveChange = async () => {
-    if (!appSettings) return;
+    if (!draftSettings) return;
     setIsSaving(true);
     try {
-      const updatedSettings = { ...appSettings };
+      const updatedSettings = { ...draftSettings };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
@@ -145,10 +151,10 @@ export function SettingsWorkstation() {
     }
   };
 
-  const handleAddProject = async () => {
-    if (!newProjectName.trim() || !appSettings) return;
+  const handleAddProject = () => {
+    if (!newProjectName.trim() || !draftSettings) return;
     const newGrant: Grant = { id: crypto.randomUUID(), name: newProjectName.trim(), enabledSheets: [], sheetDefinitions: {} };
-    await handleSettingChange('grants', [...appSettings.grants, newGrant]);
+    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
     setNewProjectName('');
   };
 
@@ -160,14 +166,14 @@ export function SettingsWorkstation() {
   };
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!appSettings || !activeGrantId) return;
+    if (!draftSettings || !activeGrantId) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsSaving(true);
     try {
       const templates = await parseExcelForTemplate(file);
-      const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
+      const activeGrant = draftSettings.grants.find(g => g.id === activeGrantId);
       if (!activeGrant) return;
 
       const nextSheetDefs = { ...activeGrant.sheetDefinitions };
@@ -175,16 +181,14 @@ export function SettingsWorkstation() {
         nextSheetDefs[t.name] = t;
       });
 
-      const updatedGrants = appSettings.grants.map(g => 
+      const updatedGrants = draftSettings.grants.map(g => 
         g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g
       );
 
-      const nextSettings = { ...appSettings, grants: updatedGrants };
-      await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings(nextSettings);
-      setAppSettings(nextSettings);
+      const nextSettings = { ...draftSettings, grants: updatedGrants };
+      setDraftSettings(nextSettings);
 
-      addNotification({ title: 'Templates Imported', description: `${templates.length} group definitions added.` });
+      addNotification({ title: 'Templates Staged', description: `${templates.length} group definitions added to draft.` });
     } catch (error) {
       addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -193,7 +197,7 @@ export function SettingsWorkstation() {
     }
   };
 
-  if (!settingsLoaded || !appSettings) return null;
+  if (!settingsLoaded || !draftSettings) return null;
 
   const SettingSection = ({ title, description, icon: Icon, children }: { title: string, description: string, icon: any, children: React.ReactNode }) => (
     <div className="space-y-4">
@@ -258,12 +262,12 @@ export function SettingsWorkstation() {
                   onClick={() => handleSettingChange('appMode', 'management')}
                   className={cn(
                     "p-6 rounded-2xl border-2 text-left transition-all group",
-                    appSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                    draftSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
                   )}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className={cn("p-2 rounded-lg", appSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
-                    {appSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                    <div className={cn("p-2 rounded-lg", draftSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
+                    {draftSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                   </div>
                   <h4 className="text-sm font-black uppercase text-foreground mb-1">Management Mode</h4>
                   <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Structural Oversight & Registry Engineering. High-level control for project leads.</p>
@@ -273,12 +277,12 @@ export function SettingsWorkstation() {
                   onClick={() => handleSettingChange('appMode', 'verification')}
                   className={cn(
                     "p-6 rounded-2xl border-2 text-left transition-all group",
-                    appSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                    draftSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
                   )}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className={cn("p-2 rounded-lg", appSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
-                    {appSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                    <div className={cn("p-2 rounded-lg", draftSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
+                    {draftSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
                   </div>
                   <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification Mode</h4>
                   <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Field Audit & Physical Assessment. Optimized for high-speed status assessing.</p>
@@ -293,7 +297,7 @@ export function SettingsWorkstation() {
                 <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
                 <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent non-admin deletions and additions</p>
               </div>
-              <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+              <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
             </div>
           </SettingSection>
         </TabsContent>
@@ -307,7 +311,7 @@ export function SettingsWorkstation() {
               </div>
 
               <div className="space-y-3">
-                {appSettings.grants.map((grant) => (
+                {draftSettings.grants.map((grant) => (
                   <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", activeGrantId === grant.id ? "border-primary shadow-xl bg-primary/[0.02]" : "border-border bg-muted/10")}>
                     <div className="p-5 flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -354,7 +358,7 @@ export function SettingsWorkstation() {
 
         <TabsContent value="users" className="m-0 outline-none pb-20">
           <SettingSection title="Identity Governance" description="System auditors & regional scopes" icon={Users}>
-            <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+            <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
           </SettingSection>
         </TabsContent>
 
@@ -370,9 +374,9 @@ export function SettingsWorkstation() {
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] tracking-widest text-muted-foreground hover:text-foreground">Discard</Button>
-        <Button onClick={handleSaveChange} disabled={isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-          Commit All Changes
+          Save Changes
         </Button>
       </div>
 
@@ -385,8 +389,8 @@ export function SettingsWorkstation() {
           sheetDefinition={selectedSheetDef}
           originalSheetName={originalSheetName}
           onSave={(orig, newDef, all) => {
-            if (!appSettings) return;
-            const updatedGrants = appSettings.grants.map(grant => {
+            if (!draftSettings) return;
+            const updatedGrants = draftSettings.grants.map(grant => {
               if (grant.id === activeGrantForSchema) {
                 const newSheetDefs = { ...grant.sheetDefinitions };
                 if (all) Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
@@ -395,10 +399,7 @@ export function SettingsWorkstation() {
               }
               return grant;
             });
-            const nextSettings = { ...appSettings, grants: updatedGrants };
-            setAppSettings(nextSettings);
-            storage.saveSettings(nextSettings);
-            if (isOnline) FirestoreService.updateSettings(nextSettings);
+            handleSettingChange('grants', updatedGrants);
           }}
         />
       )}
