@@ -51,32 +51,32 @@ export function getColorForSource(source: string, branding?: Record<string, stri
  */
 export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">[] = [
   // Identity
-  { rawName: "S/N", displayName: "S/N", normalizedName: "sn", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", locked: true, group: "Identity" },
-  { rawName: "Asset Description", displayName: "Asset Description", normalizedName: "asset_description", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Asset ID Code", displayName: "Asset ID Code", normalizedName: "asset_id_code", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Serial Number", displayName: "Serial Number", normalizedName: "serial_number", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
+  { rawName: "S/N", displayName: "S/N", normalizedName: "sn", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", locked: true, group: "Identity" },
+  { rawName: "Asset Description", displayName: "Asset Description", normalizedName: "asset_description", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
+  { rawName: "Asset ID Code", displayName: "Asset ID Code", normalizedName: "asset_id_code", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
+  { rawName: "Serial Number", displayName: "Serial Number", normalizedName: "serial_number", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
   
   // Location
-  { rawName: "Location", displayName: "Location", normalizedName: "location", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
-  { rawName: "Assignee (Location)", displayName: "Assignee (Location)", normalizedName: "assignee_location", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
+  { rawName: "Location", displayName: "Location", normalizedName: "location", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
+  { rawName: "Assignee (Location)", displayName: "Assignee (Location)", normalizedName: "assignee_location", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
   
   // Classification
-  { rawName: "Asset Class", displayName: "Asset Class", normalizedName: "asset_class", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
-  { rawName: "Manufacturer", displayName: "Manufacturer", normalizedName: "manufacturer", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
-  { rawName: "Model Number", displayName: "Model Number", normalizedName: "model_number", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
+  { rawName: "Asset Class", displayName: "Asset Class", normalizedName: "asset_class", visible: true, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
+  { rawName: "Manufacturer", displayName: "Manufacturer", normalizedName: "manufacturer", visible: true, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
+  { rawName: "Model Number", displayName: "Model Number", normalizedName: "model_number", visible: true, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
   
   // Procurement
-  { rawName: "Suppliers", displayName: "Suppliers", normalizedName: "suppliers", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
-  { rawName: "Date Purchased or Received", displayName: "Date Purchased or Received", normalizedName: "date_purchased_received", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "date", group: "Procurement" },
-  { rawName: "Purchase price (Naira)", displayName: "Price (NGN)", normalizedName: "purchase_price_ngn", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "currency", group: "Procurement" },
+  { rawName: "Suppliers", displayName: "Suppliers", normalizedName: "suppliers", visible: false, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
+  { rawName: "Date Purchased or Received", displayName: "Date Purchased or Received", normalizedName: "date_purchased_received", visible: false, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "date", group: "Procurement" },
+  { rawName: "Purchase price (Naira)", displayName: "Price (NGN)", normalizedName: "purchase_price_ngn", visible: false, table: false, quickView: false, editable: true, filterable: true, sortEnabled: true, dataType: "currency", group: "Procurement" },
   
   // Condition
-  { rawName: "Condition", displayName: "Condition", normalizedName: "condition", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition" },
-  { rawName: "Remarks", displayName: "Remarks", normalizedName: "remarks", visible: true, editable: true, filterable: true, sortEnabled: false, dataType: "text", group: "Condition" },
+  { rawName: "Condition", displayName: "Condition", normalizedName: "condition", visible: true, table: true, quickView: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition" },
+  { rawName: "Remarks", displayName: "Remarks", normalizedName: "remarks", visible: true, table: false, quickView: false, editable: true, filterable: true, sortEnabled: false, dataType: "text", group: "Condition" },
 
   // Metadata & Hierarchy
-  { rawName: "Source Sheet", displayName: "Source Sheet", normalizedName: "source_sheet", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Metadata" },
-  { rawName: "Row Number", displayName: "Row Number", normalizedName: "row_number", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "number", group: "Metadata" },
+  { rawName: "Source Sheet", displayName: "Source Sheet", normalizedName: "source_sheet", visible: true, table: false, quickView: false, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Metadata" },
+  { rawName: "Row Number", displayName: "Row Number", normalizedName: "row_number", visible: true, table: false, quickView: false, editable: false, filterable: true, sortEnabled: true, dataType: "number", group: "Metadata" },
 ];
 
 /**

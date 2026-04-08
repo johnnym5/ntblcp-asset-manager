@@ -1,6 +1,7 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
- * Optimized for Responsive Stacking and High-Density Registry Pulse.
+ * Optimized for Responsive Stacking and Dynamic Header Awareness.
+ * Phase 6: Implemented Dynamic Columns based on TableView setting.
  */
 
 import React from 'react';
@@ -23,7 +24,8 @@ import {
   Lock,
   ChevronDown,
   Globe,
-  CloudOff
+  CloudOff,
+  List
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -53,10 +55,9 @@ export function RegistryTable({
   onInspect, 
   selectedIds, 
   onToggleSelect, 
-  onSelectAll,
-  onConfigureHeaders
+  onSelectAll
 }: RegistryTableProps) {
-  const { appSettings } = useAppState();
+  const { appSettings, headers: globalHeaders } = useAppState();
   const { userProfile } = useAuth();
   const isMobile = useIsMobile();
   
@@ -66,9 +67,12 @@ export function RegistryTable({
 
   const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
+  // Dynamically determine columns based on Admin settings
+  const tableHeaders = globalHeaders.filter(h => h.table);
+
   return (
     <div className="space-y-4 pb-40 animate-in fade-in duration-700 w-full overflow-hidden">
-      {/* 1. Protocol Header - Adapts to Mobile */}
+      {/* 1. Protocol Header */}
       <div className="flex items-center px-4 sm:px-8 py-4 sm:py-5 bg-card rounded-2xl border border-border mb-6 sticky top-0 z-30 shadow-2xl">
         <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center">
           <Checkbox 
@@ -79,13 +83,20 @@ export function RegistryTable({
         </div>
         
         <div className="flex-1 grid grid-cols-12 gap-4 sm:gap-6 ml-4 sm:ml-6 items-center">
-          <div className="col-span-2 sm:col-span-1 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-muted-foreground opacity-40">S/N</div>
-          <div className="col-span-8 sm:col-span-4 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-muted-foreground opacity-40">Description</div>
-          <div className="hidden sm:block col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Asset ID / Tag</div>
-          <div className="hidden md:block col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Location Scope</div>
+          {tableHeaders.slice(0, 4).map((header, idx) => (
+            <div 
+              key={header.id} 
+              className={cn(
+                "text-[8px] sm:text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40",
+                idx === 0 ? "col-span-1" : idx === 1 ? "col-span-4" : idx === 2 ? "col-span-3" : "col-span-2"
+              )}
+            >
+              {header.displayName}
+            </div>
+          ))}
           <div className="col-span-2 flex items-center justify-end sm:justify-center gap-2">
             {!isMobile && (!isManagementMode || isAdmin) && (
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Status</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Verification</span>
             )}
           </div>
         </div>
@@ -117,55 +128,35 @@ export function RegistryTable({
 
                 <AccordionTrigger className="flex-1 hover:no-underline py-4 sm:py-6 ml-4 sm:ml-6">
                   <div className="grid grid-cols-12 gap-4 sm:gap-6 w-full text-left items-center">
-                    <div className="col-span-2 sm:col-span-1">
-                      <span className="text-[10px] sm:text-[11px] font-mono font-black text-muted-foreground/40">#{record.sn || '---'}</span>
-                    </div>
-                    <div className="col-span-10 sm:col-span-4 min-w-0 pr-2 sm:pr-6">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-xs sm:text-sm uppercase tracking-tight text-foreground truncate block">
-                          {String(record.rawRow.description || 'Untitled Asset')}
-                        </span>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
+                    {tableHeaders.slice(0, 4).map((header, idx) => {
+                      const field = record.fields.find(f => f.headerId === header.id);
+                      return (
+                        <div 
+                          key={header.id} 
+                          className={cn(
+                            "min-w-0 pr-2",
+                            idx === 0 ? "col-span-1" : idx === 1 ? "col-span-4" : idx === 2 ? "col-span-3" : "col-span-2"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "font-black tracking-tight truncate block uppercase",
+                              idx === 0 ? "text-[10px] font-mono text-muted-foreground/40" : "text-xs sm:text-sm text-foreground"
+                            )}>
+                              {idx === 0 ? `#${field?.displayValue || '---'}` : field?.displayValue || '---'}
+                            </span>
+                            {idx === 1 && (
                               <div className={cn(
                                 "p-1 rounded-md border shrink-0",
                                 syncStatus === 'synced' ? "bg-green-500/10 border-green-500/20 text-green-600" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
                               )}>
                                 {syncStatus === 'synced' ? <Globe className="h-2.5 w-2.5" /> : <CloudOff className="h-2.5 w-2.5" />}
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-[8px] font-black uppercase">
-                              {syncStatus === 'synced' ? 'Synced to Cloud' : 'Stored on Device (Offline)'}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-
-                      {isMobile && (
-                        <div className="flex items-center gap-2 mt-1 opacity-40">
-                          <Tag className="h-2.5 w-2.5 text-primary" />
-                          <span className="text-[7px] font-bold text-foreground uppercase truncate">{String(record.rawRow.assetIdCode || 'UNSET')}</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="hidden sm:block col-span-2 min-w-0 pr-4">
-                      <div className="flex items-center gap-2.5 opacity-60 group-hover/item:opacity-100 transition-opacity">
-                        <Tag className="h-3 w-3 text-primary shrink-0" />
-                        <span className="text-[10px] font-bold text-foreground/80 truncate uppercase tracking-widest">
-                          {String(record.rawRow.assetIdCode || 'UNTAGGED')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="hidden md:block col-span-3 min-w-0 pr-4">
-                      <div className="flex items-center gap-2.5 opacity-60 group-hover/item:opacity-100 transition-opacity">
-                        <MapPin className="h-3 w-3 text-primary shrink-0" />
-                        <span className="text-[10px] font-bold text-foreground/80 truncate uppercase">
-                          {String(record.rawRow.location || 'GLOBAL')}
-                        </span>
-                      </div>
-                    </div>
+                      );
+                    })}
                     <div className="col-span-2" />
                   </div>
                 </AccordionTrigger>

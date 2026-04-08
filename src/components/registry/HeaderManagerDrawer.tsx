@@ -4,6 +4,7 @@
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
  * Phase 35: Removed redundant manual close button.
  * Phase 36: Converted to centered Dialog pop-up window.
+ * Phase 37: Admin-Locked Governance & Real-Time Sync pulse.
  */
 
 import React, { useState } from 'react';
@@ -31,12 +32,19 @@ import {
   Tag,
   MapPin,
   Info,
-  Lock
+  Lock,
+  Eye,
+  List
 } from 'lucide-react';
 import type { RegistryHeader, RegistryPreset } from '@/types/registry';
-import { REGISTRY_PRESETS } from '@/lib/registry-utils';
+import { REGISTRY_PRESETS, DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { useAuth } from '@/contexts/auth-context';
+import { useAppState } from '@/contexts/app-state-context';
+import { storage } from '@/offline/storage';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { addNotification } from '@/hooks/use-notifications';
 
 interface HeaderManagerProps {
   isOpen: boolean;
@@ -58,40 +66,71 @@ const GroupIcon = ({ group }: { group: string }) => {
   }
 };
 
-export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHeaders, onReset }: HeaderManagerProps) {
+export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHeaders }: HeaderManagerProps) {
+  const { userProfile } = useAuth();
+  const { appSettings, setAppSettings, isOnline } = useAppState();
   const [search, setSearch] = useState("");
+  const [localHeaders, setLocalHeaders] = useState<RegistryHeader[]>(headers);
 
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'SUPERADMIN';
   const groups = ["Identity", "Location", "Classification", "Procurement", "Condition", "Metadata", "Hierarchy"] as const;
 
-  const toggleVisibility = (id: string) => {
-    onUpdateHeaders(headers.map(h => h.id === id ? { ...h, visible: !h.visible } : h));
+  React.useEffect(() => {
+    if (isOpen) setLocalHeaders(headers);
+  }, [isOpen, headers]);
+
+  const toggleFlag = (id: string, key: 'visible' | 'table' | 'quickView') => {
+    if (!isAdmin) return;
+    setLocalHeaders(prev => prev.map(h => h.id === id ? { ...h, [key]: !h[key] } : h));
   };
 
   const renameHeader = (id: string, newName: string) => {
-    onUpdateHeaders(headers.map(h => h.id === id ? { ...h, displayName: newName } : h));
+    if (!isAdmin) return;
+    setLocalHeaders(prev => prev.map(h => h.id === id ? { ...h, displayName: newName } : h));
   };
 
-  const applyPreset = (preset: RegistryPreset) => {
-    onUpdateHeaders(headers.map(h => ({
-      ...h,
-      visible: preset.visibleHeaderNames.includes(h.normalizedName)
-    })));
+  const handleReset = () => {
+    if (!isAdmin) return;
+    const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[];
+    setLocalHeaders(initial);
+  };
+
+  const handleCommit = async () => {
+    if (!isAdmin || !appSettings) return;
+    
+    const updatedSettings = { ...appSettings, globalHeaders: localHeaders };
+    
+    try {
+      await storage.saveSettings(updatedSettings);
+      if (isOnline) await FirestoreService.updateSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      onUpdateHeaders(localHeaders);
+      addNotification({ title: "Header Arrangement Synchronized", variant: "success" });
+      onOpenChange(false);
+    } catch (e) {
+      addNotification({ title: "Commit Failure", variant: "destructive" });
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-2xl bg-background overflow-hidden">
+      <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-2xl bg-background overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
           <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <Columns className="text-primary h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Columns className="text-primary h-6 w-6" />
+                </div>
+                <div className="flex flex-col">
+                  <DialogTitle className="text-3xl font-black uppercase tracking-tight">Field Setup</DialogTitle>
+                  <DialogDescription className="font-bold uppercase text-[9px] tracking-widest text-primary mt-1">
+                    GLOBAL REGISTRY ORCHESTRATION
+                  </DialogDescription>
+                </div>
               </div>
-              <DialogTitle className="text-3xl font-black uppercase tracking-tight">Field Setup</DialogTitle>
+              {!isAdmin && <Badge className="bg-muted text-muted-foreground border-border h-7 px-3 rounded-full font-black uppercase text-[8px] tracking-widest gap-2"><Lock className="h-3 w-3" /> Read Only</Badge>}
             </div>
-            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
-              Technical Orchestration & Field Visibility Checklist
-            </DialogDescription>
           </DialogHeader>
         </div>
 
@@ -105,19 +144,19 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
               className="pl-9 h-12 rounded-2xl bg-background border-none shadow-inner text-xs font-bold"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {REGISTRY_PRESETS.map(preset => (
-              <Button key={preset.id} variant="outline" size="sm" onClick={() => applyPreset(preset)} className="h-8 px-4 rounded-xl font-black uppercase text-[8px] tracking-widest bg-card shadow-sm hover:bg-primary/5 transition-all">
-                {preset.name}
-              </Button>
-            ))}
+          <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest opacity-40">
+            <span>Field Metadata</span>
+            <div className="flex gap-10 pr-4">
+              <span className="flex items-center gap-1.5"><Eye className="h-2.5 w-2.5" /> Card</span>
+              <span className="flex items-center gap-1.5"><List className="h-2.5 w-2.5" /> List</span>
+            </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
           <div className="p-8 space-y-10">
             {groups.map(groupName => {
-              const groupHeaders = headers.filter(h => 
+              const groupHeaders = localHeaders.filter(h => 
                 h.group === groupName && 
                 (h.displayName.toLowerCase().includes(search.toLowerCase()) || h.rawName.toLowerCase().includes(search.toLowerCase()))
               );
@@ -135,13 +174,17 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                           <div className="cursor-grab opacity-20 group-hover:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></div>
                           <div className="space-y-1.5 flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <Input value={header.displayName} onChange={(e) => renameHeader(header.id, e.target.value)} className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none truncate" disabled={!header.editable} />
+                              <Input value={header.displayName} onChange={(e) => renameHeader(header.id, e.target.value)} className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none truncate" disabled={!header.editable || !isAdmin} />
                               {header.locked && <Lock className="h-3 w-3 text-primary opacity-40 shrink-0" />}
                             </div>
                             <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-40 truncate">SRC: {header.rawName}</span>
                           </div>
                         </div>
-                        <Switch checked={header.visible} onCheckedChange={() => toggleVisibility(header.id)} disabled={header.locked} />
+                        
+                        <div className="flex items-center gap-8 pl-4">
+                          <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                          <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -152,12 +195,20 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
         </ScrollArea>
 
         <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
-          <Button variant="ghost" onClick={onReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
-            <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset Template
-          </Button>
-          <Button onClick={() => onOpenChange(false)} className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-            Commit Arrangement
-          </Button>
+          {isAdmin ? (
+            <>
+              <Button variant="ghost" onClick={handleReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
+                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset to Default
+              </Button>
+              <Button onClick={handleCommit} className="flex-[2] h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
+                Commit Arrangement Pulse
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => onOpenChange(false)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] bg-muted text-muted-foreground">
+              Exit Arrangement View
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

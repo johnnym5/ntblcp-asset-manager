@@ -4,6 +4,7 @@
  */
 
 import { type Dispatch, type SetStateAction } from 'react';
+import type { RegistryHeader } from './registry';
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
@@ -221,6 +222,7 @@ export interface AppSettings {
   onboardingComplete: boolean;
   showHelpTooltips: boolean;
   sourceBranding: Record<string, string>;
+  globalHeaders?: RegistryHeader[];
 }
 
 export interface AuthorizedUser {

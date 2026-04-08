@@ -5,6 +5,7 @@
  * Phase 1105: Integrated Fuzzy Matching into search and filter aggregation.
  * Phase 1106: Centralized name normalization for locations and assignees.
  * Phase 1107: Integrated Global Command Palette state for mobile accessibility.
+ * Phase 1108: Centralized Header management in AppSettings for real-time synchronization.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -160,6 +161,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       if (localSettings) {
         setAppSettings(localSettings);
         setSettingsLoaded(true);
+        // Sync local headers from settings
+        if (localSettings.globalHeaders) {
+          setHeaders(localSettings.globalHeaders);
+        }
       }
       
       const currentGrantId = localSettings?.activeGrantId || null;
@@ -199,18 +204,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     if (!isHydrated) return;
-    const savedHeaders = localStorage.getItem('registry-header-prefs');
-    if (savedHeaders) setHeaders(JSON.parse(savedHeaders));
-    else {
-      const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i }));
-      setHeaders(initial as RegistryHeader[]);
-    }
-  }, [isHydrated]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
     storage.getSettings().then(local => {
-      if (local) { setAppSettings(local); setSettingsLoaded(true); }
+      if (local) { 
+        setAppSettings(local); 
+        setSettingsLoaded(true); 
+        if (local.globalHeaders) setHeaders(local.globalHeaders);
+      }
     });
     if (db && isOnline) {
       const settingsRef = doc(db, 'config', 'settings');
@@ -218,6 +217,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (snapshot.exists()) {
           const remoteSettings = snapshot.data() as AppSettings;
           setAppSettings(remoteSettings);
+          if (remoteSettings.globalHeaders) setHeaders(remoteSettings.globalHeaders);
           storage.saveSettings(remoteSettings);
           setSettingsLoaded(true);
         } else setSettingsLoaded(true);
@@ -230,15 +230,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   }, [selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
 
-  /**
-   * CENTRALIZED SEARCH & FILTER ENGINE
-   * Uses fuzzy matching to handle naming variations across registry fields.
-   */
   const filteredAssets = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     let results = [...source];
 
-    // 1. Fuzzy Scope Matching
     if (selectedLocations.length > 0) {
       const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
       results = results.filter(a => {
@@ -247,7 +242,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       });
     }
 
-    // 2. Fuzzy Assignee Matching
     if (selectedAssignees.length > 0) {
       const selectedFuzzy = selectedAssignees.map(a => getFuzzySignature(a));
       results = results.filter(a => {
@@ -260,7 +254,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
-    // 3. Intelligent Fuzzy Search
     if (searchTerm) {
       const fuzzySearch = getFuzzySignature(searchTerm);
       results = results.filter(a => {
@@ -278,13 +271,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return results;
   }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter]);
 
-  /**
-   * CANONICAL OPTION AGGREGATION
-   * Groups naming variations together in the filter UI.
-   */
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    const canonicalMap = new Map<string, string>(); // Fuzzy -> Display
+    const canonicalMap = new Map<string, string>();
 
     assets.forEach(a => { 
       const pulse = LocationEngine.normalize(a.location);
@@ -345,6 +334,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const remoteSettings = await FirestoreService.getSettings();
       if (remoteSettings) {
         setAppSettings(remoteSettings);
+        if (remoteSettings.globalHeaders) setHeaders(remoteSettings.globalHeaders);
         await storage.saveSettings(remoteSettings);
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);

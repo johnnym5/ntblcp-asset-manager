@@ -18,6 +18,8 @@ export interface RegistryHeader {
   displayName: string;        // editable label shown in UI
   normalizedName: string;     // normalized canonical key
   visible: boolean;           // show in registry list
+  table: boolean;             // specifically show in table/list view
+  quickView: boolean;         // specifically show in card/grid view
   editable: boolean;          // can user rename it
   filterable: boolean;        // usable in filters
   sortEnabled: boolean;       // usable in sort
