@@ -5,25 +5,22 @@
  * Phase 1200: Consolidated redundant features into logical Operational Zones.
  * Phase 1201: Grouped Exploration, Integrity, and Reporting tools.
  * Phase 1202: Gated verification triggers based on appMode.
+ * Phase 1203: Wrapped Audit Log in a collapsed Accordion for high-density clarity.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { 
   LayoutDashboard,
   RefreshCw,
-  ListFilter,
   DatabaseZap,
   Settings,
   FolderOpen,
-  SearchCode,
   FileText,
   Activity,
   History,
   ShieldCheck,
   Zap,
-  ChevronRight,
   Monitor,
-  AlertTriangle,
   ClipboardCheck
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
@@ -37,6 +34,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export function DashboardWorkstation() {
   const { 
@@ -44,9 +47,7 @@ export function DashboardWorkstation() {
     setActiveView, 
     manualDownload, 
     isSyncing, 
-    isOnline, 
-    setIsFilterOpen, 
-    activeFilterCount 
+    isOnline 
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -211,25 +212,34 @@ export function DashboardWorkstation() {
                 <div className="grid grid-cols-1 gap-6">
                   <SyncQueueWorkstation isEmbedded={true} />
                   
-                  <Card className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-xl">
-                    <div className="p-5 border-b border-border bg-muted/10 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <History className="h-4 w-4 text-primary" />
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Recent Activity</h4>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setActiveView('AUDIT_LOG')}
-                        className="h-7 px-3 rounded-md font-black uppercase text-[8px] text-primary hover:bg-primary/10"
-                      >
-                        Full Ledger
-                      </Button>
-                    </div>
-                    <CardContent className="p-0">
-                      <AuditLogWorkstation isEmbedded={true} />
-                    </CardContent>
-                  </Card>
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="audit-log" className="border-none">
+                      <Card className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-xl">
+                        <AccordionTrigger className="hover:no-underline p-0 [&[data-state=open]>div>div>svg]:rotate-180">
+                          <div className="p-5 flex items-center justify-between w-full pr-6">
+                            <div className="flex items-center gap-3">
+                              <History className="h-4 w-4 text-primary" />
+                              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Recent Activity Pulse</h4>
+                            </div>
+                            <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">REVIEW LOGS</Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-0 pt-0 border-t border-border">
+                          <AuditLogWorkstation isEmbedded={true} />
+                          <div className="p-4 bg-muted/5 flex justify-end">
+                             <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setActiveView('AUDIT_LOG')}
+                              className="h-7 px-3 rounded-md font-black uppercase text-[8px] text-primary hover:bg-primary/10"
+                            >
+                              Open Full Ledger
+                            </Button>
+                          </div>
+                        </AccordionContent>
+                      </Card>
+                    </AccordionItem>
+                  </Accordion>
                 </div>
               </div>
             </div>
