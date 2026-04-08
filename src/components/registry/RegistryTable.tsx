@@ -1,8 +1,9 @@
+'use client';
+
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
- * Optimized for Responsive Stacking and Dynamic Header Awareness.
- * Phase 6: Implemented Dynamic Columns based on TableView setting.
- * Phase 7: Gated verification columns based on appMode.
+ * Optimized for Inline Expansion using the central AssetDossier.
+ * Phase 606: Implemented "Full View as Dropdown" inline expansion.
  */
 
 import React from 'react';
@@ -27,7 +28,8 @@ import {
   Globe,
   CloudOff,
   List,
-  ShieldCheck
+  ShieldCheck,
+  Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -42,6 +44,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AssetDossier } from './AssetDossier';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -64,13 +67,10 @@ export function RegistryTable({
   const isMobile = useIsMobile();
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
-  const isManagementMode = appSettings?.appMode === 'management';
   const isVerificationMode = appSettings?.appMode === 'verification';
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
-  // Dynamically determine columns based on Admin settings, filtering out verification fields if not in verification mode
   const tableHeaders = globalHeaders
     .filter(h => h.table)
     .filter(h => isVerificationMode || !VERIFICATION_KEYS.includes(h.normalizedName));
@@ -78,7 +78,7 @@ export function RegistryTable({
   return (
     <div className="space-y-4 pb-40 animate-in fade-in duration-700 w-full overflow-hidden">
       {/* 1. Protocol Header */}
-      <div className="flex items-center px-4 sm:px-8 py-4 sm:py-5 bg-card rounded-2xl border border-border mb-6 sticky top-0 z-30 shadow-2xl">
+      <div className="flex items-center px-4 sm:px-8 py-4 sm:py-5 bg-card rounded-2xl border border-border mb-6 sticky top-0 z-30 shadow-2xl backdrop-blur-xl">
         <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center">
           <Checkbox 
             checked={allSelected} 
@@ -101,7 +101,7 @@ export function RegistryTable({
           ))}
           <div className="col-span-2 flex items-center justify-end sm:justify-center gap-2">
             {!isMobile && isVerificationMode && (
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Verification</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Pulse Assessment</span>
             )}
           </div>
         </div>
@@ -119,7 +119,7 @@ export function RegistryTable({
               value={record.id} 
               className={cn(
                 "border-2 rounded-[1.5rem] sm:rounded-[2rem] transition-all duration-500 overflow-hidden",
-                isSelected ? "border-primary/40 bg-primary/[0.02] shadow-2xl shadow-primary/5" : "border-border bg-card hover:border-primary/20"
+                isSelected ? "border-primary/40 bg-primary/[0.02] shadow-2xl" : "border-border bg-card hover:border-primary/20"
               )}
             >
               <div className="flex items-center group/item px-4 sm:px-8 py-1.5">
@@ -186,60 +186,20 @@ export function RegistryTable({
                         <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase text-destructive">Discrepancy</SelectItem>
                       </SelectContent>
                     </Select>
-                  ) : null}
+                  ) : (
+                    <Badge variant="outline" className="h-8 px-4 rounded-xl font-black uppercase text-[8px] border-primary/20 text-primary bg-primary/5">
+                      <Database className="h-3 w-3 mr-1.5" /> Full Dossier
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              <AccordionContent className="bg-muted/10 border-t border-border p-6 sm:p-10 animate-in slide-in-from-top-2 duration-500">
-                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 sm:gap-x-12 gap-y-8 sm:gap-y-10">
-                  {record.fields
-                    .filter(f => f.displayValue !== '---')
-                    .filter(f => {
-                      const h = record.headers.find(header => header.id === f.headerId);
-                      const isVerificationField = h ? VERIFICATION_KEYS.includes(h.normalizedName) : false;
-                      if (!isVerificationMode && isVerificationField) return false;
-                      return true;
-                    })
-                    .map((field) => {
-                      const header = record.headers.find(h => h.id === field.headerId);
-                      return (
-                        <div key={field.headerId} className="space-y-2 group/field">
-                          <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-muted-foreground opacity-40 group-hover/field:text-primary transition-colors">
-                            {header?.displayName || 'Technical Parameter'}
-                          </p>
-                          <p className="text-xs sm:text-sm font-black uppercase text-foreground/80 leading-tight">
-                            {field.displayValue}
-                          </p>
-                        </div>
-                      );
-                    })}
-                </div>
-                
-                <div className="mt-10 sm:mt-12 pt-8 sm:pt-10 border-t border-dashed border-border flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-8">
-                  <div className="flex flex-wrap items-center gap-6 sm:gap-12 w-full sm:w-auto">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="p-2 bg-muted rounded-lg sm:rounded-xl"><User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground/40" /></div>
-                      <div className="flex flex-col">
-                        <span className="text-[7px] sm:text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest leading-none mb-1">Auditor</span>
-                        <span className="text-[9px] sm:text-[10px] font-bold text-foreground/60 leading-none">{String(record.rawRow.lastModifiedBy || 'System')}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="p-2 bg-muted rounded-lg sm:rounded-xl"><Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground/40" /></div>
-                      <div className="flex flex-col">
-                        <span className="text-[7px] sm:text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest leading-none mb-1">Timestamp</span>
-                        <span className="text-[9px] sm:text-[10px] font-bold text-foreground/60 leading-none">{record.rawRow.lastModified ? new Date(record.rawRow.lastModified as string).toLocaleDateString() : 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    onClick={() => onInspect(record.id)}
-                    className="w-full sm:w-auto h-12 sm:h-14 px-8 sm:px-10 rounded-[1.5rem] font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-3 bg-primary text-black shadow-2xl transition-transform active:scale-95"
-                  >
-                    <Edit3 className="h-4 w-4" /> Open Full Profile
-                  </Button>
-                </div>
+              <AccordionContent className="bg-muted/5 border-t border-border p-4 sm:p-8 animate-in slide-in-from-top-2 duration-500">
+                <AssetDossier 
+                  record={record} 
+                  onEdit={onInspect}
+                  className="shadow-inner border-dashed border-2 border-primary/10"
+                />
               </AccordionContent>
             </AccordionItem>
           );

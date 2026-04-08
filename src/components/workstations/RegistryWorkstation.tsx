@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 600: Restored Filter Logic trigger and high-density operational header.
- * Phase 601: Optimized for responsive dossier navigation.
+ * Overhauled for Inline Expansion (Drop-downs) instead of pop-ups.
+ * Phase 606: Removed AssetDetailSheet in favor of inline AssetDossier expansion.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -50,7 +50,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
-import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
@@ -125,8 +124,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     activeGrantId,
     filters,
     setFilters,
-    isFilterOpen,
-    setIsFilterOpen,
     isLogicFilterOpen,
     setIsLogicFilterOpen,
     isSortOpen,
@@ -140,7 +137,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const { userProfile } = useAuth();
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -238,7 +234,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / itemsPerPage), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [processedAssets, currentPage, itemsPerPage]);
 
-  const handleInspect = (id: string) => { setSelectedAssetId(id); setIsDetailOpen(true); };
+  const handleInspect = (id: string) => { 
+    setSelectedAssetId(id); 
+    setIsFormOpen(true); // "Inspect" now opens the edit form for direct modification
+  };
+
   const handleToggleSelect = (id: string) => { const next = new Set(selectedAssetIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedAssetIds(next); };
   
   const handleSelectAll = useCallback((checked: boolean) => {
@@ -351,12 +351,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
-  const selectedRecord = useMemo(() => {
-    if (!selectedAssetId) return undefined;
-    const asset = filteredAssets.find(a => a.id === selectedAssetId);
-    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
-  }, [selectedAssetId, filteredAssets, headers, appSettings?.sourceBranding]);
-
   const showList = isExplored || viewAll;
 
   return (
@@ -418,7 +412,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                {/* RESTORED FILTER ENGINE TRIGGER */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -543,7 +536,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
-      {/* 3. Floating Action Bar - Expanded Operational Command Pulse */}
+      {/* 3. Floating Action Bar */}
       <AnimatePresence>
         {selectedCategories.length > 0 && !showList && (
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex flex-wrap items-center justify-center gap-4 sm:gap-6 shadow-3xl backdrop-blur-3xl w-[90vw] sm:w-auto">
@@ -609,12 +602,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </AnimatePresence>
 
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <CategoryBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
       
-      {/* Merge Logic Dialog */}
       <Dialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
         <DialogContent className="max-w-md bg-background border-border rounded-[2.5rem] p-8 shadow-3xl">
           <DialogHeader>
