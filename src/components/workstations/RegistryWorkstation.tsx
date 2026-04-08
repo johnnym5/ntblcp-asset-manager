@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview Asset Hub - Main Registry Browser.
- * Hardened for responsive grids and high-fidelity navigation.
+ * @fileOverview Asset Hub - Main Registry Workstation.
+ * Phase 600: Restored Filter Logic trigger and high-density operational header.
+ * Phase 601: Optimized for responsive dossier navigation.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -417,6 +418,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* RESTORED FILTER ENGINE TRIGGER */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setIsLogicFilterOpen(true)} 
+                        className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative"
+                      >
+                        <Filter className="h-4 w-4" />
+                        {activeFilterCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background shadow-lg">
+                            {activeFilterCount}
+                          </span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Logic Engine</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
                 {showList && (
                   <TooltipProvider>
                     <Tooltip>
@@ -430,9 +453,29 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </TooltipProvider>
                 )}
 
-                {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
+                {isAdmin && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-[8px] font-black uppercase">New Record</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 
-                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Sort Pulse</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
           </div>
