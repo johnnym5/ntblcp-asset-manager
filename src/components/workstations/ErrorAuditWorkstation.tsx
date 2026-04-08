@@ -3,8 +3,7 @@
 /**
  * @fileOverview ErrorAuditWorkstation - Executive System Health Monitoring.
  * Restricted to SUPERADMIN. Provides deterministic trace of all app anomalies.
- * Phase 1011: Added batch selection and resolution controls.
- * Phase 1012: Added isEmbedded support for Accordion wrapping.
+ * Phase 1013: Implemented Retry Pulse logic for auto-resolution based on diagnostic health.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -51,6 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { saveAs } from 'file-saver';
 import { useToast } from '@/hooks/use-toast';
@@ -68,9 +68,10 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
   const [diagnosticResults, setDiagnosticResults] = useState<DiagnosticResult[] | null>(null);
   
-  // Batch State
+  // Batch & Processing State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRetryingId, setIsRetryingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOnline) loadLogs();
@@ -95,6 +96,41 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
       await loadLogs();
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  /**
+   * Retry Pulse: Checks if the error condition still persists.
+   * If the diagnostic pulse passes, the incident is auto-resolved.
+   */
+  const handleRetryLog = async (log: ErrorLogEntry) => {
+    setIsRetryingId(log.id);
+    try {
+      const results = await SystemDiagnostics.runSelfTest();
+      
+      // Determine node to check based on context
+      const moduleStr = log.context.module.toUpperCase();
+      let nodeToCheck: 'CLOUD' | 'MIRROR' | 'LOCAL' | 'AUTH' = 'LOCAL';
+      if (moduleStr.includes('FIRESTORE') || moduleStr.includes('CLOUD')) nodeToCheck = 'CLOUD';
+      else if (moduleStr.includes('RTDB') || moduleStr.includes('MIRROR')) nodeToCheck = 'MIRROR';
+      
+      const nodeStatus = results.find(r => r.node === nodeToCheck);
+
+      if (nodeStatus && nodeStatus.status === 'STABLE') {
+        await FirestoreService.updateErrorStatus(log.id, 'RESOLVED', 'System re-scan confirmed stability. Auto-resolved.');
+        toast({ title: "Pulse Restored", description: `Diagnostic re-scan confirmed ${nodeToCheck} is stable.` });
+        await loadLogs();
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "Incident Persistent", 
+          description: `Error still detected in ${nodeToCheck} node. Remaining status: PENDING.` 
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Diagnostic Failure" });
+    } finally {
+      setIsRetryingId(null);
     }
   };
 
@@ -166,7 +202,7 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
               <div className="p-3 bg-destructive/10 rounded-2xl">
                 <HeartPulse className="h-8 w-8 text-destructive animate-pulse" />
               </div>
-              Resilience Audit
+              System Health
             </h2>
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
               Autonomous Health Log & Recovery Traceability
@@ -175,24 +211,12 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
           <div className="flex items-center gap-3">
             <Button variant="outline" onClick={runDiagnostics} disabled={isDiagnosticRunning} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
               {isDiagnosticRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4 text-primary" />}
-              System Test
+              Full System Test
             </Button>
             <Button variant="outline" onClick={handleExport} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
               <FileJson className="h-4 w-4 text-primary" /> Export Audit
             </Button>
           </div>
-        </div>
-      )}
-
-      {isEmbedded && (
-        <div className="flex justify-end gap-3 mb-6 px-1">
-          <Button variant="outline" onClick={runDiagnostics} disabled={isDiagnosticRunning} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 border-2 border-white/5 hover:bg-white/5 text-white">
-            {isDiagnosticRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Cpu className="h-3 w-3 text-primary" />}
-            Test Pulse
-          </Button>
-          <Button variant="outline" onClick={handleExport} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 border-2 border-white/5 hover:bg-white/5 text-white">
-            <FileJson className="h-3 w-3 text-primary" /> Export
-          </Button>
         </div>
       )}
 
@@ -223,7 +247,7 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
       </div>
 
       <div className="relative group px-1">
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
+        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
         <Input 
           placeholder="Search by module, user or layman explanation..." 
           className="h-16 pl-14 rounded-2xl bg-white/[0.03] border-white/5 text-white shadow-xl focus-visible:ring-primary/20"
@@ -254,8 +278,8 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
                   className="h-6 w-6 rounded-lg border-2 border-white/10 shrink-0 data-[state=checked]:bg-primary"
                 />
                 
-                <div className="flex-1 flex flex-col lg:flex-row lg:items-center justify-between gap-8 cursor-pointer" onClick={() => setSelectedLog(log)}>
-                  <div className="flex items-start gap-6 flex-1 min-w-0">
+                <div className="flex-1 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                  <div className="flex items-start gap-6 flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLog(log)}>
                     <div className={cn(
                       "p-5 rounded-2xl shadow-inner shrink-0",
                       log.severity === 'CRITICAL' ? "bg-red-500/10 text-red-600" :
@@ -269,13 +293,25 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
                     <div className="space-y-3 min-w-0 flex-1">
                       <h4 className="font-black text-lg uppercase tracking-tight text-white line-clamp-1">{log.error.laymanExplanation}</h4>
                       <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-white/20 uppercase tracking-widest opacity-60">
-                        <span className="flex items-center gap-2 px-2.5 py-1 bg-white/5 rounded-lg border border-white/5"><Monitor className="h-3.5 w-3.5" /> {log.context.module}</span>
+                        <span className="flex items-center gap-2 px-2.5 py-1 bg-white/5 rounded-lg border border-white/10"><Monitor className="h-3.5 w-3.5" /> {log.context.module}</span>
                         <span className="flex items-center gap-2"><Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}</span>
                         <span className="flex items-center gap-2"><User className="h-3.5 w-3.5" /> {log.user.name}</span>
                       </div>
                     </div>
                   </div>
+                  
                   <div className="flex items-center gap-4 shrink-0">
+                    {log.status === 'PENDING' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        disabled={isRetryingId === log.id}
+                        onClick={(e) => { e.stopPropagation(); handleRetryLog(log); }}
+                        className="h-10 w-10 rounded-xl bg-white/5 hover:bg-primary/10 text-primary transition-all tactile-pulse"
+                      >
+                        {isRetryingId === log.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      </Button>
+                    )}
                     <Badge variant="outline" className={cn(
                       "text-[10px] font-black uppercase tracking-[0.2em] h-10 px-6 border-2 rounded-2xl shadow-sm",
                       log.status === 'RESOLVED' ? "text-green-600 border-green-500/20" : "text-primary border-primary/20"
