@@ -3,7 +3,19 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
+
+/**
+ * ASSETAIN FIREBASE INITIALIZATION PULSE
+ * 
+ * Configured for high-latency and restricted regional networks.
+ * Uses initializeFirestore to enable force-long-polling, which bypasses
+ * the default 10s connection timeout for streams.
+ */
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -36,7 +48,17 @@ export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
+    firestore: initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      }),
+      /**
+       * RESILIENCE PULSE: Long Polling
+       * Increases connection stability in low-bandwidth areas by bypassing
+       * the default 10s stream timeout.
+       */
+      experimentalForceLongPolling: true,
+    })
   };
 }
 

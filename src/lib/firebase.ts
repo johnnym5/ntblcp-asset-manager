@@ -1,6 +1,11 @@
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  type Firestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth";
 import { firebaseConfig as staticConfig } from "@/firebase/config";
@@ -35,7 +40,15 @@ if (typeof window !== 'undefined') {
   if (isConfigValid) {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-      db = getFirestore(app);
+      
+      // Use initializeFirestore with long polling to prevent the 10s connection timeout warning
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        }),
+        experimentalForceLongPolling: true,
+      });
+
       auth = getAuth(app);
       if (isRtdbConfigValid) {
         rtdb = getDatabase(app);
