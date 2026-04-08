@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1100: Centralized Filter Engine implementation.
  * Phase 1101: Added isExplored state for Folder Grid vs List View logic.
+ * Phase 1102: Implemented deterministic boot pulse to ensure data persistence on refresh.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -143,12 +144,51 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
+  /**
+   * Deterministic Registry Pulse:
+   * Replays the local storage state into the application memory.
+   */
+  const refreshRegistry = useCallback(async () => {
+    try {
+      const [localAssets, localSandbox, localSettings] = await Promise.all([
+        storage.getAssets(), 
+        storage.getSandbox(), 
+        storage.getSettings()
+      ]);
+      
+      if (localSettings) {
+        setAppSettings(localSettings);
+        setSettingsLoaded(true);
+      }
+      
+      const currentGrantId = localSettings?.activeGrantId || null;
+      const filtered = currentGrantId 
+        ? (localAssets || []).filter(a => a.grantId === currentGrantId) 
+        : (localAssets || []);
+        
+      setAssets(DiscrepancyEngine.scan(filtered));
+      setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
+    } catch (e) { 
+      console.error("Registry Refresh Failure", e); 
+    }
+  }, []);
+
   useEffect(() => { 
     setIsHydrated(true);
     const savedStatus = localStorage.getItem('assetain-online-status');
     if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
     else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
   }, []);
+
+  /**
+   * INITIALIZATION PULSE:
+   * Automatically re-loads the registry whenever the app boots or hydration completes.
+   */
+  useEffect(() => {
+    if (isHydrated) {
+      refreshRegistry();
+    }
+  }, [isHydrated, refreshRegistry]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -195,9 +235,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   }, [selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
 
-  /**
-   * Filter Engine Pulse: Applies basic criteria to the active asset registry.
-   */
   const filteredAssets = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     let results = [...source];
@@ -247,17 +284,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       router.push(`/?${params.toString()}`, { scroll: false });
     }
   }, [router]);
-
-  const refreshRegistry = useCallback(async () => {
-    try {
-      const [localAssets, localSandbox, localSettings] = await Promise.all([storage.getAssets(), storage.getSandbox(), storage.getSettings()]);
-      if (localSettings) setAppSettings(localSettings);
-      const currentGrantId = localSettings?.activeGrantId || null;
-      const filtered = currentGrantId ? (localAssets || []).filter(a => a.grantId === currentGrantId) : (localAssets || []);
-      setAssets(DiscrepancyEngine.scan(filtered));
-      setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
-    } catch (e) { console.error("Registry Refresh Failure", e); }
-  }, []);
 
   const manualDownload = useCallback(async () => {
     if (!isOnline) { addNotification({ title: "Offline Scope", variant: "destructive" }); return; }
