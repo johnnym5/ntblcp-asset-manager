@@ -3,7 +3,7 @@
 /**
  * @fileOverview ErrorAuditWorkstation - Executive System Health Monitoring.
  * Restricted to SUPERADMIN. Provides deterministic trace of all app anomalies.
- * Phase 1013: Implemented Retry Pulse logic for auto-resolution based on diagnostic health.
+ * Phase 1014: Implemented Selectable Audit Pulse Dropdown for streamlined oversight.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -29,7 +29,9 @@ import {
   Trash2,
   X,
   ShieldAlert,
-  Check
+  Check,
+  Filter,
+  ListFilter
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -52,9 +54,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { saveAs } from 'file-saver';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+
+type HealthFilter = 'ALL' | 'CRITICAL' | 'PENDING' | 'RESOLVED';
 
 export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { userProfile } = useAuth();
@@ -67,6 +78,9 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
   const [selectedLog, setSelectedLog] = useState<ErrorLogEntry | null>(null);
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
   const [diagnosticResults, setDiagnosticResults] = useState<DiagnosticResult[] | null>(null);
+  
+  // New Filter Pulse
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   
   // Batch & Processing State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -87,6 +101,13 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
     }
   };
 
+  const stats = useMemo(() => ({
+    total: logs.length,
+    pending: logs.filter(l => l.status === 'PENDING').length,
+    critical: logs.filter(l => l.severity === 'CRITICAL' && l.status === 'PENDING').length,
+    resolved: logs.filter(l => l.status === 'RESOLVED').length
+  }), [logs]);
+
   const handleResolve = async (id: string) => {
     setIsProcessing(true);
     try {
@@ -99,16 +120,10 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
     }
   };
 
-  /**
-   * Retry Pulse: Checks if the error condition still persists.
-   * If the diagnostic pulse passes, the incident is auto-resolved.
-   */
   const handleRetryLog = async (log: ErrorLogEntry) => {
     setIsRetryingId(log.id);
     try {
       const results = await SystemDiagnostics.runSelfTest();
-      
-      // Determine node to check based on context
       const moduleStr = log.context.module.toUpperCase();
       let nodeToCheck: 'CLOUD' | 'MIRROR' | 'LOCAL' | 'AUTH' = 'LOCAL';
       if (moduleStr.includes('FIRESTORE') || moduleStr.includes('CLOUD')) nodeToCheck = 'CLOUD';
@@ -124,11 +139,9 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
         toast({ 
           variant: "destructive", 
           title: "Incident Persistent", 
-          description: `Error still detected in ${nodeToCheck} node. Remaining status: PENDING.` 
+          description: `Error still detected in ${nodeToCheck} node.` 
         });
       }
-    } catch (e) {
-      toast({ variant: "destructive", title: "Diagnostic Failure" });
     } finally {
       setIsRetryingId(null);
     }
@@ -139,7 +152,7 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
     try {
       const results = await SystemDiagnostics.runSelfTest();
       setDiagnosticResults(results);
-      toast({ title: "Diagnostics Stable", description: "Storage node topology audited." });
+      toast({ title: "Diagnostics Stable" });
     } finally {
       setIsDiagnosticRunning(false);
     }
@@ -158,7 +171,7 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
       for (const id of Array.from(selectedIds)) {
         await FirestoreService.updateErrorStatus(id, status, 'Administrative batch adjudication.');
       }
-      toast({ title: "Audit Ledger Updated", description: `Successfully marked ${selectedIds.size} incidents as ${status}.` });
+      toast({ title: "Audit Ledger Updated" });
       setSelectedIds(new Set());
       await loadLogs();
     } finally {
@@ -166,14 +179,19 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
     }
   };
 
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelectedIds(next);
-  };
-
   const filteredLogs = useMemo(() => {
     let list = logs;
+
+    // 1. Apply Health Filter Pulse
+    if (healthFilter === 'CRITICAL') {
+      list = list.filter(l => l.severity === 'CRITICAL' && l.status === 'PENDING');
+    } else if (healthFilter === 'PENDING') {
+      list = list.filter(l => l.status === 'PENDING');
+    } else if (healthFilter === 'RESOLVED') {
+      list = list.filter(l => l.status === 'RESOLVED');
+    }
+
+    // 2. Apply Search Criteria
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       list = list.filter(l => 
@@ -183,13 +201,7 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
       );
     }
     return list;
-  }, [logs, searchTerm]);
-
-  const stats = useMemo(() => ({
-    total: logs.length,
-    pending: logs.filter(l => l.status === 'PENDING').length,
-    critical: logs.filter(l => l.severity === 'CRITICAL' && l.status === 'PENDING').length
-  }), [logs]);
+  }, [logs, searchTerm, healthFilter]);
 
   if (userProfile?.role !== 'SUPERADMIN') return null;
 
@@ -220,37 +232,45 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-1">
-        <Card className="bg-black/40 border-2 border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
-          <div className="flex justify-between items-start mb-4">
-            <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Total Incidents</span>
-            <div className="p-2 bg-white/5 rounded-xl"><Database className="h-4 w-4 text-white/40" /></div>
-          </div>
-          <div className="text-5xl font-black tracking-tighter text-white">{stats.total}</div>
-        </Card>
+      {/* consolidated Health Selector */}
+      <div className="px-1">
+        <Card className="bg-black/40 border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-3xl">
+          <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-6">
+              <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                <ShieldAlert className="h-10 w-10 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Incident Filter</h3>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest italic">Select pulse to review logs</p>
+              </div>
+            </div>
 
-        <Card className={cn("bg-black/40 border-2 rounded-[2.5rem] p-8 shadow-3xl", stats.critical > 0 ? "border-destructive/40" : "border-white/5")}>
-          <div className="flex justify-between items-start mb-4">
-            <span className="text-[9px] font-black uppercase tracking-widest text-destructive">Critical Failures</span>
-            <div className="p-2 bg-destructive/10 rounded-xl"><Zap className="h-4 w-4 text-destructive" /></div>
+            <div className="w-full md:w-[320px]">
+              <Select value={healthFilter} onValueChange={(v) => setHealthFilter(v as HealthFilter)}>
+                <SelectTrigger className="h-16 rounded-[1.5rem] bg-white/5 border-2 border-white/10 font-black text-xs uppercase tracking-widest focus:ring-primary/20">
+                  <div className="flex items-center gap-3">
+                    <ListFilter className="h-4 w-4 text-primary" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="bg-black border-white/10 rounded-2xl">
+                  <SelectItem value="ALL" className="text-[10px] font-black uppercase py-3">Total Incidents [{stats.total}]</SelectItem>
+                  <SelectItem value="CRITICAL" className="text-[10px] font-black uppercase py-3 text-red-500">Critical Failures [{stats.critical}]</SelectItem>
+                  <SelectItem value="PENDING" className="text-[10px] font-black uppercase py-3 text-primary">Pending Review [{stats.pending}]</SelectItem>
+                  <SelectItem value="RESOLVED" className="text-[10px] font-black uppercase py-3 text-green-500">Resolved Pulses [{stats.resolved}]</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className={cn("text-5xl font-black tracking-tighter", stats.critical > 0 ? "text-destructive" : "text-white")}>{stats.critical}</div>
-        </Card>
-
-        <Card className="bg-black/40 border-2 border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
-          <div className="flex justify-between items-start mb-4">
-            <span className="text-[9px] font-black uppercase tracking-widest text-primary">Pending Review</span>
-            <div className="p-2 bg-primary/10 rounded-xl"><Clock className="h-4 w-4 text-primary" /></div>
-          </div>
-          <div className="text-5xl font-black tracking-tighter text-primary">{stats.pending}</div>
         </Card>
       </div>
 
       <div className="relative group px-1">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
         <Input 
-          placeholder="Search by module, user or layman explanation..." 
-          className="h-16 pl-14 rounded-2xl bg-white/[0.03] border-white/5 text-white shadow-xl focus-visible:ring-primary/20"
+          placeholder="Scan current pulse for keywords..." 
+          className="h-16 pl-14 rounded-2xl bg-white/[0.03] border-white/5 text-white shadow-xl focus-visible:ring-primary/20 placeholder:opacity-20"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -274,7 +294,11 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
               <CardContent className="p-8 flex items-center gap-8">
                 <Checkbox 
                   checked={selectedIds.has(log.id)}
-                  onCheckedChange={() => toggleSelect(log.id)}
+                  onCheckedChange={(c) => {
+                    const next = new Set(selectedIds);
+                    if (c) next.add(log.id); else next.delete(log.id);
+                    setSelectedIds(next);
+                  }}
                   className="h-6 w-6 rounded-lg border-2 border-white/10 shrink-0 data-[state=checked]:bg-primary"
                 />
                 
@@ -325,9 +349,12 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
             </Card>
           ))
         ) : (
-          <div className="py-40 text-center opacity-30 border-2 border-dashed border-white/5 rounded-[4rem]">
-            <ShieldCheck className="h-28 w-24 mx-auto text-green-600" />
-            <h3 className="text-3xl font-black uppercase tracking-[0.3em] text-white mt-6">Audit Ledger Clear</h3>
+          <div className="py-40 text-center opacity-30 border-2 border-dashed border-white/5 rounded-[4rem] flex flex-col items-center gap-8">
+            <ShieldCheck className="h-28 w-24 text-green-600" />
+            <div className="space-y-2">
+              <h3 className="text-3xl font-black uppercase tracking-[0.3em] text-white">Registry Stable</h3>
+              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">No anomalies found in the current pulse.</p>
+            </div>
           </div>
         )}
       </div>
@@ -343,9 +370,6 @@ export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boo
             <div className="flex items-center gap-2">
               <Button onClick={() => handleBatchAction('RESOLVED')} disabled={isProcessing} className="h-11 px-8 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl bg-green-600 hover:bg-green-500">
                 {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Mark Resolved
-              </Button>
-              <Button variant="ghost" onClick={() => handleBatchAction('PENDING')} disabled={isProcessing} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-white/60 hover:text-white">
-                Reset to Pending
               </Button>
               <button onClick={() => setSelectedIds(new Set())} className="p-2 text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
             </div>
