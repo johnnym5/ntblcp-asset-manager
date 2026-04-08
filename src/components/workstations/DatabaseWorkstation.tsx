@@ -4,6 +4,7 @@
  * @fileOverview DatabaseWorkstation - Granular Database Explorer & Management.
  * Phase 200: Implemented high-density document explorer with CRUD and Multi-select.
  * Phase 201: Fixed ReferenceError by adding missing Table component imports.
+ * Phase 202: Fixed ReferenceError by importing the missing Bomb icon.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -30,7 +31,8 @@ import {
   Check,
   ChevronDown,
   ArrowRightLeft,
-  ShieldCheck
+  ShieldCheck,
+  Bomb
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -249,7 +251,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="h-7 px-3 border-white/10 text-white/40 font-mono text-[8px] uppercase tracking-widest">{filteredNodes.length} Documents</Badge>
-              <Button onClick={handleCreate} size="sm" className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[9px] gap-2"><Plus className="h-3 w-3" /> Create</Button>
+              <Button onClick={handleCreate} size="sm" className="h-9 px-4 rounded-lg bg-primary text-black font-black uppercase text-[9px] gap-2"><Plus className="h-3" /> Create</Button>
             </div>
           </div>
 
