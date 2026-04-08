@@ -119,7 +119,8 @@ export default function SPAHub() {
     missingFieldFilter,
     setMissingFieldFilter,
     goBack,
-    selectedCategories
+    selectedCategories,
+    activeFilterCount
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -151,9 +152,7 @@ export default function SPAHub() {
   useEffect(() => {
     if (profileSetupComplete) {
       const isFreshLogin = sessionStorage.getItem('assetain-fresh-login') === 'true';
-      if (isFreshLogin) {
-        setIsWelcomeOpen(true);
-      }
+      if (isFreshLogin) setIsWelcomeOpen(true);
     }
   }, [profileSetupComplete]);
 
@@ -182,9 +181,7 @@ export default function SPAHub() {
         setIsSearchExpanded(true);
         setTimeout(() => searchInputRef.current?.focus(), 100);
       }
-      if (e.key === 'Escape') {
-        setIsSearchExpanded(false);
-      }
+      if (e.key === 'Escape') setIsSearchExpanded(false);
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
@@ -256,11 +253,11 @@ export default function SPAHub() {
                   <Boxes className="h-3.5 w-3.5" />
                   <div className="flex flex-col text-left">
                     <h1 className="text-[10px] font-black uppercase text-white tracking-tight leading-none">Asset Manager</h1>
-                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Inventory Hub</span>
+                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Dashboard</span>
                   </div>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Dashboard</TooltipContent>
+              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Home</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -303,9 +300,13 @@ export default function SPAHub() {
                     variant="ghost" 
                     size="icon" 
                     onClick={() => setIsFilterOpen(true)}
-                    className={cn("h-5 w-5 rounded-md text-white/20 hover:text-primary relative", isFilterOpen && "text-primary")}
+                    className={cn(
+                      "h-5 w-5 rounded-md text-white/20 hover:text-primary relative", 
+                      activeFilterCount > 0 && "text-primary"
+                    )}
                   >
                     <Filter className="h-2.5 w-2.5" />
+                    {activeFilterCount > 0 && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-primary rounded-full" />}
                   </Button>
                   <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-md text-white/20 hover:text-white">
                     <X className="h-2.5 w-2.5" />

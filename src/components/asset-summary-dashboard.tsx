@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Inventory Dashboard - Compact Data Summary.
+ * Phase 1100: Switched to filteredAssets for reactive metrics.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -96,37 +97,29 @@ const ReadinessPulse = ({ label, count, subLabel, onClick, isDestructive }: any)
 
 export function AssetSummaryDashboard() {
     const { 
-        assets, 
-        manualDownload, 
-        isSyncing, 
-        isOnline,
-        setActiveView,
-        setSearchTerm,
-        setSelectedStatuses,
-        setSelectedCategory,
-        setSelectedLocations,
-        setMissingFieldFilter
+        filteredAssets,
+        setActiveView
     } = useAppState();
     
     const [view, setView] = useState<'stats' | 'insights'>('stats');
 
     const metrics = useMemo(() => {
-        const total = assets.length;
-        const verified = assets.filter(a => a.status === 'VERIFIED').length;
+        const total = filteredAssets.length;
+        const verified = filteredAssets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
         
         return {
             coverage,
             total,
             verified,
-            pending: assets.filter(a => a.status === 'UNVERIFIED').length,
-            missingId: assets.filter(a => !a.assetIdCode).length,
-            critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length,
-            exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
-            folders: new Set(assets.map(a => a.category)).size,
-            anomalies: assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length
+            pending: filteredAssets.filter(a => a.status === 'UNVERIFIED').length,
+            missingId: filteredAssets.filter(a => !a.assetIdCode).length,
+            critical: filteredAssets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length,
+            exceptions: filteredAssets.filter(a => a.status === 'DISCREPANCY').length,
+            folders: new Set(filteredAssets.map(a => a.category)).size,
+            anomalies: filteredAssets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length
         };
-    }, [assets]);
+    }, [filteredAssets]);
 
     return (
         <div className="space-y-6">
@@ -196,7 +189,7 @@ export function AssetSummaryDashboard() {
                             <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Category Status</h4>
                             <ScrollArea className="h-[250px] pr-2">
                                 <div className="space-y-1.5">
-                                    {Object.entries(assets.reduce((acc, a) => {
+                                    {Object.entries(filteredAssets.reduce((acc, a) => {
                                         const cat = a.category || 'Other';
                                         if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
                                         acc[cat].total++;
@@ -219,7 +212,7 @@ export function AssetSummaryDashboard() {
                             <h4 className="text-[9px] font-black uppercase tracking-widest text-primary mb-4">Regional Status</h4>
                             <ScrollArea className="h-[250px] pr-2">
                                 <div className="space-y-1.5">
-                                    {Object.entries(assets.reduce((acc, a) => {
+                                    {Object.entries(filteredAssets.reduce((acc, a) => {
                                         const loc = a.location || 'Unknown';
                                         if (!acc[loc]) acc[loc] = 0;
                                         acc[loc]++;

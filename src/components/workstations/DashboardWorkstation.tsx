@@ -22,7 +22,8 @@ import {
   DatabaseZap,
   Settings,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  ListFilter
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -47,7 +48,7 @@ import {
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { assets, appSettings, setActiveView, manualDownload, isSyncing, isOnline } = useAppState();
+  const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, activeFilterCount } = useAppState();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
@@ -55,8 +56,8 @@ export function DashboardWorkstation() {
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const anomalyCount = useMemo(() => {
-    return assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
-  }, [assets]);
+    return filteredAssets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
+  }, [filteredAssets]);
 
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
@@ -89,15 +90,35 @@ export function DashboardWorkstation() {
                 </TabsTrigger>
               </TabsList>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={manualDownload} 
-              disabled={isSyncing || !isOnline}
-              className="rounded-lg h-8 w-8 bg-white/5 border border-white/5 text-white/40 hover:text-primary shrink-0"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
-            </Button>
+            
+            <div className="flex items-center gap-1.5">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsFilterOpen(true)} 
+                className={cn(
+                  "h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative",
+                  activeFilterCount > 0 && "border-primary/40 shadow-lg shadow-primary/5"
+                )}
+              >
+                <ListFilter className="h-4 w-4" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={manualDownload} 
+                disabled={isSyncing || !isOnline}
+                className="rounded-lg h-10 w-10 bg-white/5 border border-white/5 text-white/40 hover:text-primary shrink-0"
+              >
+                <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

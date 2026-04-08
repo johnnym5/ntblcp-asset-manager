@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1000: Hardened for deployment. Optimized initial download and settings pulse.
- * Phase 1001: Integrated autonomous network detection for PWA awareness.
+ * Phase 1100: Centralized Filter Engine implementation.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -30,6 +29,7 @@ import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 
 interface AppStateContextType {
   assets: Asset[];
+  filteredAssets: Asset[];
   sandboxAssets: Asset[];
   dataSource: DataSource;
   setDataSource: (source: DataSource) => void;
@@ -78,6 +78,8 @@ interface AppStateContextType {
 
   isFilterOpen: boolean;
   setIsFilterOpen: (open: boolean) => void;
+  isLogicFilterOpen: boolean;
+  setIsLogicFilterOpen: (open: boolean) => void;
   isSortOpen: boolean;
   setIsSortOpen: (open: boolean) => void;
   filters: HeaderFilter[];
@@ -90,17 +92,12 @@ interface AppStateContextType {
   itemsPerPage: number | 'all';
   setItemsPerPage: (val: number | 'all') => void;
   goBack: () => void;
+  activeFilterCount: number;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-function ViewParamSync({ 
-  activeView, 
-  setActiveViewStatus 
-}: { 
-  activeView: WorkstationView, 
-  setActiveViewStatus: (v: WorkstationView) => void 
-}) {
+function ViewParamSync({ activeView, setActiveViewStatus }: { activeView: WorkstationView, setActiveViewStatus: (v: WorkstationView) => void }) {
   const searchParams = useSearchParams();
   useEffect(() => {
     const v = searchParams?.get('v');
@@ -114,34 +111,29 @@ function ViewParamSync({
 
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
-  
   const [isHydrated, setIsHydrated] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
   const [isOnline, setIsOnlineStatus] = useState(true);
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
-
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
-
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isLogicFilterOpen, setIsLogicFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
-
   const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
@@ -154,20 +146,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
   }, []);
 
-  // Autonomous Network Awareness Logic
   useEffect(() => {
     if (!isHydrated) return;
-
-    const handleOnline = () => {
-      if (!isOnline) setIsOnline(true);
-    };
-    const handleOffline = () => {
-      if (isOnline) setIsOnline(false);
-    };
-
+    const handleOnline = () => { if (!isOnline) setIsOnline(true); };
+    const handleOffline = () => { if (isOnline) setIsOnline(false); };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -177,9 +161,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   useEffect(() => {
     if (!isHydrated) return;
     const savedHeaders = localStorage.getItem('registry-header-prefs');
-    if (savedHeaders) {
-      setHeaders(JSON.parse(savedHeaders));
-    } else {
+    if (savedHeaders) setHeaders(JSON.parse(savedHeaders));
+    else {
       const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i }));
       setHeaders(initial as RegistryHeader[]);
     }
@@ -187,14 +170,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     if (!isHydrated) return;
-
     storage.getSettings().then(local => {
-      if (local) {
-        setAppSettings(local);
-        setSettingsLoaded(true);
-      }
+      if (local) { setAppSettings(local); setSettingsLoaded(true); }
     });
-
     if (db && isOnline) {
       const settingsRef = doc(db, 'config', 'settings');
       const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
@@ -203,15 +181,59 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           setAppSettings(remoteSettings);
           storage.saveSettings(remoteSettings);
           setSettingsLoaded(true);
-        } else {
-          setSettingsLoaded(true);
-        }
-      }, (error) => {
-        console.warn("Governance Pulse: Latency detected in settings sync.", error);
+        } else setSettingsLoaded(true);
       });
       return () => unsubscribe();
     }
   }, [isHydrated, isOnline]);
+
+  const activeFilterCount = useMemo(() => {
+    return selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
+  }, [selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
+
+  /**
+   * Filter Engine Pulse: Applies basic criteria to the active asset registry.
+   */
+  const filteredAssets = useMemo(() => {
+    const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+    let results = [...source];
+
+    if (selectedLocations.length > 0) results = results.filter(a => selectedLocations.includes(a.location));
+    if (selectedAssignees.length > 0) results = results.filter(a => selectedAssignees.includes(a.custodian));
+    if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
+    if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
+    if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      results = results.filter(a => (a.description || '').toLowerCase().includes(term) || (a.assetIdCode || '').toLowerCase().includes(term));
+    }
+    return results;
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter]);
+
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { const val = a.location || 'Unknown'; counts.set(val, (counts.get(val) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const assigneeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { const val = a.custodian || 'Unassigned'; counts.set(val, (counts.get(val) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { const val = a.condition || 'Unassessed'; counts.set(val, (counts.get(val) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const statusOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { const val = a.status || 'UNVERIFIED'; counts.set(val, (counts.get(val) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
 
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
@@ -222,207 +244,95 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [router]);
 
-  const goBack = useCallback(() => {
-    if (activeView === 'REGISTRY' && selectedCategories.length > 0) {
-      setSelectedCategoriesStatus([]);
-    } else {
-      setActiveView('DASHBOARD');
-    }
-  }, [activeView, selectedCategories, setActiveView]);
-
-  const setSelectedCategories = useCallback((cats: string[]) => {
-    setSelectedCategoriesStatus(cats);
-    if (cats.length > 0) {
-      setActiveView('REGISTRY');
-    }
-  }, [setActiveView]);
-
-  const setSelectedCategory = useCallback((cat: string | null) => {
-    setSelectedCategories(cat ? [cat] : []);
-  }, [setSelectedCategories]);
-
-  const selectedCategory = useMemo(() => selectedCategories.length === 1 ? selectedCategories[0] : null, [selectedCategories]);
-
   const refreshRegistry = useCallback(async () => {
     try {
-      const [localAssets, localSandbox, localSettings] = await Promise.all([
-        storage.getAssets(),
-        storage.getSandbox(),
-        storage.getSettings()
-      ]);
-
+      const [localAssets, localSandbox, localSettings] = await Promise.all([storage.getAssets(), storage.getSandbox(), storage.getSettings()]);
       if (localSettings) setAppSettings(localSettings);
-      
       const currentGrantId = localSettings?.activeGrantId || null;
-      const filtered = currentGrantId 
-        ? (localAssets || []).filter(a => a.grantId === currentGrantId)
-        : (localAssets || []);
-
+      const filtered = currentGrantId ? (localAssets || []).filter(a => a.grantId === currentGrantId) : (localAssets || []);
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
-    } catch (e) {
-      console.error("Registry Refresh Failure", e);
-    }
+    } catch (e) { console.error("Registry Refresh Failure", e); }
   }, []);
 
   const manualDownload = useCallback(async () => {
-    if (!isOnline) {
-      addNotification({ title: "Offline Scope", description: "Reconnection required for cloud pull.", variant: "destructive" });
-      return;
-    }
-
+    if (!isOnline) { addNotification({ title: "Offline Scope", variant: "destructive" }); return; }
     const userSession = localStorage.getItem('assetain-user-session');
     const profile = userSession ? JSON.parse(userSession) : null;
     const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
-
     setIsSyncing(true);
-    addNotification({ title: "Download Initiated", description: "Fetching latest assigned records from Cloud Authority..." });
-    
     try {
       const remoteSettings = await FirestoreService.getSettings();
       if (remoteSettings) {
         setAppSettings(remoteSettings);
         await storage.saveSettings(remoteSettings);
-        
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
           const localAssets = await storage.getAssets();
-          
           let nextAssets;
           const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-
           if (stateScopes) {
             const scopeSet = new Set(stateScopes.map(s => s.toLowerCase()));
-            const otherAssets = localAssets.filter(a => 
-              a.grantId !== remoteSettings.activeGrantId || 
-              !scopeSet.has((a.location || '').toLowerCase())
-            );
+            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || !scopeSet.has((a.location || '').toLowerCase()));
             nextAssets = [...otherAssets, ...taggedRemote];
           } else {
             const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
             nextAssets = [...otherAssets, ...taggedRemote];
           }
-            
           await storage.saveAssets(nextAssets);
-          addNotification({ title: "Sync Successful", description: `Retrieved ${remoteAssets.length} records for ${profile?.state || 'Global'}.`, variant: "success" });
+          addNotification({ title: "Sync Successful", variant: "success" });
         }
       }
       await refreshRegistry();
-    } catch (e) {
-      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed. Retry when link stabilizes.", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-    }
+    } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
-  const locationOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.location || 'Unknown';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const assigneeOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.custodian || 'Unassigned';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const conditionOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.condition || 'Unassessed';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [assets]);
-
-  const statusOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    assets.forEach(a => {
-      const val = a.status || 'UNVERIFIED';
-      counts.set(val, (counts.get(val) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
-  }, [assets]);
-
-  const setReadAuthority = async (node: AuthorityNode) => {
-    if (!appSettings) return;
-    const nextSettings = { ...appSettings, readAuthority: node };
-    setAppSettings(nextSettings);
-    await storage.saveSettings(nextSettings);
-    if (isOnline) await FirestoreService.updateSettings({ readAuthority: node });
-    addNotification({ title: 'Authority Shifted', description: `Priority: ${node}`, variant: "success" });
-    await refreshRegistry();
-  };
-
-  const setIsOnline = useCallback((status: boolean) => {
-    setIsOnlineStatus(status);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('assetain-online-status', JSON.stringify(status));
-    }
-    addNotification({ 
-      title: status ? "Online Mode" : "Offline Scope", 
-      description: status ? "Connecting to Cloud Authority..." : "Working in regional persistence pulse." 
-    });
-  }, []);
-
-  const setActiveGrantId = useCallback(async (id: string) => {
-    if (!appSettings) return;
-    setIsSyncing(true);
-    
-    try {
-      const next = { ...appSettings, activeGrantId: id };
-      await storage.saveSettings(next);
-      if (isOnline) {
-        await FirestoreService.updateSettings({ activeGrantId: id });
-      }
-      setAppSettings(next);
-      await refreshRegistry();
-      addNotification({ title: "Project Scope Switched", description: `Active: ${next.grants.find(g => g.id === id)?.name}`, variant: "success" });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [appSettings, isOnline, refreshRegistry]);
-
   const manualUpload = useCallback(async () => {
-    if (!isOnline) {
-      addNotification({ title: "Upload Failed", description: "Internet required for cloud broadcast.", variant: "destructive" });
-      return;
-    }
-    addNotification({ title: "Upload Initiated", description: "Broadcasting local modifications to Cloud Authority..." });
+    if (!isOnline) { addNotification({ title: "Upload Failed", variant: "destructive" }); return; }
+    addNotification({ title: "Upload Initiated" });
     await processSyncQueue();
     await refreshRegistry();
   }, [isOnline, refreshRegistry]);
 
-  useEffect(() => {
-    if (!isHydrated) return;
-    refreshRegistry().then(() => setSettingsLoaded(true));
-  }, [isHydrated, refreshRegistry]);
+  const goBack = useCallback(() => {
+    if (activeView === 'REGISTRY' && selectedCategories.length > 0) setSelectedCategoriesStatus([]);
+    else setActiveView('DASHBOARD');
+  }, [activeView, selectedCategories, setActiveView]);
 
   return (
     <AppStateContext.Provider value={{
-      assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline,
+      assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
-      setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
+      setActiveGrantId: async (id) => {
+        if (!appSettings) return;
+        const next = { ...appSettings, activeGrantId: id };
+        await storage.saveSettings(next);
+        if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id });
+        setAppSettings(next);
+        await refreshRegistry();
+      },
+      setReadAuthority: async (node) => {
+        if (!appSettings) return;
+        const next = { ...appSettings, readAuthority: node };
+        setAppSettings(next);
+        await storage.saveSettings(next);
+        if (isOnline) await FirestoreService.updateSettings({ readAuthority: node });
+        await refreshRegistry();
+      },
+      globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions,
-      isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
-      selectedCategory, selectedCategories, setSelectedCategories, setSelectedCategory,
-      itemsPerPage, setItemsPerPage, goBack
+      isFilterOpen, setIsFilterOpen, isLogicFilterOpen, setIsLogicFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
+      selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
+      selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveView('REGISTRY'); },
+      setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveView('REGISTRY'); },
+      itemsPerPage, setItemsPerPage, goBack, activeFilterCount
     }}>
-      <Suspense fallback={null}>
-        <ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} />
-      </Suspense>
+      <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}
     </AppStateContext.Provider>
   );
