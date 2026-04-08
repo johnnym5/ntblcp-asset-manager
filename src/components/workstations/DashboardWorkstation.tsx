@@ -45,6 +45,7 @@ export function DashboardWorkstation() {
   
   const isAdvanced = appSettings?.uxMode === 'advanced';
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isReportingMode = appSettings?.appMode === 'reporting';
 
   const anomalyCount = useMemo(() => {
     return filteredAssets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
@@ -215,14 +216,16 @@ export function DashboardWorkstation() {
             </AccordionItem>
           </Accordion>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start px-1 border-t border-border pt-10 sm:pt-12">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 px-1">
-                <FileText className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting</h3>
+          <div className={cn("grid grid-cols-1 gap-8 items-start px-1 border-t border-border pt-10 sm:pt-12", isReportingMode && "xl:grid-cols-2")}>
+            {isReportingMode && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                  <FileText className="h-3 w-3 text-primary" />
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting Hub</h3>
+                </div>
+                <ReportsWorkstation isEmbedded={true} />
               </div>
-              <ReportsWorkstation isEmbedded={true} />
-            </div>
+            )}
             
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">

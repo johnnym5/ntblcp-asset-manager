@@ -213,7 +213,7 @@ export interface AppSettings {
   version: number;
   authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
-  appMode: 'management' | 'verification';
+  appMode: 'management' | 'verification' | 'reporting';
   readAuthority: AuthorityNode;
   activeGrantId: string | null;
   grants: Grant[];

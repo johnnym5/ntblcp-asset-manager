@@ -7,6 +7,7 @@
  * Phase 1017: Fixed TabsList hierarchy error by wrapping workstation in root Tabs.
  * Phase 1018: Integrated Application Mode switcher into General Settings.
  * Phase 1019: Implemented Dirty Check logic for Save Changes pulse.
+ * Phase 1020: Added 'reporting' mode to appMode switcher.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -51,7 +52,8 @@ import {
   ChevronDown,
   FolderOpen,
   ClipboardCheck,
-  ShieldCheck as ShieldIcon
+  ShieldCheck as ShieldIcon,
+  FileText
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -111,7 +113,7 @@ export function SettingsWorkstation() {
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
-  const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+  const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -257,7 +259,7 @@ export function SettingsWorkstation() {
 
           <SettingSection title="Operational Mode" description="Workstation logic presets" icon={Smartphone}>
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button 
                   onClick={() => handleSettingChange('appMode', 'management')}
                   className={cn(
@@ -269,8 +271,8 @@ export function SettingsWorkstation() {
                     <div className={cn("p-2 rounded-lg", draftSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
                     {draftSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
                   </div>
-                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Management Mode</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Structural Oversight & Registry Engineering. High-level control for project leads.</p>
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Management</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed line-clamp-3">Structural Oversight & Registry Engineering.</p>
                 </button>
 
                 <button 
@@ -284,8 +286,23 @@ export function SettingsWorkstation() {
                     <div className={cn("p-2 rounded-lg", draftSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
                     {draftSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
                   </div>
-                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification Mode</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Field Audit & Physical Assessment. Optimized for high-speed status assessing.</p>
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed line-clamp-3">Field Audit & Physical Assessment Pulse.</p>
+                </button>
+
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'reporting')}
+                  className={cn(
+                    "p-6 rounded-2xl border-2 text-left transition-all group",
+                    draftSettings.appMode === 'reporting' ? "border-blue-500 bg-blue-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={cn("p-2 rounded-lg", draftSettings.appMode === 'reporting' ? "bg-blue-500 text-white" : "bg-muted text-muted-foreground")}><FileText className="h-5 w-5" /></div>
+                    {draftSettings.appMode === 'reporting' && <CheckCircle2 className="h-5 w-5 text-blue-500" />}
+                  </div>
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Reporting</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed line-clamp-3">Executive Documentation & Quality Hub.</p>
                 </button>
               </div>
             </div>
@@ -391,7 +408,7 @@ export function SettingsWorkstation() {
           onSave={(orig, newDef, all) => {
             if (!draftSettings) return;
             const updatedGrants = draftSettings.grants.map(grant => {
-              if (grant.id === activeGrantForSchema) {
+              if (grant.id === activeGrantIdForSchema) {
                 const newSheetDefs = { ...grant.sheetDefinitions };
                 if (all) Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
                 else { newSheetDefs[newDef.name] = newDef; if (orig && orig !== newDef.name) delete newSheetDefs[orig]; }

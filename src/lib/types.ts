@@ -84,7 +84,6 @@ export interface SheetDefinition {
   name: string;
   headers: string[];
   displayFields: DisplayField[];
-  groups?: DiscoveredGroup[];
   // Optional array of header keywords that can trigger the start of this sheet's data block
   // Useful for files where multiple tables are in one sheet.
   subSheetTriggers?: string[]; 
@@ -95,5 +94,5 @@ export interface AppSettings {
   sheetDefinitions: Record<string, SheetDefinition>;
   enabledSheets: string[];
   lockAssetList: boolean;
-  appMode: 'management' | 'verification';
+  appMode: 'management' | 'verification' | 'reporting';
 }
