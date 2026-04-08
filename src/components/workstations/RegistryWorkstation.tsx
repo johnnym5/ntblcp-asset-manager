@@ -93,6 +93,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FirestoreService } from '@/services/firebase/firestore';
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/components/category-batch-edit-form';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
@@ -309,6 +316,129 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleExploreFolder = (cat: string) => {
+    setSelectedCategories([cat]);
+    setIsExplored(true);
+    setCurrentPage(1);
+  };
+
+  const handleToggleCategorySelection = (cat: string) => {
+    const next = selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat];
+    setSelectedCategories(next);
+  };
+
+  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+    setIsProcessing(true);
+    try {
+      const targetAssets = filteredAssets.filter(a => selectedCategories.includes(a.category));
+      for (const asset of targetAssets) {
+        const updated = {
+          ...asset,
+          ...(data.status && { status: data.status.toUpperCase() as any }),
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: userProfile?.displayName || 'Batch Processor'
+        };
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+      await refreshRegistry();
+      addNotification({ title: "Folders Updated Successfully", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+      setIsCategoryBatchEditOpen(false);
+    }
+  };
+
+  const handleExportCategories = async () => {
+    try {
+      const assetsToExport = filteredAssets.filter(a => selectedCategories.includes(a.category));
+      await ExcelService.exportRegistry(assetsToExport, headers);
+      addNotification({ title: "Excel Export Complete", variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Export Failed", variant: "destructive" });
+    }
+  };
+
+  const handleMergeCategories = async () => {
+    if (!targetMergeCategory) return;
+    setIsProcessing(true);
+    try {
+      const assetsToMerge = filteredAssets.filter(a => selectedCategories.includes(a.category));
+      for (const asset of assetsToMerge) {
+        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
+      }
+      await refreshRegistry();
+      setSelectedCategories([]);
+      setIsMergeDialogOpen(false);
+      addNotification({ title: `Merged into ${targetMergeCategory}`, variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMergeAssets = async () => {
+    if (!targetMergeCategory) return;
+    setIsProcessing(true);
+    try {
+      const assetsToMerge = filteredAssets.filter(a => selectedAssetIds.has(a.id));
+      for (const asset of assetsToMerge) {
+        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
+      }
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      setIsMergeDialogOpen(false);
+      addNotification({ title: `Migration to ${targetMergeCategory} complete`, variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExecutePurge = async () => {
+    if (categoriesToPurge.length === 0 && selectedCategories.length === 0) return;
+    const targets = categoriesToPurge.length > 0 ? categoriesToPurge : selectedCategories;
+    
+    setIsProcessing(true);
+    try {
+      const idsToDelete = filteredAssets.filter(a => targets.includes(a.category)).map(a => a.id);
+      for (const id of idsToDelete) await enqueueMutation('DELETE', 'assets', { id });
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.filter(a => !idsToDelete.includes(a.id)));
+      await refreshRegistry();
+      setSelectedCategories([]);
+      setCategoriesToPurge([]);
+      setIsPurgeDialogOpen(false);
+      addNotification({ title: "Folders Removed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRenameCommit = async () => {
+    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrant) return;
+    setIsProcessing(true);
+    try {
+      const assetsToUpdate = filteredAssets.filter(a => a.category === categoryToRename);
+      for (const asset of assetsToUpdate) await enqueueMutation('UPDATE', 'assets', { ...asset, category: newCategoryName.trim() });
+      
+      const newSheetDefs = { ...activeGrant.sheetDefinitions };
+      newSheetDefs[newCategoryName.trim()] = { ...newSheetDefs[categoryToRename], name: newCategoryName.trim() };
+      delete newSheetDefs[categoryToRename];
+
+      const nextSettings = { 
+        ...appSettings, 
+        grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefs } : g) 
+      };
+      
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+      await refreshRegistry();
+      setIsRenameDialogOpen(false);
+      addNotification({ title: "Folder Renamed", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-4 h-full flex flex-col relative">
       {/* 1. Controller Header */}
@@ -336,11 +466,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             
             <div className="space-y-0.5">
               <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">
-                {showList ? selectedCategories[0] : (activeGrant?.name || 'Asset Hub')}
+                {showList ? (selectedCategories[0] || 'Asset List') : (activeGrant?.name || 'Asset Hub')}
               </h2>
               <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
                 {showList 
-                  ? `${groupStats[selectedCategories[0]]?.total || 0} RECORDS IN THIS FOLDER` 
+                  ? `${processedAssets.length} RECORDS IN THIS FOLDER` 
                   : `${filteredAssets.length} TOTAL ASSETS IN SCOPE`}
               </p>
             </div>
@@ -574,7 +704,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               <Button variant="outline" onClick={showList ? handleExportAssets : handleExportCategories} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
                 <FileDown className="h-4 w-4" /> Export
               </Button>
-              <Button variant="outline" onClick={() => showList ? setIsMergeDialogOpen(true) : setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
+              <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
                 <GitMerge className="h-4 w-4" /> Merge
               </Button>
               <Button variant="outline" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
@@ -607,7 +737,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       {/* Merge Confirmation */}
       <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase text-white">Merge Selection?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select the target folder for this migration pulse.</AlertDialogDescription>
@@ -633,7 +763,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       {/* Asset Purge Confirmation */}
       <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase text-destructive">Purge Records?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/40">You are about to destroy {selectedAssetIds.size} records. This action is immutable.</AlertDialogDescription>
@@ -649,12 +779,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       {/* Rename Dialog */}
       <AlertDialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase text-white">Rename Folder</AlertDialogTitle>
           </AlertDialogHeader>
           <div className="py-6">
-            <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-14 bg-white/5 border-2 border-white/10 rounded-2xl font-black uppercase text-sm" />
+            <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-14 bg-white/5 border-2 border-white/10 rounded-2xl font-black uppercase text-sm text-white" />
           </div>
           <AlertDialogFooter className="gap-3">
             <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white">Cancel</AlertDialogCancel>
@@ -665,7 +795,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       {/* Category Purge Confirmation */}
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase text-destructive">Destroy Folder(s)?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/40">Permanently removing {selectedCategories.length || 1} asset folder(s).</AlertDialogDescription>
@@ -680,118 +810,4 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </AlertDialog>
     </div>
   );
-
-  function handleExploreFolder(cat: string) {
-    setSelectedCategories([cat]);
-    setIsExplored(true);
-    setCurrentPage(1);
-  }
-
-  function handleToggleCategorySelection(cat: string) {
-    const next = selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat];
-    setSelectedCategories(next);
-  }
-
-  async function handleSaveCategoryBatchEdit(data: CategoryBatchUpdateData) {
-    setIsProcessing(true);
-    try {
-      const targetAssets = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      for (const asset of targetAssets) {
-        const updated = {
-          ...asset,
-          ...(data.status && { status: data.status.toUpperCase() as any }),
-          lastModified: new Date().toISOString(),
-          lastModifiedBy: userProfile?.displayName || 'Batch Processor'
-        };
-        await enqueueMutation('UPDATE', 'assets', updated);
-      }
-      await refreshRegistry();
-      addNotification({ title: "Folders Updated Successfully", variant: "success" });
-    } finally {
-      setIsProcessing(false);
-      setIsCategoryBatchEditOpen(false);
-    }
-  }
-
-  async function handleExportCategories() {
-    try {
-      const assetsToExport = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      await ExcelService.exportRegistry(assetsToExport, headers);
-      addNotification({ title: "Excel Export Complete", variant: "success" });
-    } catch (e) {
-      addNotification({ title: "Export Failed", variant: "destructive" });
-    }
-  }
-
-  async function handleMergeCategories() {
-    if (!targetMergeCategory) return;
-    setIsProcessing(true);
-    try {
-      const assetsToMerge = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      for (const asset of assetsToMerge) {
-        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
-      }
-      await refreshRegistry();
-      setSelectedCategories([]);
-      setIsMergeDialogOpen(false);
-      addNotification({ title: `Merged into ${targetMergeCategory}`, variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function handleMergeAssets() {
-    if (!targetMergeCategory) return;
-    setIsProcessing(true);
-    try {
-      const assetsToMerge = filteredAssets.filter(a => selectedAssetIds.has(a.id));
-      for (const asset of assetsToMerge) {
-        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      setIsMergeDialogOpen(false);
-      addNotification({ title: `Migration to ${targetMergeCategory} complete`, variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function handleExecutePurge() {
-    if (categoriesToPurge.length === 0 && selectedCategories.length === 0) return;
-    const targets = categoriesToPurge.length > 0 ? categoriesToPurge : selectedCategories;
-    
-    setIsProcessing(true);
-    try {
-      const idsToDelete = filteredAssets.filter(a => targets.includes(a.category)).map(a => a.id);
-      for (const id of idsToDelete) await enqueueMutation('DELETE', 'assets', { id });
-      const currentLocal = await storage.getAssets();
-      await storage.saveAssets(currentLocal.filter(a => !idsToDelete.includes(a.id)));
-      await refreshRegistry();
-      setSelectedCategories([]);
-      setCategoriesToPurge([]);
-      setIsPurgeDialogOpen(false);
-      addNotification({ title: "Folders Removed", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function handleRenameCommit() {
-    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrant) return;
-    setIsProcessing(true);
-    try {
-      const assetsToUpdate = filteredAssets.filter(a => a.category === categoryToRename);
-      for (const asset of assetsToUpdate) await enqueueMutation('UPDATE', 'assets', { ...asset, category: newCategoryName.trim() });
-      const nextSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: { ...g.sheetDefinitions, [newCategoryName.trim()]: { ...g.sheetDefinitions[categoryToRename], name: newCategoryName.trim() } } } : g) };
-      await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings(nextSettings);
-      setAppSettings(nextSettings);
-      await refreshRegistry();
-      setIsRenameDialogOpen(false);
-      addNotification({ title: "Folder Renamed", variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  }
 }
