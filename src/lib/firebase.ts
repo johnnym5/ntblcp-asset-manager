@@ -46,19 +46,28 @@ let rtdb: Database | undefined;
 if (typeof window !== 'undefined') {
   if (isConfigValid) {
     try {
-      app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+      // Ensure we only initialize once to prevent connection overhead
+      if (!getApps().length) {
+        app = initializeApp(firebaseConfig);
+      } else {
+        app = getApp();
+      }
       
       /**
        * RESILIENCE PULSE: Hardened Firestore
        * We use initializeFirestore instead of getFirestore to enable 
        * experimentalForceLongPolling. This mitigates the "Backend didn't respond 
        * within 10 seconds" error encountered in low-bandwidth regional scopes.
+       * 
+       * We also enable ignoreUndefinedProperties to prevent mutation failures
+       * on optional registry fields.
        */
       db = initializeFirestore(app, {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager()
         }),
         experimentalForceLongPolling: true,
+        ignoreUndefinedProperties: true
       });
 
       auth = getAuth(app);
