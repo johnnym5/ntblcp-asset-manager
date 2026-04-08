@@ -5,6 +5,7 @@
  * Overhauled for Selection Pulses & Batch Operational Workflows.
  * Phase 800: Implemented Asset Multi-Selection & Floating Action Bar.
  * Phase 801: Integrated Batch Edit, Merge, and Export for selected records.
+ * Phase 802: Context-aware single/batch primary action trigger.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -698,9 +699,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="h-8 w-px bg-white/10" />
             
             <div className="flex items-center gap-2">
-              <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl hover:scale-105 transition-all">
-                <Edit3 className="h-4 w-4" /> Batch Edit
-              </Button>
+              {showList && selectedAssetIds.size === 1 ? (
+                <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl hover:scale-105 transition-all">
+                  <Edit3 className="h-4 w-4" /> Edit Record
+                </Button>
+              ) : (
+                <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl hover:scale-105 transition-all">
+                  <Edit3 className="h-4 w-4" /> Batch Edit
+                </Button>
+              )}
+              
               <Button variant="outline" onClick={showList ? handleExportAssets : handleExportCategories} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5">
                 <FileDown className="h-4 w-4" /> Export
               </Button>
