@@ -3,7 +3,7 @@
 /**
  * @fileOverview AssetGroupsWorkstation - Folder-Based Registry Hub.
  * Optimized for High-Density Grid Pulse.
- * Phase 1106: Removed default expanded groups to start closed.
+ * Phase 1107: Removed redundant group re-calculation to fix rendering error.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -102,6 +102,8 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
   }, [filteredAssets]);
 
   const tree = useMemo(() => ClassificationEngine.getGroupTree(classifiedAssets), [classifiedAssets]);
+  
+  // Use the memoized result to avoid passing complex object calculations directly to JSX
   const conditionGroups = useMemo(() => groupAssetsByCondition(filteredAssets), [filteredAssets]);
   
   const drillDownAssets = useMemo(() => {
@@ -144,7 +146,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
             {selectedGroup ? (
               <button 
                 onClick={() => { setSelectedGroup(null); setSelectedSubgroup(null); setCurrentPage(1); }}
-                className="h-10 w-10 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl"
+                className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl text-muted-foreground hover:text-foreground border border-border transition-all shadow-xl"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -154,26 +156,26 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
               </div>
             )}
             <div className="space-y-0.5">
-              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">
+              <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">
                 {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Folders'}
               </h2>
-              <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
                 {selectedGroup ? 'NAVIGATING CONTAINER' : 'STRUCTURAL HUB'}
               </p>
             </div>
           </div>
 
           {!selectedGroup && (
-            <div className="bg-white/[0.03] p-1 rounded-xl border border-white/5 shadow-inner backdrop-blur-xl flex">
+            <div className="bg-muted/30 p-1 rounded-xl border border-border shadow-inner backdrop-blur-xl flex">
               <button 
                 onClick={() => setGroupMode('category')}
-                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-muted-foreground hover:text-foreground")}
               >
                 Groups
               </button>
               <button 
                 onClick={() => setGroupMode('condition')}
-                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-muted-foreground hover:text-foreground")}
               >
                 Condition
               </button>
@@ -188,7 +190,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
             {/* Sidebar Subgroups */}
             <div className="lg:col-span-3 space-y-4">
-              <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 px-1">Sub-Containers</h4>
+              <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1">Sub-Containers</h4>
               <div className="space-y-1.5">
                 {Object.entries(tree[selectedGroup].subgroups).map(([sg, count]) => (
                   <button 
@@ -196,11 +198,11 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                     onClick={() => { setSelectedSubgroup(sg === selectedSubgroup ? null : sg); setCurrentPage(1); }}
                     className={cn(
                       "w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all",
-                      selectedSubgroup === sg ? "bg-primary border-primary text-black" : "bg-[#0A0A0A] border-white/5 hover:border-white/20"
+                      selectedSubgroup === sg ? "bg-primary border-primary text-black" : "bg-card border-border hover:border-primary/20"
                     )}
                   >
                     <span className="text-[10px] font-black uppercase tracking-tight truncate pr-2">{sg}</span>
-                    <Badge variant="outline" className={cn("h-5 border-none font-mono text-[8px]", selectedSubgroup === sg ? "bg-black/20 text-black" : "bg-white/5 text-white/40")}>{count}</Badge>
+                    <Badge variant="outline" className={cn("h-5 border-none font-mono text-[8px]", selectedSubgroup === sg ? "bg-black/20 text-black" : "bg-muted text-muted-foreground")}>{count}</Badge>
                   </button>
                 ))}
               </div>
@@ -208,7 +210,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
 
             {/* Optimized Grid Drill-down */}
             <div className="lg:col-span-9 h-full flex flex-col">
-              <ScrollArea className={cn("flex-1 border-2 border-white/5 rounded-[2rem] bg-[#050505] p-4 md:p-6 shadow-3xl", isEmbedded ? "h-[500px]" : "")}>
+              <ScrollArea className={cn("flex-1 border-2 border-border/40 rounded-[2rem] bg-card/30 p-4 md:p-6 shadow-3xl", isEmbedded ? "h-[500px]" : "")}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 pb-40">
                   <AnimatePresence mode="popLayout">
                     {paginatedDrillDown.map(asset => (
@@ -225,10 +227,10 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
               </ScrollArea>
 
               {totalPages > 1 && (
-                <div className="mt-4 self-center bg-black/80 border border-white/10 rounded-full px-4 py-1.5 flex items-center gap-4 backdrop-blur-xl">
-                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Page {currentPage} of {totalPages}</span>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-1 text-white/40 hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
+                <div className="mt-4 self-center bg-background/80 border border-border rounded-full px-4 py-1.5 flex items-center gap-4 backdrop-blur-xl">
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Page {currentPage} of {totalPages}</span>
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
                 </div>
               )}
             </div>
@@ -239,25 +241,25 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
               <Card 
                 key={name} 
                 onClick={() => { setSelectedGroup(name); setCurrentPage(1); }}
-                className="bg-[#080808] border-2 border-white/5 rounded-2xl overflow-hidden group hover:border-primary/40 transition-all cursor-pointer relative shadow-3xl"
+                className="bg-card border-2 border-border/40 rounded-2xl overflow-hidden group hover:border-primary/40 transition-all cursor-pointer relative shadow-3xl"
               >
                 <div className="p-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-xl"><Boxes className="h-5 w-5 text-primary" /></div>
-                    <h3 className="text-sm font-black uppercase text-white tracking-tight truncate max-w-[120px]">{name}</h3>
+                    <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate max-w-[120px]">{name}</h3>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-primary group-hover:translate-x-1" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1" />
                 </div>
                 <div className="px-5 pb-5">
-                  <p className="text-3xl font-black tracking-tighter text-white">{data.count}</p>
-                  <p className="text-[8px] font-black text-white/20 uppercase tracking-widest">Indexed Records</p>
+                  <p className="text-3xl font-black tracking-tighter text-foreground">{data.count}</p>
+                  <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Indexed Records</p>
                 </div>
               </Card>
             ))}
           </div>
         ) : (
           <div className="space-y-6">
-            <ConditionSummary counts={groupAssetsByCondition(filteredAssets) as any} total={filteredAssets.length} />
+            <ConditionSummary counts={conditionGroups} total={filteredAssets.length} />
             <ScrollArea className={cn("pr-4", isEmbedded ? "h-[500px]" : "h-[calc(100vh-20rem)]")}>
               <Accordion type="multiple" className="space-y-4">
                 {CONDITION_GROUPS.map(group => {
@@ -265,7 +267,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                   if (groupAssets.length === 0 && group !== 'Good') return null;
 
                   return (
-                    <AccordionItem key={group} value={group} className={cn("border-2 rounded-[2rem] overflow-hidden bg-[#080808]", GROUP_BG_COLORS[group])}>
+                    <AccordionItem key={group} value={group} className={cn("border-2 rounded-[2rem] overflow-hidden bg-card/30", GROUP_BG_COLORS[group])}>
                       <AccordionTrigger className="px-6 py-4 hover:no-underline">
                         <div className="flex items-center gap-4">
                           <div className={cn("p-2 rounded-lg", GROUP_BG_COLORS[group])}><Boxes className={cn("h-5 w-5", GROUP_COLORS[group])} /></div>
@@ -292,14 +294,14 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => {}} />
       
       {selectedAssetIds.size > 0 && !isEmbedded && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
           <div className="flex items-center gap-3 pl-3">
             <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
-            <span className="text-[9px] font-black uppercase text-white tracking-widest">Selected</span>
+            <span className="text-[9px] font-black uppercase text-foreground tracking-widest">Selected</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
-            <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white"><X className="h-4 w-4" /></button>
+            <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-muted-foreground hover:text-foreground"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
+            <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
         </motion.div>
       )}
