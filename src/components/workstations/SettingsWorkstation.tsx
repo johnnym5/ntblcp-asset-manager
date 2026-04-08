@@ -1,8 +1,10 @@
 'use client';
 
 /**
- * @fileOverview App Settings - Configuration Hub.
- * Phase 1014: Disabled Version Control increment pulse. Integrated direct save logic.
+ * @fileOverview SettingsWorkstation - Operational Control Center.
+ * Phase 1015: Overhauled with pill-shaped UI categories.
+ * Enabled Project/User/History access for standard Admins.
+ * Integrated Mode descriptions into General settings.
  */
 
 import React, { useState, useRef } from 'react';
@@ -45,7 +47,9 @@ import {
   KeyRound,
   ShieldAlert,
   ChevronDown,
-  FolderOpen
+  FolderOpen,
+  ClipboardCheck,
+  ShieldCheck as ShieldIcon
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -123,7 +127,7 @@ export function SettingsWorkstation() {
       if (isOnline) await FirestoreService.updateSettings({ [key]: value });
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
-      addNotification({ title: "Settings Updated", variant: "success" });
+      addNotification({ title: "Configuration Updated", variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -133,8 +137,6 @@ export function SettingsWorkstation() {
     if (!appSettings) return;
     setIsSaving(true);
     try {
-      // Version control build disabled as requested. 
-      // Broadcasting changes directly to all users.
       const updatedSettings = { ...appSettings };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
@@ -185,7 +187,7 @@ export function SettingsWorkstation() {
       if (isOnline) await FirestoreService.updateSettings(nextSettings);
       setAppSettings(nextSettings);
 
-      addNotification({ title: 'Templates Imported', description: `${templates.length} group definitions added to ${activeGrant.name}.` });
+      addNotification({ title: 'Templates Imported', description: `${templates.length} group definitions added.` });
     } catch (error) {
       addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -196,135 +198,186 @@ export function SettingsWorkstation() {
 
   if (!settingsLoaded || !appSettings) return null;
 
-  const SectionTitle = ({ title, description, icon: Icon }: { title: string, description: string, icon: any }) => (
-    <div className="space-y-1 px-1 mb-4">
-      <div className="flex items-center gap-2.5">
-        <Icon className="h-4 w-4 text-primary" />
-        <h3 className="text-base font-black uppercase text-foreground tracking-tight leading-none">{title}</h3>
+  const SettingSection = ({ title, description, icon: Icon, children }: { title: string, description: string, icon: any, children: React.ReactNode }) => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 px-1">
+        <div className="p-2 bg-primary/10 rounded-xl"><Icon className="h-4 w-4 text-primary" /></div>
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-black uppercase text-foreground tracking-tight leading-none">{title}</h3>
+          <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{description}</p>
+        </div>
       </div>
-      <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{description}</p>
+      <Card className="bg-card border-border rounded-[1.5rem] overflow-hidden shadow-xl">
+        <CardContent className="p-6 space-y-6">
+          {children}
+        </CardContent>
+      </Card>
     </div>
   );
 
   return (
-    <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative">
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-2 -mx-1 shrink-0">
-        <div className="flex flex-col gap-4 max-w-[1600px] mx-auto w-full">
+    <div className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-6 -mx-1 shrink-0">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Settings</h2>
-              <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Configuration Center</p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><SettingsIcon className="h-5 w-5 text-primary" /></div>
+              <div className="space-y-0.5">
+                <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Control Center</h2>
+                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Configuration Pulse</p>
+              </div>
             </div>
-            <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-4 w-4 text-foreground/40" /></button>
+            <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-5 w-5 text-foreground/40" /></button>
           </div>
-          <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner overflow-x-auto no-scrollbar">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center w-full min-max-content">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><SettingsIcon className="h-3 w-3" /> General</TabsTrigger>
-              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><LayoutGrid className="h-3 w-3" /> Projects</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><Users className="h-3 w-3" /> Users</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><HeartPulse className="h-3 w-3" /> Health</TabsTrigger>}
-              <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all"><History className="h-3 w-3" /> History</TabsTrigger>
+          <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
+            <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
+              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>
+              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">History</TabsTrigger>}
+              {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Health</TabsTrigger>}
             </TabsList>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 pt-2 overflow-y-auto custom-scrollbar pb-20 px-1">
-        <TabsContent value="general" className="space-y-8 m-0 outline-none">
-          <section>
-            <SectionTitle title="Visual Identity" description="Choose your environment theme" icon={Palette} />
-            <Card className="bg-card border-border rounded-xl p-4 shadow-xl">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-12 rounded-lg font-black uppercase text-[9px] gap-2">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
+        <Tabs defaultValue="general" className="w-full">
+          <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
+            <SettingSection title="Visual Identity" description="Environment themes" icon={Palette}>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
                   <Sun className="h-4 w-4" /> Light Mode
                 </Button>
-                <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-12 rounded-lg font-black uppercase text-[9px] gap-2">
+                <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
                   <Moon className="h-4 w-4" /> Dark Mode
                 </Button>
               </div>
-            </Card>
-          </section>
+            </SettingSection>
 
-          <section>
-            <SectionTitle title="Security" description="Password Management" icon={Lock} />
-            <Card className="bg-card border-border rounded-xl p-4 shadow-xl text-right">
-              <Button onClick={() => setIsPassphraseDialogOpen(true)} variant="outline" className="h-9 px-6 rounded-lg border-border text-foreground font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-muted">
-                <KeyRound className="h-3.5 w-3.5 text-primary" /> Update Password
-              </Button>
-            </Card>
-          </section>
+            <SettingSection title="Operational Mode" description="Workstation logic presets" icon={Smartphone}>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => handleSettingChange('appMode', 'management')}
+                    className={cn(
+                      "p-6 rounded-2xl border-2 text-left transition-all group",
+                      appSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={cn("p-2 rounded-lg", appSettings.appMode === 'management' ? "bg-primary text-black" : "bg-muted text-muted-foreground")}><ShieldIcon className="h-5 w-5" /></div>
+                      {appSettings.appMode === 'management' && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                    </div>
+                    <h4 className="text-sm font-black uppercase text-foreground mb-1">Management Mode</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Structural Oversight & Registry Engineering. High-level control for project leads.</p>
+                  </button>
 
-          <section>
-            <SectionTitle title="System Rules" description="Operational Constraints" icon={Smartphone} />
-            <Card className="bg-card border-border rounded-xl p-4 shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
+                  <button 
+                    onClick={() => handleSettingChange('appMode', 'verification')}
+                    className={cn(
+                      "p-6 rounded-2xl border-2 text-left transition-all group",
+                      appSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20 hover:border-primary/20"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={cn("p-2 rounded-lg", appSettings.appMode === 'verification' ? "bg-green-500 text-white" : "bg-muted text-muted-foreground")}><ClipboardCheck className="h-5 w-5" /></div>
+                      {appSettings.appMode === 'verification' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                    </div>
+                    <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification Mode</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Field Audit & Physical Assessment. Optimized for high-speed status assessing.</p>
+                  </button>
+                </div>
+              </div>
+            </SettingSection>
+
+            <SettingSection title="Global Rules" description="Registry constraints" icon={Lock}>
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
                 <div className="space-y-0.5">
-                  <Label className="text-xs font-black uppercase">Lock Asset List</Label>
-                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Prevent accidental deletions</p>
+                  <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent non-admin deletions and additions</p>
                 </div>
                 <Switch checked={appSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
               </div>
-            </Card>
-          </section>
-        </TabsContent>
+            </SettingSection>
+          </TabsContent>
 
-        <TabsContent value="groups" className="m-0 outline-none space-y-8">
-          <div className="space-y-4 px-1">
-            <h3 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">Project Management</h3>
-            <div className="flex gap-2">
-              <Input placeholder="Enter project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-10 bg-background border-border rounded-lg font-medium text-xs text-foreground" />
-              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-10 px-6 rounded-lg bg-primary text-black font-black uppercase text-[8px] tracking-widest">Create Project</Button>
-            </div>
-          </div>
+          <TabsContent value="groups" className="space-y-10 m-0 outline-none pb-20">
+            <SettingSection title="Project Management" description="Authorized Registers" icon={LayoutGrid}>
+              <div className="space-y-6">
+                <div className="flex gap-2">
+                  <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm" />
+                  <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Project</Button>
+                </div>
 
-          <Accordion type="single" collapsible className="space-y-3">
-            {appSettings.grants.map((grant) => (
-              <AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-card transition-all", activeGrantId === grant.id ? "border-primary/40 shadow-xl" : "border-border")}>
-                <AccordionTrigger className="hover:no-underline p-4 border-none flex-1 justify-start gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={cn("p-1.5 rounded-lg", activeGrantId === grant.id ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}><FolderOpen className="h-4 w-4" /></div>
-                    <span className="text-sm font-black uppercase text-foreground tracking-tight leading-none">{grant.name}</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="bg-background/50 border-t border-border p-6 space-y-8 animate-in slide-in-from-top-2 duration-500">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                      <div key={name} className="flex items-center justify-between p-4 bg-muted/30 border border-border rounded-xl group transition-all hover:border-primary/20">
-                        <span className="text-[10px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
-                        <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
+                <div className="space-y-3">
+                  {appSettings.grants.map((grant) => (
+                    <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", activeGrantId === grant.id ? "border-primary shadow-xl bg-primary/[0.02]" : "border-border bg-muted/10")}>
+                      <div className="p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={cn("p-2 rounded-xl", activeGrantId === grant.id ? "bg-primary text-black" : "bg-muted")}><FolderOpen className="h-5 w-5" /></div>
+                          <div className="space-y-0.5">
+                            <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
+                            <p className="text-[8px] font-mono text-muted-foreground uppercase">UID: {grant.id.split('-')[0]}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {activeGrantId !== grant.id && (
+                            <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] tracking-widest border-2">Set Active</Button>
+                          )}
+                          <Badge variant="outline" className="h-6 px-3 border-border bg-card text-[8px] font-black uppercase">{Object.keys(grant.sheetDefinitions || {}).length} GROUPS</Badge>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2 pt-4 border-t border-border">
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest">Add Category</Button>
-                    <Button variant="outline" className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest" onClick={() => fileInputRef.current?.click()}>Import Template</Button>
-                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest text-primary">Import Assets</Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </TabsContent>
+                      
+                      {activeGrantId === grant.id && (
+                        <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4 animate-in slide-in-from-top-2 duration-500">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
+                              <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl group transition-all hover:border-primary/20">
+                                <span className="text-[9px] font-black uppercase text-foreground/60 truncate pr-4">{name}</span>
+                                <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] tracking-widest gap-2">
+                              <FileUp className="h-3.5 w-3.5" /> Import Template
+                            </Button>
+                            <Button onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-primary text-black font-black uppercase text-[8px] tracking-widest gap-2">
+                              <ScanSearch className="h-3.5 w-3.5" /> Scan & Import
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </SettingSection>
+          </TabsContent>
 
-        <TabsContent value="users" className="m-0 outline-none">
-          <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
-        </TabsContent>
+          <TabsContent value="users" className="m-0 outline-none pb-20">
+            <SettingSection title="Identity Governance" description="System auditors & regional scopes" icon={Users}>
+              <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+            </SettingSection>
+          </TabsContent>
 
-        <TabsContent value="resilience" className="m-0 outline-none space-y-8">
-          <DatabaseWorkstation isEmbedded={true} />
-          <ErrorAuditWorkstation isEmbedded={true} />
-        </TabsContent>
+          <TabsContent value="history" className="m-0 outline-none pb-20">
+            <AuditLogWorkstation isEmbedded={true} />
+          </TabsContent>
 
-        <TabsContent value="history" className="m-0 outline-none">
-          <AuditLogWorkstation isEmbedded={true} />
-        </TabsContent>
+          <TabsContent value="health" className="m-0 outline-none space-y-10 pb-20">
+            <DatabaseWorkstation isEmbedded={true} />
+            <ErrorAuditWorkstation isEmbedded={true} />
+          </TabsContent>
+        </Tabs>
       </div>
 
-      <div className="mt-2 pt-4 border-t border-border flex items-center justify-between px-1 shrink-0 pb-10">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-muted text-foreground/60 font-black uppercase text-[9px] tracking-widest">Discard</Button>
-        <Button onClick={handleSaveChange} disabled={isSaving} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-          Save Changes
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] tracking-widest text-foreground/40 hover:text-foreground">Discard</Button>
+        <Button onClick={handleSaveChange} disabled={isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-5 w-5 mr-3" />}
+          Commit All Changes
         </Button>
       </div>
 
@@ -354,6 +407,6 @@ export function SettingsWorkstation() {
           }}
         />
       )}
-    </Tabs>
+    </div>
   );
 }
