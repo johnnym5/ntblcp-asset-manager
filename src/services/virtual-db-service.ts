@@ -2,8 +2,11 @@
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
  * Phase 86: Hardened with deterministic purge and preparation pulses.
+ * Phase 87: Implemented createNode and deleteNode for granular CRUD support.
  */
 
+import { doc, setDoc, deleteDoc, collection as fsCol } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { FirestoreService } from './firebase/firestore';
 import { storage } from '@/offline/storage';
 import { getAssets as getRtdbAssets, getSettings as getRtdbSettings, batchSetAssets as setRtdbAssets, clearAssets as clearRtdbAssets } from '@/lib/database';
@@ -57,6 +60,9 @@ export class VirtualDBService {
         } else if (collectionPath === 'error_logs') {
           const logs = await FirestoreService.getErrorLogs();
           logs.forEach(l => nodes.push(this.mapToNode(l, `Error: ${l.error.laymanExplanation}`, layer, 'error_logs', l.id)));
+        } else if (collectionPath === 'config/settings') {
+          const settings = await FirestoreService.getSettings();
+          if (settings) nodes.push(this.mapToNode(settings, 'App Settings Node', layer, 'config', 'settings'));
         }
       } else if (layer === 'LOCAL') {
         if (collectionPath === 'assets') {
@@ -68,6 +74,9 @@ export class VirtualDBService {
         } else if (collectionPath === 'sandbox') {
           const sandbox = await storage.getSandbox();
           sandbox.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'sandbox')));
+        } else if (collectionPath === 'config/settings') {
+          const settings = await storage.getSettings();
+          if (settings) nodes.push(this.mapToNode(settings, 'Local Settings Pulse', layer, 'settings', 'app-settings'));
         }
       }
     } catch (e) {
@@ -107,7 +116,6 @@ export class VirtualDBService {
   }
 
   private static async fetchFirestoreDoc(col: string, id: string) {
-    // Basic implementation for direct fetch
     const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS');
     return assets.find(a => a.id === id) || null;
   }
@@ -147,42 +155,45 @@ export class VirtualDBService {
   }
 
   /**
-   * Deterministic resolution of a conflict.
-   */
-  static async resolveConflict(path: string, resolution: any): Promise<void> {
-    await Promise.all([
-      this.updateNode('FIRESTORE', path, resolution),
-      this.updateNode('LOCAL', path, resolution),
-    ]);
-
-    await FirestoreService.logActivity({
-      assetId: path.split('/').pop() || 'UNKNOWN',
-      assetDescription: `Conflict Resolved: ${path}`,
-      operation: 'UPDATE',
-      performedBy: 'Super Administrator',
-      userState: 'RESOLUTION_WIZARD'
-    });
-  }
-
-  /**
    * Updates a specific node in the chosen layer.
    */
   static async updateNode(layer: StorageLayer, path: string, data: any): Promise<void> {
     const parts = path.split('/');
-    const collection = parts[0];
+    const colName = parts[0];
+    const docId = parts[1];
     
-    if (layer === 'FIRESTORE') {
-      if (collection === 'assets') await FirestoreService.saveAsset(data, 'UPDATE');
-      else if (collection === 'config') await FirestoreService.updateSettings(data);
+    if (layer === 'FIRESTORE' && db) {
+      const docRef = doc(db, colName, docId);
+      await setDoc(docRef, data, { merge: true });
     } else if (layer === 'LOCAL') {
-      if (collection === 'assets') {
+      if (colName === 'assets') {
         const assets = await storage.getAssets();
-        const next = assets.some(a => a.id === data.id) 
-          ? assets.map(a => a.id === data.id ? data : a) 
+        const next = assets.some(a => a.id === docId) 
+          ? assets.map(a => a.id === docId ? data : a) 
           : [data, ...assets];
         await storage.saveAssets(next);
-      } else if (collection === 'config') {
+      } else if (colName === 'settings' || colName === 'config') {
         await storage.saveSettings(data);
+      }
+    }
+  }
+
+  /**
+   * Granularly destroys a node in the chosen layer.
+   */
+  static async deleteNode(layer: StorageLayer, path: string): Promise<void> {
+    const [col, id] = path.split('/');
+    if (layer === 'FIRESTORE' && db) {
+      await deleteDoc(doc(db, col, id));
+    } else if (layer === 'LOCAL') {
+      if (col === 'assets') {
+        const current = await storage.getAssets();
+        await storage.saveAssets(current.filter(a => a.id !== id));
+      } else if (col === 'sandbox') {
+        const current = await storage.getSandbox();
+        await storage.saveToSandbox(current.filter(a => a.id !== id));
+      } else if (col === 'queue') {
+        await storage.dequeue(id);
       }
     }
   }
@@ -202,7 +213,6 @@ export class VirtualDBService {
 
   /**
    * Synchronized global purge across all storage tiers.
-   * Prepares the system for a fresh data ingestion pulse.
    */
   static async purgeGlobalRegistry(): Promise<void> {
     await Promise.all([
