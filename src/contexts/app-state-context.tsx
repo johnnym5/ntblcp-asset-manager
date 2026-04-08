@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1105: Integrated Fuzzy Matching into search and filter aggregation.
  * Phase 1106: Centralized name normalization for locations and assignees.
+ * Phase 1107: Integrated Global Command Palette state for mobile accessibility.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -87,6 +88,9 @@ interface AppStateContextType {
   filters: HeaderFilter[];
   setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
 
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+
   selectedCategory: string | null;
   selectedCategories: string[];
   setSelectedCategories: (cats: string[]) => void;
@@ -137,6 +141,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isLogicFilterOpen, setIsLogicFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
   const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
   const [isExplored, setIsExplored] = useState(false);
@@ -408,6 +413,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions,
       isFilterOpen, setIsFilterOpen, isLogicFilterOpen, setIsLogicFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
+      isCommandPaletteOpen, setIsCommandPaletteOpen,
       selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
       selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveView('REGISTRY'); },
       setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveView('REGISTRY'); },

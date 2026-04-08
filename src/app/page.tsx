@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1301: Implemented Light/Dark theme background adaptation.
+ * Phase 1302: Integrated Command Palette trigger into the header for mobile accessibility.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -31,7 +31,8 @@ import {
   ShieldCheck,
   ClipboardCheck,
   User as UserIcon,
-  ChevronDown
+  ChevronDown,
+  Command
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -126,7 +127,8 @@ export default function SPAHub() {
     setMissingFieldFilter,
     goBack,
     selectedCategories,
-    activeFilterCount
+    activeFilterCount,
+    setIsCommandPaletteOpen
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -359,6 +361,10 @@ export default function SPAHub() {
             <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </button>
           
+          <button onClick={() => setIsCommandPaletteOpen(true)} className="p-1.5 bg-muted rounded-md text-foreground/40 hover:text-primary transition-all">
+            <Command className="h-3 w-3" />
+          </button>
+
           <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-muted rounded-md text-foreground/40 hover:text-primary transition-all">
             <HelpCircle className="h-3 w-3" />
           </button>

@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Universal Command Search.
+ * Phase 2: Linked state to global context for mobile accessibility via header trigger.
  */
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect } from 'react';
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,41 +16,36 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 import { 
-  Boxes, 
   LayoutDashboard, 
   FileUp, 
-  History, 
-  Settings, 
-  Plus, 
+  RefreshCw,
+  Boxes,
   LogOut,
   CheckCircle2,
-  ListTodo,
   FileText,
   Users,
   Package,
   ClipboardList,
-  RefreshCw,
-  SearchCode,
-  ShieldAlert
+  ShieldAlert,
+  Search
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false);
-  const { assets, refreshRegistry, appSettings, setActiveView } = useAppState();
-  const { userProfile, logout } = useAuth();
+  const { isCommandPaletteOpen: open, setIsCommandPaletteOpen: setOpen, assets, refreshRegistry, setActiveView, setSearchTerm } = useAppState();
+  const { logout, userProfile } = useAuth();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen(!open);
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, []);
+  }, [open, setOpen]);
 
   const runCommand = (command: () => void) => {
     setOpen(false);
@@ -113,7 +108,7 @@ export function CommandPalette() {
                 <span>Auditors & Users</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => setActiveView('SETTINGS'))}>
-                <Settings className="mr-2 h-4 w-4" />
+                <Users className="mr-2 h-4 w-4" />
                 <span>Global Settings</span>
               </CommandItem>
             </CommandGroup>
