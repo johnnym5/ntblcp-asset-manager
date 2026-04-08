@@ -24,7 +24,8 @@ import {
     Cloud,
     Fingerprint,
     MapPin,
-    AlertCircle
+    AlertCircle,
+    CheckCircle2
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
