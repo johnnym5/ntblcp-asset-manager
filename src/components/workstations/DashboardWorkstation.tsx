@@ -98,30 +98,6 @@ export function DashboardWorkstation() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
-                      variant="outline" 
-                      size="icon" 
-                      onClick={() => setIsFilterOpen(true)} 
-                      className={cn(
-                        "h-10 w-10 rounded-xl border-border bg-muted/50 text-primary relative transition-all",
-                        activeFilterCount > 0 && "border-primary/40 shadow-xl"
-                      )}
-                    >
-                      <ListFilter className="h-4 w-4" />
-                      {activeFilterCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-primary text-black text-[9px] font-black rounded-full flex items-center justify-center border-2 border-background shadow-lg">
-                          {activeFilterCount}
-                        </span>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="text-[8px] font-black uppercase">Active Filters</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
                       variant="ghost" 
                       size="icon" 
                       onClick={manualDownload} 

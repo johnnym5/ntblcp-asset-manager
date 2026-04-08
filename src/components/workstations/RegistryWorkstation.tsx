@@ -432,23 +432,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
                 {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
                 
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => setIsFilterOpen(true)} 
-                  className={cn(
-                    "h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative",
-                    activeFilterCount > 0 && "border-primary/40 shadow-lg"
-                  )}
-                >
-                  <Filter className="h-4 w-4" />
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </Button>
-
                 <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative", filters.length > 0 && "border-primary/40")}>
                   <ListFilter className="h-4 w-4" />
                   {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-background">{filters.length}</span>}
@@ -645,7 +628,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">This will permanently delete {categoriesToPurge.length} folders and all records within them from both local and cloud storage. This action is irreversible.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm Deletion</AlertDialogAction>
+            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Trash2 className="mr-2 h-4 w-4 mr-2" />} Confirm Deletion</AlertDialogAction>
             <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
