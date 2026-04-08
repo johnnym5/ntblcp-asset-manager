@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Concise Workstation.
- * Optimized for maximum data density and focused registry review.
+ * Phase 1201: Enhanced with visible vertical scrollbars for better navigation.
  */
 
 import React from 'react';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -110,7 +110,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col bg-black border-r border-white/5 min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col bg-black border-r border-white/5 min-h-0 overflow-hidden relative">
               <div className="px-6 py-3 shrink-0 flex items-center justify-between bg-white/[0.01] border-b border-white/5">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="h-6 px-3 text-[8px] font-black uppercase tracking-widest rounded-full border-2 bg-white/5" style={{ color: record.accentColor, borderColor: `${record.accentColor}40` }}>
@@ -164,12 +164,13 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                   )}
                   <div className="h-20 shrink-0" />
                 </div>
+                <ScrollBar orientation="vertical" className="bg-white/5" />
               </ScrollArea>
             </div>
 
             {/* Sidebar Pane */}
-            <div className="w-full md:w-[300px] lg:w-[340px] bg-[#050505] flex flex-col shrink-0 border-t md:border-t-0 border-white/5 min-h-0 overflow-hidden shadow-2xl">
-              <ScrollArea className="flex-1">
+            <div className="w-full md:w-[300px] lg:w-[340px] bg-[#050505] flex flex-col shrink-0 border-t md:border-t-0 border-white/5 min-h-0 overflow-hidden shadow-2xl relative">
+              <ScrollArea className="flex-1 custom-scrollbar">
                 <div className="p-6 space-y-10 pb-20">
                   <div className="flex items-center gap-3 text-primary">
                     <div className="p-1.5 bg-primary/10 rounded-lg"><ClipboardCheck className="h-4 w-4" /></div>
@@ -199,6 +200,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                     </div>
                   </div>
                 </div>
+                <ScrollBar orientation="vertical" className="bg-white/5" />
               </ScrollArea>
             </div>
           </div>

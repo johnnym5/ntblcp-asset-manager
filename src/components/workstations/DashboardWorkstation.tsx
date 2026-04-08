@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Dashboard - Main Overview Hub.
- * Phase 1302: Implemented background color adaptation for themes.
- * Phase 1303: Overhauled contrast for Light Mode legibility.
- * Phase 1304: Fixed ReferenceError by importing missing icons.
+ * Phase 1305: Integrated Audit Log into the main Accordion pulse.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -18,7 +16,8 @@ import {
   FolderOpen,
   SearchCode,
   FileText,
-  Activity
+  Activity,
+  History
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -29,6 +28,7 @@ import { ReportsWorkstation } from './ReportsWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
 import { DiscrepancyWorkstation } from './DiscrepancyWorkstation';
+import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -189,6 +189,23 @@ export function DashboardWorkstation() {
               </div>
               <AccordionContent className="p-0">
                 <DiscrepancyWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="history" className="border-none">
+              <div className="flex items-center justify-between px-1 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-primary/10 rounded-lg"><History className="h-4 w-4 text-primary" /></div>
+                  <h3 className="text-base font-black uppercase text-foreground tracking-tight">Recent Activity</h3>
+                </div>
+                <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
+                  <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-muted gap-1.5">
+                    View Log <ChevronDown className="h-2.5 w-2.5" />
+                  </Badge>
+                </AccordionTrigger>
+              </div>
+              <AccordionContent className="p-0">
+                <AuditLogWorkstation isEmbedded={true} />
               </AccordionContent>
             </AccordionItem>
           </Accordion>

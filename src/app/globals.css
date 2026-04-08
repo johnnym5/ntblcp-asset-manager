@@ -82,16 +82,16 @@
   }
   
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-foreground/5;
+    @apply bg-transparent;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+    @apply bg-primary/60 rounded-full hover:bg-primary/80 transition-colors border-2 border-background;
   }
 
   .no-scrollbar::-webkit-scrollbar {
