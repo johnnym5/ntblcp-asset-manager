@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
- * Phase 1209: Integrated theme-responsive backgrounds.
- * Phase 1210: Refined Light Mode contrast and semantic styling.
+ * Phase 1300: Implemented context-aware headers with Project/Folder counts.
+ * Phase 1301: Integrated Field Setup (Header Manager) pulse into list view.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -25,7 +25,10 @@ import {
   RefreshCw,
   ListFilter,
   Filter,
-  Eye
+  Eye,
+  Settings2,
+  ArrowLeft,
+  LayoutGrid
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -39,6 +42,7 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -81,6 +85,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     searchTerm,
     setSearchTerm,
     headers,
+    setHeaders,
     refreshRegistry,
     appSettings,
     setAppSettings,
@@ -104,13 +109,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsSortOpen,
     itemsPerPage,
     setItemsPerPage,
-    activeFilterCount
+    activeFilterCount,
+    goBack
   } = useAppState();
   
   const { userProfile } = useAuth();
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -249,13 +256,38 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col relative">
+      {/* 1. Dynamic Workstation Header */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
-            <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
+            <AnimatePresence mode="wait">
+              {showList ? (
+                <motion.button
+                  key="back-btn"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  onClick={goBack}
+                  className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"
+                >
+                  <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                </motion.button>
+              ) : (
+                <div key="logo-icon" className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
+                  <Database className="h-5 w-5 text-primary" />
+                </div>
+              )}
+            </AnimatePresence>
+            
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">{!showList ? 'Asset Hub' : 'Asset List'}</h2>
-              <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em]">{!showList ? 'CATEGORIES' : 'VIEWING FOLDER'}</p>
+              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">
+                {showList ? selectedCategories[0] : (activeGrant?.name || 'Asset Hub')}
+              </h2>
+              <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
+                {showList 
+                  ? `${groupStats[selectedCategories[0]]?.total || 0} RECORDS IN THIS FOLDER` 
+                  : `${filteredAssets.length} TOTAL ASSETS IN SCOPE`}
+              </p>
             </div>
           </div>
 
@@ -282,6 +314,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
+              {showList && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
               {isAdmin && <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>}
               
               <Button 
@@ -312,6 +357,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
+      {/* 2. Workstation Content */}
       <div className="flex-1 min-h-0 px-1 pt-4">
         {!showList ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
@@ -340,7 +386,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
                 <div className="space-y-1 mb-8 pl-8">
                   <p className="text-4xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
-                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">TOTAL ASSETS</p>
+                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">RECORDS DISCOVERED</p>
                 </div>
                 <Button 
                   onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} 
@@ -372,6 +418,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
+      {/* 3. Floating Action Bar */}
       <AnimatePresence>
         {selectedCategories.length > 0 && !showList && (
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
@@ -387,6 +434,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent className="max-w-md bg-background border-border text-foreground p-8 rounded-[2.5rem]">
