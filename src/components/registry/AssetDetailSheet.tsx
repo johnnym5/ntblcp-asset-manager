@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview AssetDetailSheet - High-Fidelity Concise Workstation.
- * Phase 1201: Enhanced with visible vertical scrollbars for better navigation.
+ * @fileOverview AssetDetailSheet - High-Fidelity Professional Workstation.
+ * Phase 1300: Overhauled with persistent vertical scrollbars and independent dual-pane scrolling.
+ * Phase 1301: Theme-aware scroll pulse implementation.
  */
 
 import React from 'react';
@@ -46,13 +47,13 @@ interface AssetDetailSheetProps {
 
 const FullViewField = ({ label, value, isLast }: { label: string, value: string, isLast?: boolean }) => (
   <div className={cn(
-    "p-3.5 flex flex-col gap-1 relative transition-colors hover:bg-white/[0.03] group/field",
-    !isLast && "border-b border-white/5"
+    "p-5 flex flex-col gap-1.5 relative transition-colors hover:bg-foreground/[0.03] group/field",
+    !isLast && "border-b border-border/40"
   )}>
-    <span className="text-[8px] font-black uppercase tracking-[0.25em] text-white/20 group-hover/field:text-primary transition-colors leading-none">
+    <span className="text-[8px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-40 group-hover/field:text-primary group-hover/field:opacity-100 transition-all leading-none">
       {label}
     </span>
-    <p className="text-[11px] font-black uppercase tracking-tight text-white/80 leading-tight break-words">
+    <p className="text-[13px] font-black uppercase tracking-tight text-foreground leading-tight break-words">
       {value || '---'}
     </p>
   </div>
@@ -74,59 +75,59 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1100px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black text-white border-white/10 rounded-[2rem] shadow-3xl">
+      <DialogContent className="max-w-[1200px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-background text-foreground border-border rounded-[2.5rem] shadow-3xl">
         <motion.div 
           className="flex flex-col h-full"
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
         >
           {/* Header Pulse */}
-          <div className="p-5 sm:p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-primary/10 rounded-xl shadow-inner hidden sm:block">
-                <ShieldCheck className="h-5 w-5 text-primary" />
+          <div className="p-6 sm:p-8 border-b border-border flex items-center justify-between bg-muted/10 shrink-0">
+            <div className="flex items-center gap-5">
+              <div className="p-3 bg-primary/10 rounded-2xl shadow-inner hidden sm:block">
+                <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
-              <div className="flex flex-col">
-                <DialogTitle className="text-lg font-black uppercase tracking-tight text-white leading-none">
+              <div className="space-y-1">
+                <DialogTitle className="text-xl sm:text-3xl font-black uppercase tracking-tight text-foreground leading-none">
                   Asset Profile
                 </DialogTitle>
-                <div className="flex items-center gap-2 mt-1">
-                  <DialogDescription className="text-[8px] font-bold uppercase text-primary tracking-[0.3em]">
+                <div className="flex items-center gap-3">
+                  <DialogDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em]">
                     Dossier Analysis
                   </DialogDescription>
-                  <div className="h-1 w-1 rounded-full bg-white/10" />
-                  <span className="text-[8px] font-mono font-bold text-white/20 uppercase truncate">ID: {record.id.split('-')[0]}</span>
+                  <div className="h-1 w-1 rounded-full bg-border" />
+                  <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase truncate">UUID: {record.id.split('-')[0]}</span>
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-white/5 rounded-xl p-0.5 border border-white/5">
-                <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg hover:bg-white/10 text-white/40"><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg hover:bg-white/10 text-white/40"><ChevronRight className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-muted/50 rounded-2xl p-1 border border-border shadow-inner">
+                <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-10 w-10 rounded-xl hover:bg-background text-muted-foreground hover:text-primary"><ChevronLeft className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-10 w-10 rounded-xl hover:bg-background text-muted-foreground hover:text-primary"><ChevronRight className="h-5 w-5" /></Button>
               </div>
             </div>
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col bg-black border-r border-white/5 min-h-0 overflow-hidden relative">
-              <div className="px-6 py-3 shrink-0 flex items-center justify-between bg-white/[0.01] border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="h-6 px-3 text-[8px] font-black uppercase tracking-widest rounded-full border-2 bg-white/5" style={{ color: record.accentColor, borderColor: `${record.accentColor}40` }}>
-                    <Database className="h-3 w-3 mr-1.5" /> {record.sourceSheet || 'REGISTRY'}
+            <div className="flex-1 flex flex-col bg-background border-r border-border min-h-0 overflow-hidden relative">
+              <div className="px-8 py-4 shrink-0 flex items-center justify-between bg-muted/5 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="h-7 px-4 text-[9px] font-black uppercase tracking-widest rounded-full border-2 bg-card" style={{ color: record.accentColor, borderColor: `${record.accentColor}40` }}>
+                    <Database className="h-3.5 w-3.5 mr-2" /> {record.sourceSheet || 'REGISTRY'}
                   </Badge>
                 </div>
                 {isManagementMode && !isAdmin && (
-                  <Badge className="bg-white/5 text-white/20 border-white/10 h-6 px-2.5 rounded-full font-black uppercase text-[7px] tracking-widest gap-1.5">
-                    <Lock className="h-2.5 w-2.5" /> Locked
+                  <Badge className="bg-muted text-muted-foreground border-border h-7 px-3 rounded-full font-black uppercase text-[8px] tracking-widest gap-2">
+                    <Lock className="h-3 w-3" /> System Locked
                   </Badge>
                 )}
               </div>
 
               <ScrollArea className="flex-1 custom-scrollbar">
                 <div className="flex flex-col">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-b border-white/5 bg-black">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-b border-border/40">
                     {record.fields
                       .filter(f => {
                         const h = record.headers.find(header => header.id === f.headerId);
@@ -139,7 +140,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                         return (
                           <FullViewField 
                             key={field.headerId} 
-                            label={header?.displayName || 'Parameter'} 
+                            label={header?.displayName || 'Technical Parameter'} 
                             value={field.displayValue} 
                           />
                         );
@@ -147,71 +148,73 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                   </div>
 
                   {metadataEntries.length > 0 && (
-                    <div className="p-6 space-y-4 bg-white/[0.01]">
-                      <div className="flex items-center gap-2.5 opacity-40">
-                        <ListTree className="h-3.5 w-3.5" />
-                        <h4 className="text-[9px] font-black uppercase tracking-[0.25em]">Extended Attributes</h4>
+                    <div className="p-8 space-y-6 bg-muted/5">
+                      <div className="flex items-center gap-3 opacity-40">
+                        <ListTree className="h-4 w-4" />
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Extended Data Pulse</h4>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-6">
                         {metadataEntries.map(([key, value]) => (
-                          <div key={key} className="space-y-1 group/meta">
-                            <p className="text-[7px] font-black uppercase tracking-[0.2em] text-white/20 group-hover/meta:text-primary transition-colors">{key}</p>
-                            <p className="text-[10px] font-bold text-white/60 leading-tight break-words">{String(value || '---')}</p>
+                          <div key={key} className="space-y-1.5 group/meta">
+                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 group-hover/meta:text-primary transition-colors">{key}</p>
+                            <p className="text-[11px] font-bold text-foreground leading-tight break-words">{String(value || '---')}</p>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-                  <div className="h-20 shrink-0" />
+                  <div className="h-32 shrink-0" />
                 </div>
-                <ScrollBar orientation="vertical" className="bg-white/5" />
+                {/* Side Scroll Wheel Experience */}
+                <ScrollBar orientation="vertical" className="bg-muted/30" />
               </ScrollArea>
             </div>
 
             {/* Sidebar Pane */}
-            <div className="w-full md:w-[300px] lg:w-[340px] bg-[#050505] flex flex-col shrink-0 border-t md:border-t-0 border-white/5 min-h-0 overflow-hidden shadow-2xl relative">
+            <div className="w-full md:w-[320px] lg:w-[380px] bg-card/30 flex flex-col shrink-0 border-t md:border-t-0 border-border min-h-0 overflow-hidden relative shadow-2xl">
               <ScrollArea className="flex-1 custom-scrollbar">
-                <div className="p-6 space-y-10 pb-20">
-                  <div className="flex items-center gap-3 text-primary">
-                    <div className="p-1.5 bg-primary/10 rounded-lg"><ClipboardCheck className="h-4 w-4" /></div>
-                    <h4 className="text-[10px] font-black uppercase tracking-widest">Quality Audit</h4>
+                <div className="p-8 space-y-12 pb-24">
+                  <div className="flex items-center gap-4 text-primary">
+                    <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><ClipboardCheck className="h-5 w-5" /></div>
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em]">Fidelity Audit</h4>
                   </div>
                   
                   <AssetChecklist values={record.rawRow as any} />
                   
-                  <div className="p-5 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-5">
-                    <div className="flex items-center gap-2 opacity-40">
-                      <History className="h-3 w-3" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Tracking Pulse</span>
+                  <div className="p-6 rounded-3xl bg-muted/20 border-2 border-dashed border-border space-y-6">
+                    <div className="flex items-center gap-3 opacity-40">
+                      <History className="h-4 w-4" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Historical Anchor</span>
                     </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-[8px] uppercase">
-                        <span className="text-white/20">Source</span>
-                        <span className="text-white/60 font-bold truncate max-w-[120px]">{record.sourceSheet || 'MANUAL'}</span>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-[9px] uppercase font-black">
+                        <span className="text-muted-foreground opacity-60">Source</span>
+                        <span className="text-foreground truncate max-w-[140px]">{record.sourceSheet || 'MANUAL'}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[8px] uppercase">
-                        <span className="text-white/20">Positional Anchor</span>
-                        <span className="text-white/60 font-bold">ROW #{record.sourceRow || 'MAN'}</span>
+                      <div className="flex justify-between items-center text-[9px] uppercase font-black">
+                        <span className="text-muted-foreground opacity-60">Positional Anchor</span>
+                        <span className="text-primary bg-primary/5 px-2 py-0.5 rounded-lg">ROW #{record.sourceRow || 'MAN'}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[8px] uppercase">
-                        <span className="text-white/20">Last Sync</span>
-                        <span className="text-white/60 font-bold">{record.rawRow.lastModified ? new Date(record.rawRow.lastModified as string).toLocaleDateString() : 'N/A'}</span>
+                      <div className="flex justify-between items-center text-[9px] uppercase font-black">
+                        <span className="text-muted-foreground opacity-60">Registry Sync</span>
+                        <span className="text-foreground">{record.rawRow.lastModified ? new Date(record.rawRow.lastModified as string).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <ScrollBar orientation="vertical" className="bg-white/5" />
+                {/* Right Scroll Wheel for Sidebar */}
+                <ScrollBar orientation="vertical" className="bg-muted/30" />
               </ScrollArea>
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="p-5 sm:p-6 bg-black border-t border-white/5 flex flex-row items-center gap-3 shrink-0 pb-safe shadow-3xl">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 h-12 font-black uppercase text-[9px] tracking-widest rounded-xl bg-white/5 text-white/40 hover:text-white transition-all">
-              Dismiss
+          <div className="p-6 sm:p-10 bg-background border-t border-border flex flex-row items-center gap-4 shrink-0 pb-safe shadow-3xl">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl bg-muted/20 text-muted-foreground hover:text-foreground transition-all">
+              Dismiss Pulse
             </Button>
-            <Button onClick={() => onEdit(record.id)} className="flex-[2] h-12 rounded-xl font-black uppercase text-[9px] tracking-[0.2em] shadow-2xl bg-primary text-black gap-2.5 transition-transform active:scale-95">
-              <Edit3 className="h-3.5 w-3.5" /> <span className="hidden xs:inline">Initialize Edit Pulse</span>
+            <Button onClick={() => onEdit(record.id)} className="flex-[2] h-14 rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black gap-3 transition-transform active:scale-95">
+              <Edit3 className="h-4 w-4" /> <span className="hidden xs:inline">Initialize Modification Pulse</span>
             </Button>
           </div>
         </motion.div>

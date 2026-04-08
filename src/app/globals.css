@@ -54,7 +54,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
+    @apply bg-background text-foreground antialiased overflow-x-hidden;
+    font-family: 'Inter', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     
     /* Native App Feel */
@@ -82,16 +83,16 @@
   }
   
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    @apply bg-background/50;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/60 rounded-full hover:bg-primary/80 transition-colors border-2 border-background;
+    @apply bg-primary/40 rounded-full hover:bg-primary/60 transition-colors border-2 border-background;
   }
 
   .no-scrollbar::-webkit-scrollbar {

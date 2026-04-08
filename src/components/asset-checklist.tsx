@@ -1,16 +1,27 @@
-
 'use client';
 
 /**
  * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
- * Phase 300: Matches the professional vertical checklist architecture.
+ * Phase 400: Dynamic pulse logic driven by folder-specific templates.
  */
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, ShieldCheck, ListTree, Hash, MapPin, Building, Tag } from 'lucide-react';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  FileText, 
+  User, 
+  ShieldCheck, 
+  ListTree, 
+  Hash, 
+  MapPin, 
+  Building, 
+  Tag,
+  Info
+} from 'lucide-react';
 import type { Asset } from '@/types/domain';
 import { cn } from '@/lib/utils';
+import { useAppState } from '@/contexts/app-state-context';
 
 interface AssetChecklistProps {
   values: Partial<Asset>;
@@ -21,13 +32,13 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
     <div className="flex items-center gap-4">
       <div className={cn(
         "p-2 rounded-lg transition-colors",
-        isCompleted ? "bg-primary/5 text-primary" : "bg-white/5 text-white/20"
+        isCompleted ? "bg-primary/5 text-primary" : "bg-foreground/5 text-foreground/20"
       )}>
         <Icon className="h-4 w-4" />
       </div>
       <span className={cn(
-        "text-xs font-black uppercase tracking-tight transition-colors",
-        isCompleted ? "text-white" : "text-white/20"
+        "text-[10px] font-black uppercase tracking-tight transition-colors",
+        isCompleted ? "text-foreground" : "text-foreground/20"
       )}>{label}</span>
     </div>
     <div className="shrink-0">
@@ -36,8 +47,8 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
             <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
           </div>
         ) : (
-          <div className="h-5 w-5 rounded-full border-2 border-white/10 flex items-center justify-center">
-            <XCircle className="h-3.5 w-3.5 text-red-600/40" />
+          <div className="h-5 w-5 rounded-full border-2 border-foreground/10 flex items-center justify-center">
+            <XCircle className="h-3.5 w-3.5 text-destructive/40" />
           </div>
         )}
     </div>
@@ -45,51 +56,60 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
 );
 
 export function AssetChecklist({ values }: AssetChecklistProps) {
-  const requiredItems = [
+  const { appSettings } = useAppState();
+
+  // Determine active checklist items based on the folder's template
+  const sheetDef = appSettings?.grants
+    .find(g => g.id === values.grantId)
+    ?.sheetDefinitions[values.category || ''];
+
+  const checklistFields = React.useMemo(() => {
+    if (!sheetDef) return [];
+    return sheetDef.displayFields.filter(f => f.inChecklist);
+  }, [sheetDef]);
+
+  const defaultItems = [
     { label: 'Category', completed: !!values.category, icon: ListTree },
-    { label: 'Asset Description', completed: !!values.description, icon: FileText },
-    { label: 'Serial Number', completed: !!values.serialNumber && values.serialNumber !== 'N/A', icon: Hash },
+    { label: 'Description', completed: !!values.description, icon: FileText },
     { label: 'Location', completed: !!values.location, icon: MapPin },
-    { label: 'Condition', completed: !!values.condition, icon: ShieldCheck },
   ];
 
-  const importantItems = [
-    { label: 'Asset ID Code', completed: !!values.assetIdCode, icon: Tag },
-    { label: 'LGA', completed: !!values.lga, icon: MapPin },
-    { label: 'Assignee', completed: !!values.custodian, icon: User },
-    { label: 'Manufacturer', completed: !!values.manufacturer, icon: Building },
-    { label: 'Model Number', completed: !!values.modelNumber, icon: Hash },
-    { label: 'Asset Class', completed: !!values.category, icon: ListTree },
-    { label: 'Remarks/Notes', completed: !!values.remarks, icon: FileText },
-  ];
+  const templateItems = checklistFields.map(field => ({
+    label: field.label,
+    completed: !!(values as any)[field.key] && (values as any)[field.key] !== 'N/A',
+    icon: Info
+  }));
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="space-y-2">
-        <h3 className="text-3xl font-black uppercase tracking-tight text-white leading-none">Asset Data Checklist</h3>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Fidelity Assurance Pulse</p>
+        <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Fidelity Checklist</h3>
+        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground opacity-60">Validation pulse per folder template</p>
       </div>
 
       <div className="space-y-8">
         <div className="space-y-4">
-          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Required Fields</h4>
-          <div className="space-y-3">
-            {requiredItems.map((item) => (
+          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Required Anchors</h4>
+          <div className="space-y-3.5">
+            {defaultItems.map((item) => (
               <ChecklistItem key={item.label} {...item} />
             ))}
           </div>
         </div>
 
-        <div className="w-full h-px bg-white/5" />
-
-        <div className="space-y-4">
-          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Important Fields</h4>
-          <div className="space-y-3">
-            {importantItems.map((item) => (
-              <ChecklistItem key={item.label} {...item} />
-            ))}
-          </div>
-        </div>
+        {templateItems.length > 0 && (
+          <>
+            <div className="w-full h-px bg-border/40" />
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Folder Parameters</h4>
+              <div className="space-y-3.5">
+                {templateItems.map((item) => (
+                  <ChecklistItem key={item.label} {...item} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

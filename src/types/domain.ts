@@ -193,6 +193,7 @@ export interface DisplayField {
   label: string;
   table: boolean;
   quickView: boolean;
+  inChecklist?: boolean;
 }
 
 export interface SheetDefinition {
