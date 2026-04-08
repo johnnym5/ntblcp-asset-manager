@@ -4,6 +4,7 @@
  * @fileOverview Dashboard - Main Overview Hub.
  * Phase 1302: Implemented background color adaptation for themes.
  * Phase 1303: Overhauled contrast for Light Mode legibility.
+ * Phase 1304: Fixed ReferenceError by importing missing icons.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -15,7 +16,9 @@ import {
   Settings,
   ChevronDown,
   FolderOpen,
-  SearchCode
+  SearchCode,
+  FileText,
+  Activity
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
