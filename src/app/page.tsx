@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1302: Integrated Command Palette trigger into the header for mobile accessibility.
+ * Phase 1303: Linked header search button directly to Command Palette for unified global search.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -136,9 +136,7 @@ export default function SPAHub() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const CurrentWorkstation = useMemo(() => {
@@ -181,19 +179,6 @@ export default function SPAHub() {
       }
     }
   }, [lastAddedId, notifications]);
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setIsSearchExpanded(true);
-        setTimeout(() => searchInputRef.current?.focus(), 100);
-      }
-      if (e.key === 'Escape') setIsSearchExpanded(false);
-    };
-    document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
-  }, []);
 
   const handleOnboardingComplete = async () => {
     setIsWelcomeOpen(false);
@@ -278,58 +263,16 @@ export default function SPAHub() {
         </div>
 
         <div className="flex-1 flex items-center justify-center mx-2 sm:mx-8">
-          <AnimatePresence mode="wait">
-            {!isSearchExpanded ? (
-              <motion.button
-                key="search-trigger"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                onClick={() => setIsSearchExpanded(true)}
-                className="flex items-center gap-3 px-3 py-1 bg-muted/30 border border-border rounded-lg text-foreground/40 hover:text-primary hover:border-primary/20 transition-all group"
-              >
-                <Search className="h-3 w-3" />
-                <span className="text-[8px] font-black uppercase tracking-widest hidden sm:inline">Search Registry</span>
-              </motion.button>
-            ) : (
-              <motion.div
-                key="search-input"
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", maxWidth: "350px", opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className="relative flex items-center group"
-              >
-                <Search className="absolute left-3 h-3 w-3 text-primary" />
-                <input 
-                  ref={searchInputRef}
-                  autoFocus
-                  type="text"
-                  placeholder="Quick Search..."
-                  className="w-full h-7 bg-muted/50 border-2 border-primary/20 rounded-lg pl-8 pr-16 text-[9px] font-bold focus:outline-none focus:border-primary transition-all placeholder:text-muted-foreground/30"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
-                  onBlur={() => !searchTerm && setIsSearchExpanded(false)}
-                />
-                <div className="absolute right-1 flex items-center gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsFilterOpen(true)}
-                    className={cn(
-                      "h-5 w-5 rounded-md text-foreground/20 hover:text-primary relative", 
-                      activeFilterCount > 0 && "text-primary"
-                    )}
-                  >
-                    <Filter className="h-2.5 w-2.5" />
-                    {activeFilterCount > 0 && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-primary rounded-full" />}
-                  </Button>
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="p-1 rounded-md text-foreground/20 hover:text-foreground">
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="flex items-center gap-3 px-4 py-1 bg-muted/30 border border-border rounded-lg text-foreground/40 hover:text-primary hover:border-primary/20 transition-all group h-8 max-w-[350px] w-full"
+          >
+            <Search className="h-3 w-3" />
+            <span className="text-[8px] font-black uppercase tracking-widest text-left flex-1">Search Registry...</span>
+            <kbd className="hidden sm:inline-flex h-4 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[8px] font-medium opacity-60 ml-2">
+              <span className="text-[10px]">⌘</span>K
+            </kbd>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
