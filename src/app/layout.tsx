@@ -7,13 +7,13 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
-  title: 'Asset Manager | Professional Inventory Platform',
+  title: 'Assetain | Professional Asset Intelligence',
   description: 'A mission-critical, offline-first asset management and verification platform.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Asset Manager',
+    title: 'Assetain',
   },
 };
 
@@ -37,6 +37,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <link rel="apple-touch-icon" href="https://picsum.photos/seed/assetain/180/180" />
       </head>
       <body className="font-sans select-none overflow-hidden overscroll-none" suppressHydrationWarning>
         <ThemeProvider
