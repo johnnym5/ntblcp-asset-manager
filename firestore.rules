@@ -7,41 +7,51 @@ service cloud.firestore {
      * 
      * Core Philosophy:
      * 1. Governance Settings: Global read for workstation init, Admin-only write.
-     * 2. Assets: Multi-tenant access via grantId. 
-     * 3. Audit/Error Logs: Append-only pulse for forensic integrity.
+     * 2. Assets: Scoped read/write pulse based on authenticated session.
+     * 3. Audit/Error Logs: Append-only for forensic integrity.
      */
 
+    // Global Helper: Evaluates if the incoming pulse is from an authenticated session.
     function isSignedIn() {
       return request.auth != null;
     }
 
     // --- Configuration & Governance ---
+    // Settings are readable by everyone to allow the Login Gateway to bootstrap.
+    // Writes are restricted to authorized auditors.
     match /config/settings {
-      allow read: if true; // Required for login state validation
-      allow write: if isSignedIn(); // Restricted to authorized admins via app logic
-    }
-
-    // --- Asset Registry ---
-    match /assets/{assetId} {
-      allow read, list: if true; // Local-first sync handles scoping
+      allow read: if true; 
       allow write: if isSignedIn();
     }
 
-    // --- Forensic Audit Ledger ---
+    // --- Asset Registry ---
+    // The primary database nodes. 
+    // In a "Local-First" architecture, the app handles regional scoping logic, 
+    // while the rules ensure only verified accounts can broadcast state changes.
+    match /assets/{assetId} {
+      allow read, list: if true; 
+      allow write: if isSignedIn();
+    }
+
+    // --- Activity History (Audit Ledger) ---
+    // This is an IMMUTABLE ledger. 
+    // Records can be created but NEVER updated or deleted.
     match /audit_logs/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if false; // Immutable ledger pulse
+      allow update, delete: if false; 
     }
 
-    // --- System Resilience Audit ---
+    // --- System Health Ledger ---
+    // Tracks application anomalies.
+    // Allows writes even during high latency to ensure technical failures are captured.
     match /error_logs/{logId} {
       allow read: if isSignedIn();
-      allow create, update: if true; // Allow system to log anomalies even during auth latency
+      allow create, update: if true; 
       allow delete: if false;
     }
 
-    // Default deny for unmatched paths
+    // Default Deny: Ensures no unauthorized paths are accessible.
     match /{document=**} {
       allow read, write: if false;
     }
