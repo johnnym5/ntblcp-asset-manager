@@ -1,7 +1,7 @@
 /**
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
- * Phase 805: Integrated inChecklist property for unified fidelity auditing.
+ * Phase 806: Hardened transform logic for absolute field parity.
  */
 
 import type { Asset } from "@/types/domain";
@@ -105,22 +105,32 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = "";
     
+    // Resolve value with resilient fallback pulse
     switch(header.normalizedName) {
-      case "sn": rawValue = asset.sn || ""; break;
-      case "location": rawValue = asset.location || ""; break;
-      case "assignee_location": rawValue = asset.custodian || ""; break;
-      case "asset_description": rawValue = asset.description || ""; break;
-      case "asset_id_code": rawValue = asset.assetIdCode || ""; break;
-      case "asset_class": rawValue = asset.category || ""; break;
-      case "condition": rawValue = asset.condition || ""; break;
-      case "purchase_price_ngn": rawValue = asset.value || 0; break;
-      case "date_purchased_received": rawValue = asset.purchaseDate || ""; break;
-      case "serial_number": rawValue = asset.serialNumber || ""; break;
-      case "source_sheet": rawValue = asset.importMetadata?.sheetName || ""; break;
-      case "row_number": rawValue = asset.importMetadata?.rowNumber || 0; break;
+      case "sn": rawValue = asset.sn; break;
+      case "location": rawValue = asset.location; break;
+      case "assignee_location": rawValue = asset.custodian; break;
+      case "asset_description": rawValue = asset.description || asset.name; break;
+      case "asset_id_code": rawValue = asset.assetIdCode; break;
+      case "serial_number": rawValue = asset.serialNumber; break;
+      case "asset_class": rawValue = asset.category; break;
+      case "condition": rawValue = asset.condition; break;
+      case "manufacturer": rawValue = asset.manufacturer; break;
+      case "model_number": rawValue = asset.modelNumber; break;
+      case "remarks": rawValue = asset.remarks; break;
+      case "purchase_price_ngn": rawValue = asset.value; break;
+      case "date_purchased_received": rawValue = asset.purchaseDate; break;
+      case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
+      case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
       default:
         const metadata = asset.metadata || {};
         rawValue = metadata[header.rawName] || metadata[header.normalizedName] || "";
+    }
+
+    // Metadata fallback if promoted property is empty
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      const meta = asset.metadata || {};
+      rawValue = meta[header.rawName] || meta[header.normalizedName] || "";
     }
 
     return {
@@ -152,7 +162,8 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
 function formatDisplayValue(val: any, type: DataType): string {
   if (val === null || val === undefined || val === "") return "---";
   if (type === "currency") {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(val));
+    const num = Number(val);
+    return isNaN(num) ? String(val) : new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(num);
   }
   if (type === "date") {
     try { return new Date(val).toLocaleDateString(); } catch(e) { return String(val); }
