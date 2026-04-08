@@ -48,7 +48,7 @@ import {
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, activeFilterCount } = useAppState();
+  const { filteredAssets, appSettings, setActiveView, manualDownload, isSyncing, isOnline, setIsFilterOpen, setIsExplored, setSelectedCategories, activeFilterCount } = useAppState();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   

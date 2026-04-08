@@ -3,9 +3,11 @@
 /**
  * @fileOverview Asset Hub - Main Registry Browser.
  * Phase 1206: Integrated Basic Filter (AssetFilterSheet) and separate Logic Filter.
+ * Phase 1207: Overhauled Folder view to separate selection from exploration.
+ * Phase 1208: Converted all sidebars to centered Dialog pop-up windows.
  */
 
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
@@ -26,7 +28,8 @@ import {
   RefreshCw,
   AlertTriangle,
   ListFilter,
-  Filter
+  Filter,
+  Eye
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -92,6 +95,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSortDir,
     selectedCategories,
     setSelectedCategories,
+    isExplored,
+    setIsExplored,
     isOnline,
     activeGrantId,
     filters,
@@ -179,12 +184,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     let results = [...filteredAssets];
     if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
     
-    // Applying logic engine filters (if any)
-    if (filters.length > 0) {
-      // In a real implementation, we would apply the 'filters' array here.
-      // For now, it's handled by the FilterDrawer logic.
-    }
-
     if (sortKey) {
       const sortHeader = headers.find(h => h.id === sortKey);
       results.sort((a, b) => {
@@ -202,7 +201,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
     }
     return results;
-  }, [filteredAssets, sortKey, sortDir, selectedCategories, headers, filters]);
+  }, [filteredAssets, sortKey, sortDir, selectedCategories, headers]);
 
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / itemsPerPage), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [processedAssets, currentPage, itemsPerPage]);
@@ -214,6 +213,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (checked) setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
     else setSelectedAssetIds(new Set());
   }, [processedAssets]);
+
+  const handleExploreFolder = (cat: string) => {
+    setSelectedCategories([cat]);
+    setIsExplored(true);
+    setCurrentPage(1);
+  };
+
+  const handleToggleCategorySelection = (cat: string) => {
+    const next = selectedCategories.includes(cat)
+      ? selectedCategories.filter(c => c !== cat)
+      : [...selectedCategories, cat];
+    setSelectedCategories(next);
+  };
 
   const handleExecutePurge = async () => {
     if (categoriesToPurge.length === 0) return;
@@ -238,6 +250,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, filteredAssets, headers, appSettings?.sourceBranding]);
 
+  const showList = isExplored || viewAll;
+
   return (
     <div className="space-y-4 h-full flex flex-col relative">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
@@ -245,13 +259,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <div className="flex items-center gap-3 self-start">
             <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">{selectedCategories.length === 0 ? 'Asset Hub' : 'Asset List'}</h2>
-              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{selectedCategories.length === 0 ? 'CATEGORIES' : 'VIEWING FOLDER'}</p>
+              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">{!showList ? 'Asset Hub' : 'Asset List'}</h2>
+              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{!showList ? 'CATEGORIES' : 'VIEWING FOLDER'}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
-            {(selectedCategories.length === 0 || !viewAll) && (
+            {!showList && (
               <div className="flex items-center gap-3 pr-4 border-r border-white/10 shrink-0">
                 <Checkbox id="sel-all-hub" checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => setSelectedCategories(c ? categories : [])} className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary" />
                 <label htmlFor="sel-all-hub" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">Select All</label>
@@ -304,21 +318,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </div>
 
       <div className="flex-1 min-h-0 px-1 pt-4">
-        {selectedCategories.length === 0 || viewAll ? (
+        {!showList ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             {categories.map(cat => (
-              <Card key={cat} className={cn("bg-[#080808] border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6 relative", selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-white/5")}>
+              <Card 
+                key={cat} 
+                onClick={() => handleToggleCategorySelection(cat)}
+                className={cn(
+                  "bg-[#080808] border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6 relative cursor-pointer", 
+                  selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-white/5"
+                )}
+              >
                 <div className="absolute top-4 left-4 z-20">
-                  <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={(c) => setSelectedCategories(c ? [...selectedCategories, cat] : selectedCategories.filter(x => x !== cat))} className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary" />
+                  <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={(c) => handleToggleCategorySelection(cat)} className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary" />
                 </div>
                 <div className="flex justify-between items-start mb-8 pl-8">
                   <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat}</h3>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-white/20 hover:text-white" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-black border-white/10 text-white p-1">
-                      <DropdownMenuItem onClick={() => { setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename Folder</span></DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedCategories([cat])} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Open Folder</span></DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setCategoriesToPurge([cat]); setIsPurgeDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-destructive/10 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Delete Folder</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename Folder</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Open Folder</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCategoriesToPurge([cat]); setIsPurgeDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-destructive/10 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Delete Folder</span></DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -326,7 +347,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <p className="text-4xl font-black tracking-tighter text-white">{groupStats[cat]?.total || 0}</p>
                   <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">TOTAL ASSETS</p>
                 </div>
-                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">Explore Folder <ChevronRight className="h-3 w-3" /></Button>
+                <Button 
+                  onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} 
+                  variant="outline" 
+                  className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all"
+                >
+                  Explore Folder <ChevronRight className="h-3 w-3" />
+                </Button>
               </Card>
             ))}
           </div>
@@ -351,10 +378,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </div>
 
       <AnimatePresence>
-        {selectedCategories.length > 0 && (
+        {selectedCategories.length > 0 && !showList && (
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3"><div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-white tracking-widest">Folders Selected</span></div>
             <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setIsExplored(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10"><Eye className="h-3.5 w-3.5" /> View Assets</Button>
               <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><X className="h-3.5 w-3.5" /> Deselect</Button>
               {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Delete Folders</Button>}
             </div>
@@ -366,8 +394,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent className="max-w-md bg-black border-white/10 text-white p-8">
-          <DialogHeader><DialogTitle className="text-xl font-black uppercase">Rename Folder</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md bg-black border-white/10 text-white p-8 rounded-[2.5rem]">
+          <DialogHeader><DialogTitle className="text-xl font-black uppercase tracking-tight">Rename Folder</DialogTitle></DialogHeader>
           <div className="py-6 space-y-4">
             <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Folder Label</Label>
             <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase text-sm" />
@@ -380,7 +408,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </Dialog>
 
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white p-10">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-black text-white p-10">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><AlertTriangle className="h-10 w-10 text-destructive" /></div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Confirm Deletion</AlertDialogTitle>
@@ -395,6 +423,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
+      <HeaderManagerDrawer isOpen={false} onOpenChange={() => {}} headers={headers} onUpdateHeaders={setAppSettings as any} onReset={() => {}} />
     </div>
   );
 

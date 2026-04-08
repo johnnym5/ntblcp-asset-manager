@@ -3,14 +3,22 @@
 /**
  * @fileOverview FilterDrawer - High-Fidelity Logic Engine.
  * Phase 155: Enhanced with Empty State and Value Discovery logging.
+ * Phase 156: Converted to centered Dialog pop-up window.
  */
 
 import React, { useState, useMemo } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ListFilter, Search, X, Check, Database, Info } from 'lucide-react';
+import { ListFilter, Search, X, Check, Database } from 'lucide-react';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '../ui/checkbox';
@@ -72,25 +80,22 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
   );
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => { if (open) setLocalFilters(activeFilters); onOpenChange(open); }}>
-      <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0 border-none rounded-l-[2.5rem] shadow-2xl bg-background overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (open) setLocalFilters(activeFilters); onOpenChange(open); }}>
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-3xl bg-background overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
-          <SheetHeader>
+          <DialogHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase text-white">
+              <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase text-white">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <ListFilter className="text-primary h-6 w-6" />
                 </div>
                 Logic Engine
-              </SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10 text-white/40">
-                <X className="h-5 w-5" />
-              </Button>
+              </DialogTitle>
             </div>
-            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
               Multi-select criteria for all registry dimensions.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
         <div className="px-8 py-6 bg-muted/5 border-b">
@@ -186,7 +191,7 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
           </div>
         </ScrollArea>
 
-        <SheetFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
+        <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
           <Button 
             variant="ghost" 
             onClick={() => setLocalFilters([])}
@@ -200,8 +205,8 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
           >
             Apply Filter Pulse
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

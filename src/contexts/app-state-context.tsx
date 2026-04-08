@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1100: Centralized Filter Engine implementation.
+ * Phase 1101: Added isExplored state for Folder Grid vs List View logic.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -89,6 +90,8 @@ interface AppStateContextType {
   selectedCategories: string[];
   setSelectedCategories: (cats: string[]) => void;
   setSelectedCategory: (cat: string | null) => void;
+  isExplored: boolean;
+  setIsExplored: (val: boolean) => void;
   itemsPerPage: number | 'all';
   setItemsPerPage: (val: number | 'all') => void;
   goBack: () => void;
@@ -135,6 +138,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
   const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
+  const [isExplored, setIsExplored] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
@@ -295,9 +299,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, [isOnline, refreshRegistry]);
 
   const goBack = useCallback(() => {
-    if (activeView === 'REGISTRY' && selectedCategories.length > 0) setSelectedCategoriesStatus([]);
-    else setActiveView('DASHBOARD');
-  }, [activeView, selectedCategories, setActiveView]);
+    if (activeView === 'REGISTRY' && isExplored) {
+      setIsExplored(false);
+      setSelectedCategoriesStatus([]);
+    } else if (activeView === 'REGISTRY' && selectedCategories.length > 0) {
+      setSelectedCategoriesStatus([]);
+    } else {
+      setActiveView('DASHBOARD');
+    }
+  }, [activeView, isExplored, selectedCategories, setActiveView]);
 
   return (
     <AppStateContext.Provider value={{
@@ -330,6 +340,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
       selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveView('REGISTRY'); },
       setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveView('REGISTRY'); },
+      isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack, activeFilterCount
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>

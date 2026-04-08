@@ -3,18 +3,18 @@
 /**
  * @fileOverview ColumnCustomizationSheet - High-Fidelity Asset Group Schema Editor.
  * Phase 350: Overhauled to focus on Asset Groups rather than physical sheets.
+ * Phase 351: Converted to centered Dialog pop-up window.
  */
 
 import React, { useState, useEffect } from 'react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -96,25 +96,22 @@ export function ColumnCustomizationSheet({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden bg-black text-white rounded-l-[2.5rem] border-white/5 shadow-2xl">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 overflow-hidden bg-black text-white rounded-[2.5rem] border-white/10 shadow-2xl">
         <div className="p-10 pb-6 bg-white/5 border-b border-white/5">
-          <SheetHeader>
+          <DialogHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 bg-primary/10 rounded-xl">
                   <Layers className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <SheetTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Group Layout</SheetTitle>
-                  <SheetDescription className="font-bold uppercase text-[9px] tracking-[0.3em] text-primary mt-1.5">STRUCTURAL SCHEMA ORCHESTRATION</SheetDescription>
+                  <DialogTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Group Layout</DialogTitle>
+                  <DialogDescription className="font-bold uppercase text-[9px] tracking-[0.3em] text-primary mt-1.5">STRUCTURAL SCHEMA ORCHESTRATION</DialogDescription>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-12 w-12 bg-white/5 hover:bg-white/10 text-white">
-                <X className="h-6 w-6" />
-              </Button>
             </div>
-          </SheetHeader>
+          </DialogHeader>
         </div>
 
         <div className="px-10 py-6 border-b border-white/5 bg-black flex items-center justify-between">
@@ -175,16 +172,14 @@ export function ColumnCustomizationSheet({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="p-10 bg-black border-t border-white/5 flex flex-row items-center gap-4">
-          <SheetClose asChild>
-            <Button variant="ghost" className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] bg-white/5 hover:bg-white/10 text-white">Cancel</Button>
-          </SheetClose>
+        <DialogFooter className="p-10 bg-black border-t border-white/5 flex flex-row items-center gap-4">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] bg-white/5 hover:bg-white/10 text-white">Cancel</Button>
           <div className="flex-[3] flex gap-4">
             <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2 border-white/10 text-white hover:bg-white/5">Apply to All Groups</Button>
             <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black hover:bg-primary/90">Apply to This Group</Button>
           </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

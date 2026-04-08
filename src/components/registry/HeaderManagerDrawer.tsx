@@ -1,10 +1,20 @@
+'use client';
+
 /**
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
  * Phase 35: Removed redundant manual close button.
+ * Phase 36: Converted to centered Dialog pop-up window.
  */
 
 import React, { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,26 +23,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Columns, 
   GripVertical, 
-  Eye, 
   RotateCcw, 
-  X, 
   Search,
   LayoutGrid,
   Zap,
   ShieldCheck,
   Tag,
   MapPin,
-  History,
   Info,
-  Filter,
-  ArrowUpDown,
   Lock
 } from 'lucide-react';
 import type { RegistryHeader, RegistryPreset } from '@/types/registry';
 import { REGISTRY_PRESETS } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface HeaderManagerProps {
   isOpen: boolean;
@@ -75,20 +79,20 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0 border-none rounded-l-[2.5rem] shadow-2xl bg-background overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] shadow-2xl bg-background overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
-          <SheetHeader>
+          <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-xl">
                 <Columns className="text-primary h-6 w-6" />
               </div>
-              <SheetTitle className="text-3xl font-black uppercase tracking-tight">Field Setup</SheetTitle>
+              <DialogTitle className="text-3xl font-black uppercase tracking-tight">Field Setup</DialogTitle>
             </div>
-            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
               Technical Orchestration & Field Visibility Checklist
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
         <div className="px-8 py-6 bg-muted/5 border-b space-y-4">
@@ -147,17 +151,15 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
           </div>
         </ScrollArea>
 
-        <SheetFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
+        <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
           <Button variant="ghost" onClick={onReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
             <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset Template
           </Button>
-          <SheetClose asChild>
-            <Button className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-              Commit Arrangement
-            </Button>
-          </SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <Button onClick={() => onOpenChange(false)} className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
+            Commit Arrangement
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

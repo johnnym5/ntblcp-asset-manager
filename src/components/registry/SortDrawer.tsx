@@ -3,14 +3,21 @@
 /**
  * @fileOverview High-Fidelity Sort Sequence Engine.
  * Phase 102: Redesigned to match the dark high-fidelity workstation theme.
+ * Phase 103: Converted to centered Dialog pop-up window.
  */
 
 import React from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUpDown, ArrowUp, ArrowDown, X, Layers, CheckCircle2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import type { RegistryHeader } from '@/types/registry';
 import { cn } from '@/lib/utils';
 
@@ -27,20 +34,17 @@ export function SortDrawer({ isOpen, onOpenChange, headers, sortBy, sortDirectio
   const activeHeaders = headers.filter(h => h.sortEnabled);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-l-[2.5rem]">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md h-[70vh] flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         <div className="p-10 pb-6 border-b border-white/5 space-y-4">
-          <SheetHeader>
+          <DialogHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white">Sort Sequence</SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl text-white/40 hover:text-white hover:bg-white/5 h-10 w-10">
-                <X className="h-5 w-5" />
-              </Button>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Sort Sequence</DialogTitle>
             </div>
-            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic">
+            <DialogDescription className="text-sm font-medium text-white/40 leading-relaxed italic">
               Define the primary sequence pulse for the current project registry.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
         <ScrollArea className="flex-1 bg-black">
@@ -88,15 +92,15 @@ export function SortDrawer({ isOpen, onOpenChange, headers, sortBy, sortDirectio
           </div>
         </ScrollArea>
 
-        <div className="p-10 bg-[#050505] border-t border-white/5">
+        <DialogFooter className="p-10 bg-[#050505] border-t border-white/5">
           <Button 
             onClick={() => onOpenChange(false)}
             className="w-full h-14 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
           >
-            Done
+            Confirm Sort Pulse
           </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
