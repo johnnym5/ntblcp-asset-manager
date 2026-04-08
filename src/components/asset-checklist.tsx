@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
- * Phase 405: Driven by Global Header Settings for real-time validation pulses.
+ * Phase 406: Compacted for Dossier integration.
  */
 
 import React from 'react';
@@ -24,26 +24,26 @@ interface AssetChecklistProps {
 
 const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCompleted: boolean; icon: any }) => (
   <div className="flex items-center justify-between group transition-all">
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-3">
       <div className={cn(
-        "p-2 rounded-lg transition-colors",
+        "p-1.5 rounded-md transition-colors",
         isCompleted ? "bg-primary/5 text-primary" : "bg-foreground/5 text-foreground/20"
       )}>
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3 w-3" />
       </div>
       <span className={cn(
-        "text-[10px] font-black uppercase tracking-tight transition-colors",
+        "text-[9px] font-black uppercase tracking-tight transition-colors",
         isCompleted ? "text-foreground" : "text-foreground/20"
       )}>{label}</span>
     </div>
     <div className="shrink-0">
         {isCompleted ? (
-          <div className="h-5 w-5 rounded-full border-2 border-primary flex items-center justify-center bg-primary/10">
-            <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+          <div className="h-4 w-4 rounded-full border border-primary flex items-center justify-center bg-primary/10">
+            <CheckCircle2 className="h-2.5 w-2.5 text-primary" />
           </div>
         ) : (
-          <div className="h-5 w-5 rounded-full border-2 border-foreground/10 flex items-center justify-center">
-            <XCircle className="h-3.5 w-3.5 text-destructive/40" />
+          <div className="h-4 w-4 rounded-full border border-foreground/10 flex items-center justify-center">
+            <XCircle className="h-2.5 w-2.5 text-destructive/40" />
           </div>
         )}
     </div>
@@ -80,26 +80,24 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
   });
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="space-y-2">
-        <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Fidelity Audit</h3>
-        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground opacity-60">Global registry validation pulse</p>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <div className="space-y-1">
+        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Fidelity Audit</h3>
+        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">Global validation pulse</p>
       </div>
 
-      <div className="space-y-8">
-        <div className="space-y-4">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Required Anchors</h4>
-          <div className="space-y-3.5">
-            {items.length > 0 ? (
-              items.map((item) => (
-                <ChecklistItem key={item.label} {...item} />
-              ))
-            ) : (
-              <div className="p-4 rounded-xl border-2 border-dashed border-border/40 text-center">
-                <p className="text-[8px] font-black uppercase text-muted-foreground opacity-40 italic">No fidelity markers configured</p>
-              </div>
-            )}
-          </div>
+      <div className="space-y-4">
+        <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Required Anchors</h4>
+        <div className="space-y-2.5">
+          {items.length > 0 ? (
+            items.map((item) => (
+              <ChecklistItem key={item.label} {...item} />
+            ))
+          ) : (
+            <div className="p-3 rounded-xl border-2 border-dashed border-border/40 text-center">
+              <p className="text-[7px] font-black uppercase text-muted-foreground opacity-40 italic">No markers</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
