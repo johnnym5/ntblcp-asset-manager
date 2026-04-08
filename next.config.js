@@ -10,6 +10,10 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
+  workboxOptions: {
+    clientsClaim: true,
+    skipWaiting: true,
+  }
 });
 
 const nextConfig = {
@@ -20,7 +24,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Ensure we focus strictly on the app router
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },
