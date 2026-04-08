@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -41,7 +40,8 @@ import {
   Eye,
   ArrowRight,
   Zap,
-  Cpu
+  Cpu,
+  Hammer
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -202,6 +202,14 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedIds(next);
+  };
+
+  const toggleAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(filteredNodes.map(n => n.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
   };
 
   if (userProfile?.role !== 'SUPERADMIN') return null;
