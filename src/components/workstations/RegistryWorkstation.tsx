@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Phase 905: Implemented Inline Header Orchestration and gesture-aware selection pulses.
+ * Phase 906: Resolved ReferenceError by defining isHeaderManagerOpen state.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -145,6 +146,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHeaderEditingMode, setIsHeaderEditingMode] = useState(false);
+  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [selectedAssetIdForEdit, setSelectedAssetIdForEdit] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -268,6 +270,85 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSelectedCategories([cat]);
     setIsExplored(true);
     setCurrentPage(1);
+  };
+
+  const handleMergeSelection = async () => {
+    if (!targetMergeCategory) return;
+    setIsProcessing(true);
+    try {
+      const targetAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
+      for (const asset of targetAssets) {
+        const updated = {
+          ...asset,
+          category: targetMergeCategory,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: userProfile?.displayName || 'Registry Orchestrator'
+        };
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      setIsMergeDialogOpen(false);
+      addNotification({ title: "Assets Merged", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRenameCategory = async () => {
+    if (!categoryToRename || !newCategoryName.trim()) return;
+    setIsProcessing(true);
+    try {
+      const affectedAssets = filteredAssets.filter(a => a.category === categoryToRename);
+      for (const asset of affectedAssets) {
+        const updated = {
+          ...asset,
+          category: newCategoryName.trim(),
+          lastModified: new Date().toISOString()
+        };
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+      await refreshRegistry();
+      setIsRenameDialogOpen(false);
+      addNotification({ title: "Folder Renamed", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePurgeCategories = async () => {
+    setIsProcessing(true);
+    try {
+      const idsToPurge = filteredAssets
+        .filter(a => categoriesToPurge.includes(a.category))
+        .map(a => a.id);
+      
+      for (const id of idsToPurge) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      await refreshRegistry();
+      setIsPurgeDialogOpen(false);
+      setCategoriesToPurge([]);
+      setSelectedCategories([]);
+      addNotification({ title: "Folders Purged", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchDeleteAssets = async () => {
+    setIsProcessing(true);
+    try {
+      for (const id of Array.from(selectedAssetIds)) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      setIsAssetDeleteOpen(false);
+      addNotification({ title: "Records Purged", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -466,6 +547,56 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={handleSaveAssetBatch} />
       <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
+
+      {/* Action Dialogs */}
+      <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-primary/10 bg-black text-white shadow-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Merge Selection</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select target folder for migration pulse.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-6">
+            <Select value={targetMergeCategory} onValueChange={setTargetMergeCategory}>
+              <SelectTrigger className="h-14 rounded-2xl bg-white/5 border-2 border-white/10 font-black text-[10px] uppercase">
+                <SelectValue placeholder="Target Category..." />
+              </SelectTrigger>
+              <SelectContent className="bg-black border-white/10">
+                {categories.map(c => <SelectItem key={c} value={c} className="text-[10px] font-black uppercase">{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Confirm Merge</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight">Purge Selection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40">This will permanently destroy {selectedAssetIds.size} records from the registry.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Execute Purge</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight">Destroy Folders?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Confirm permanent deletion of {selectedCategories.length} registry folders and all contained nodes.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePurgeCategories} disabled={isProcessing} className="bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Commit Destruction</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
