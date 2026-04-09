@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Hardened for high-volume data handling and deterministic normalization.
- * Phase 1301: Integrated Diagnostic Search Tokens for Dashboard Navigation.
- * Phase 1302: Added groupsViewMode for operational folder/condition shortcuts.
+ * Phase 1303: Category-Aware Technical ID Gap filtering (Chassis/Engine for vehicles vs Serial/Model for others).
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -253,9 +251,20 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SERIAL') {
-        results = results.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '');
+        // Category-Aware Technical ID filter
+        results = results.filter(a => {
+          const cat = (a.category || '').toLowerCase();
+          const isVehicle = cat.includes('motor') || cat.includes('vehicle');
+          if (isVehicle) {
+            return !a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === '' || 
+                   !a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === '';
+          } else {
+            return !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '' || 
+                   !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '';
+          }
+        });
       } else if (searchTerm === 'CONDITION_BAD') {
-        results = results.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
+        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
       } else {
         const fuzzySearch = getFuzzySignature(searchTerm);
         results = results.filter(a => {

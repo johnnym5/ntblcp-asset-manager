@@ -2,10 +2,7 @@
 
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
- * Phase 1500: Relocated Issue Scanner and At-a-Glance to the top.
- * Phase 1501: Expanded Issue Scanner logic to detect ID gaps and critical conditions.
- * Phase 1502: Optimized typography for desktop folder name visibility.
- * Phase 1503: Resolved refreshRegistry ReferenceError.
+ * Phase 1504: Prioritized Carousels at the very top and refined Issue logic to be category-aware.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -69,17 +66,31 @@ export function DashboardWorkstation() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // 1. Issue Scanner Assets - ENHANCED LOGIC
+  // 1. Issue Scanner Assets - ENHANCED CATEGORY-AWARE LOGIC
   const issueAssets = useMemo(() => {
-    const list = assets.filter(a => 
-      a.status !== 'VERIFIED' || 
-      ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '') || 
-      !a.assetIdCode || 
-      a.assetIdCode === 'N/A' || 
-      a.assetIdCode.trim() === '' ||
-      !a.serialNumber ||
-      a.serialNumber === 'N/A'
-    );
+    const list = assets.filter(a => {
+      // Logic: identify assets with ANY fidelity gap
+      const isUnverified = a.status !== 'VERIFIED';
+      const isBadCondition = ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '');
+      const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() !== '';
+      
+      const cat = (a.category || '').toLowerCase();
+      const isVehicle = cat.includes('motor') || cat.includes('vehicle');
+      
+      let hasTechId = false;
+      if (isVehicle) {
+        // Vehicles use Chassis & Engine
+        hasTechId = !!a.chassisNo && a.chassisNo !== 'N/A' && a.chassisNo.trim() !== '' && 
+                    !!a.engineNo && a.engineNo !== 'N/A' && a.engineNo.trim() !== '';
+      } else {
+        // Others use Serial & Model
+        hasTechId = !!a.serialNumber && a.serialNumber !== 'N/A' && a.serialNumber.trim() !== '' && 
+                    !!a.modelNumber && a.modelNumber !== 'N/A' && a.modelNumber.trim() !== '';
+      }
+
+      return isUnverified || isBadCondition || !hasAssetId || !hasTechId;
+    });
+    // Shuffle and pick 5
     return [...list].sort(() => 0.5 - Math.random()).slice(0, 5);
   }, [assets, randomSeed]);
 
@@ -160,29 +171,10 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 2. BOLD MODE PROTOCOL HEADER */}
-      <div className="px-1">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10 rounded-[3rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl shadow-primary/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
-            <modeInfo.icon className="h-40 w-40 text-primary" />
-          </div>
-          <div className="flex items-center gap-8 relative z-10 text-center md:text-left flex-col md:flex-row">
-            <div className="p-6 bg-primary rounded-[2rem] shadow-2xl shadow-primary/30">
-              <modeInfo.icon className="h-10 w-10 text-black stroke-[2.5]" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{modeInfo.label}</h3>
-              <p className="text-xs font-medium text-muted-foreground italic leading-relaxed max-w-xl">{modeInfo.desc}</p>
-            </div>
-          </div>
-          <Badge className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-full shadow-lg relative z-10 border-2 border-black">LIVE REGISTRY PROTOCOL</Badge>
-        </motion.div>
-      </div>
-
       <div className="flex-1 min-h-0">
         <div className="space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-32">
           
-          {/* 3. DYNAMIC CAROUSELS - NOW AT THE TOP */}
+          {/* 2. DYNAMIC CAROUSELS - NOW AT THE VERY TOP */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 px-1">
             
             {/* ISSUE SCANNER */}
@@ -216,10 +208,27 @@ export function DashboardWorkstation() {
                           <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 space-y-2">
                             <div className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><AlertCircle className="h-3 w-3" /> Potential Issues Detected:</div>
                             <ul className="text-[9px] font-bold text-muted-foreground uppercase list-disc pl-4 space-y-1">
-                              {!issueAssets[issueIndex].assetIdCode && <li>Missing System Tag ID</li>}
+                              {(!issueAssets[issueIndex].assetIdCode || issueAssets[issueIndex].assetIdCode === 'N/A') && <li>Missing System Tag ID</li>}
                               {issueAssets[issueIndex].status !== 'VERIFIED' && <li>Pending Physical Verification</li>}
                               {['Bad condition', 'Poor', 'Burnt', 'Stolen'].includes(issueAssets[issueIndex].condition || '') && <li>Critical condition alert: {issueAssets[issueIndex].condition}</li>}
-                              {!issueAssets[issueIndex].serialNumber && <li>Missing Serial Number</li>}
+                              
+                              {(() => {
+                                const a = issueAssets[issueIndex];
+                                const cat = (a.category || '').toLowerCase();
+                                const isVehicle = cat.includes('motor') || cat.includes('vehicle');
+                                
+                                if (isVehicle) {
+                                  const gaps = [];
+                                  if (!a.chassisNo || a.chassisNo === 'N/A') gaps.push('Chassis No');
+                                  if (!a.engineNo || a.engineNo === 'N/A') gaps.push('Engine No');
+                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
+                                } else {
+                                  const gaps = [];
+                                  if (!a.serialNumber || a.serialNumber === 'N/A') gaps.push('Serial Number');
+                                  if (!a.modelNumber || a.modelNumber === 'N/A') gaps.push('Model Number');
+                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
+                                }
+                              })()}
                             </ul>
                           </div>
                         </div>
@@ -279,6 +288,25 @@ export function DashboardWorkstation() {
                 )}
               </AnimatePresence>
             </div>
+          </div>
+
+          {/* 3. BOLD MODE PROTOCOL HEADER */}
+          <div className="px-1">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10 rounded-[3rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl shadow-primary/5 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
+                <modeInfo.icon className="h-40 w-40 text-primary" />
+              </div>
+              <div className="flex items-center gap-8 relative z-10 text-center md:text-left flex-col md:flex-row">
+                <div className="p-6 bg-primary rounded-[2rem] shadow-2xl shadow-primary/30">
+                  <modeInfo.icon className="h-10 w-10 text-black stroke-[2.5]" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{modeInfo.label}</h3>
+                  <p className="text-xs font-medium text-muted-foreground italic leading-relaxed max-w-xl">{modeInfo.desc}</p>
+                </div>
+              </div>
+              <Badge className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-full shadow-lg relative z-10 border-2 border-black">LIVE REGISTRY PROTOCOL</Badge>
+            </motion.div>
           </div>
           
           {/* 4. ANALYTICS & TOOLS SECTION */}

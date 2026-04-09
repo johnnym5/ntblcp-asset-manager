@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Inventory Pulse Dashboard - High-Fidelity Metric Hub.
- * Implements exactly 10 business-critical asset anchors with detailed descriptions.
- * Phase 1505: Locked Pending Action card to Verification Mode and updated navigation.
+ * Phase 1506: Refined Technical ID Gaps logic to be category-aware (Chassis/Engine for vehicles) and added Model Number check.
  */
 
 import React, { useMemo } from 'react';
@@ -122,7 +121,22 @@ export function AssetSummaryDashboard() {
         
         const pending = filteredAssets.filter(a => a.status === 'UNVERIFIED').length;
         const missingId = filteredAssets.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '').length;
-        const missingSerial = filteredAssets.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '').length;
+        
+        // Category-Aware Identification Gaps
+        const missingTechIds = filteredAssets.filter(a => {
+            const cat = (a.category || '').toLowerCase();
+            const isVehicle = cat.includes('motor') || cat.includes('vehicle');
+            
+            if (isVehicle) {
+                // Vehicles use Chassis & Engine
+                return !a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === '' || 
+                       !a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === '';
+            } else {
+                // Standard assets use Serial & Model
+                return !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '' || 
+                       !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '';
+            }
+        }).length;
         
         const critical = filteredAssets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length;
         
@@ -147,7 +161,7 @@ export function AssetSummaryDashboard() {
             verified,
             pending,
             missingId,
-            missingSerial,
+            missingTechIds,
             critical,
             maintenance,
             exceptions,
@@ -186,7 +200,7 @@ export function AssetSummaryDashboard() {
                     />
                 )}
 
-                {/* 2. Pending Action - Locked to Verification Mode */}
+                {/* 2. Pending Action */}
                 {isVerificationMode && (
                     <PulseCard 
                         label="Pending Action"
@@ -210,11 +224,11 @@ export function AssetSummaryDashboard() {
                     variant="warning"
                 />
 
-                {/* 4. Missing Serials */}
+                {/* 4. Missing Serial / Model */}
                 <PulseCard 
-                    label="Missing Serials"
-                    description="Items missing manufacturer serial numbers. Risk for identification."
-                    count={metrics.missingSerial}
+                    label="Serial / Model Gaps"
+                    description="Items missing manufacturer serials, models, or vehicle identifiers (Chassis/Engine)."
+                    count={metrics.missingTechIds}
                     icon={SearchCode}
                     color="bg-orange-600"
                     onClick={() => navigateTo('REGISTRY', 'MISSING_SERIAL')}
