@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
- * Phase 1504: Prioritized Carousels at the very top and refined Issue logic to be category-aware.
+ * Phase 1507: Prioritized At-a-Glance and locked Verification issues to Verification Mode.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -66,11 +66,17 @@ export function DashboardWorkstation() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // 1. Issue Scanner Assets - ENHANCED CATEGORY-AWARE LOGIC
+  // 1. At a Glance Assets - Prioritized
+  const glanceAssets = useMemo(() => {
+    return [...assets].sort(() => 0.5 - Math.random()).slice(0, 5);
+  }, [assets, randomSeed]);
+
+  // 2. Issue Scanner Assets - MODE AWARE
   const issueAssets = useMemo(() => {
     const list = assets.filter(a => {
-      // Logic: identify assets with ANY fidelity gap
-      const isUnverified = a.status !== 'VERIFIED';
+      // Verification issues only show in verification mode
+      const isUnverified = mode === 'verification' && a.status !== 'VERIFIED';
+      
       const isBadCondition = ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '');
       const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() !== '';
       
@@ -92,12 +98,7 @@ export function DashboardWorkstation() {
     });
     // Shuffle and pick 5
     return [...list].sort(() => 0.5 - Math.random()).slice(0, 5);
-  }, [assets, randomSeed]);
-
-  // 2. At a Glance Assets
-  const glanceAssets = useMemo(() => {
-    return [...assets].sort(() => 0.5 - Math.random()).slice(0, 5);
-  }, [assets, randomSeed]);
+  }, [assets, mode, randomSeed]);
 
   const handleRefreshRandom = () => {
     setRandomSeed(prev => prev + 1);
@@ -174,74 +175,10 @@ export function DashboardWorkstation() {
       <div className="flex-1 min-h-0">
         <div className="space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-32">
           
-          {/* 2. DYNAMIC CAROUSELS - NOW AT THE VERY TOP */}
+          {/* 2. DYNAMIC CAROUSELS - AT THE TOP */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 px-1">
             
-            {/* ISSUE SCANNER */}
-            <div className="space-y-6">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3">
-                  <div className="p-1.5 bg-red-500/10 rounded-lg border border-red-500/20"><FileWarning className="h-4 w-4 text-red-600" /></div>
-                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight">Issue Scanner</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" disabled={issueIndex === 0} onClick={() => setIssueIndex(i => i - 1)} className="h-8 w-8 rounded-full border border-border"><ChevronLeft className="h-4 w-4" /></Button>
-                  <span className="text-[10px] font-mono font-bold text-muted-foreground">{issueIndex + 1} / {issueAssets.length || 1}</span>
-                  <Button variant="ghost" size="icon" disabled={issueIndex === issueAssets.length - 1} onClick={() => setIssueIndex(i => i + 1)} className="h-8 w-8 rounded-full border border-border"><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {issueAssets.length > 0 ? (
-                  <motion.div key={`issue-${issueIndex}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                    <Card className="rounded-[2.5rem] border-2 border-red-500/20 bg-red-500/[0.02] p-8 shadow-3xl group cursor-pointer hover:border-red-500/40 transition-all" onClick={() => handleInspect(issueAssets[issueIndex].id)}>
-                      <div className="flex flex-col sm:flex-row items-center gap-8">
-                        <div className="p-6 bg-white rounded-[2rem] border-2 border-red-500/10 shadow-inner shrink-0 relative">
-                          <Activity className="h-12 w-12 text-red-600" />
-                          <Badge className="absolute -top-3 -right-3 bg-red-600 text-white font-black text-[8px] px-2 h-6 border-2 border-black">URGENT</Badge>
-                        </div>
-                        <div className="space-y-4 flex-1 text-center sm:text-left">
-                          <div className="space-y-1">
-                            <h4 className="text-xl font-black uppercase text-foreground leading-tight line-clamp-2">{issueAssets[issueIndex].description}</h4>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{issueAssets[issueIndex].location} &bull; {issueAssets[issueIndex].category}</p>
-                          </div>
-                          <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 space-y-2">
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><AlertCircle className="h-3 w-3" /> Potential Issues Detected:</div>
-                            <ul className="text-[9px] font-bold text-muted-foreground uppercase list-disc pl-4 space-y-1">
-                              {(!issueAssets[issueIndex].assetIdCode || issueAssets[issueIndex].assetIdCode === 'N/A') && <li>Missing System Tag ID</li>}
-                              {issueAssets[issueIndex].status !== 'VERIFIED' && <li>Pending Physical Verification</li>}
-                              {['Bad condition', 'Poor', 'Burnt', 'Stolen'].includes(issueAssets[issueIndex].condition || '') && <li>Critical condition alert: {issueAssets[issueIndex].condition}</li>}
-                              
-                              {(() => {
-                                const a = issueAssets[issueIndex];
-                                const cat = (a.category || '').toLowerCase();
-                                const isVehicle = cat.includes('motor') || cat.includes('vehicle');
-                                
-                                if (isVehicle) {
-                                  const gaps = [];
-                                  if (!a.chassisNo || a.chassisNo === 'N/A') gaps.push('Chassis No');
-                                  if (!a.engineNo || a.engineNo === 'N/A') gaps.push('Engine No');
-                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
-                                } else {
-                                  const gaps = [];
-                                  if (!a.serialNumber || a.serialNumber === 'N/A') gaps.push('Serial Number');
-                                  if (!a.modelNumber || a.modelNumber === 'N/A') gaps.push('Model Number');
-                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
-                                }
-                              })()}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                ) : (
-                  <Card className="rounded-[2.5rem] border-2 border-dashed border-border p-20 text-center opacity-20"><Info className="h-12 w-12 mx-auto mb-4" /><p className="text-sm font-black uppercase tracking-widest">No issues found in current scope</p></Card>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* AT A GLANCE */}
+            {/* AT A GLANCE - HIGHER POSITION */}
             <div className="space-y-6">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-3">
@@ -285,6 +222,73 @@ export function DashboardWorkstation() {
                   </motion.div>
                 ) : (
                   <Card className="rounded-[2.5rem] border-2 border-dashed border-border p-20 text-center opacity-20"><Search className="h-12 w-12 mx-auto mb-4" /><p className="text-sm font-black uppercase tracking-widest">Registry Silent</p></Card>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* ISSUE SCANNER */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-red-500/10 rounded-lg border border-red-500/20"><FileWarning className="h-4 w-4 text-red-600" /></div>
+                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight">Issue Scanner</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" disabled={issueIndex === 0} onClick={() => setIssueIndex(i => i - 1)} className="h-8 w-8 rounded-full border border-border"><ChevronLeft className="h-4 w-4" /></Button>
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground">{issueIndex + 1} / {issueAssets.length || 1}</span>
+                  <Button variant="ghost" size="icon" disabled={issueIndex === issueAssets.length - 1} onClick={() => setIssueIndex(i => i + 1)} className="h-8 w-8 rounded-full border border-border"><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {issueAssets.length > 0 ? (
+                  <motion.div key={`issue-${issueIndex}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                    <Card className="rounded-[2.5rem] border-2 border-red-500/20 bg-red-500/[0.02] p-8 shadow-3xl group cursor-pointer hover:border-red-500/40 transition-all" onClick={() => handleInspect(issueAssets[issueIndex].id)}>
+                      <div className="flex flex-col sm:flex-row items-center gap-8">
+                        <div className="p-6 bg-white rounded-[2rem] border-2 border-red-500/10 shadow-inner shrink-0 relative">
+                          <Activity className="h-12 w-12 text-red-600" />
+                          <Badge className="absolute -top-3 -right-3 bg-red-600 text-white font-black text-[8px] px-2 h-6 border-2 border-black">AUDIT</Badge>
+                        </div>
+                        <div className="space-y-4 flex-1 text-center sm:text-left">
+                          <div className="space-y-1">
+                            <h4 className="text-xl font-black uppercase text-foreground leading-tight line-clamp-2">{issueAssets[issueIndex].description}</h4>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{issueAssets[issueIndex].location} &bull; {issueAssets[issueIndex].category}</p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><AlertCircle className="h-3 w-3" /> Potential Issues Detected:</div>
+                            <ul className="text-[9px] font-bold text-muted-foreground uppercase list-disc pl-4 space-y-1">
+                              {(!issueAssets[issueIndex].assetIdCode || issueAssets[issueIndex].assetIdCode === 'N/A') && <li>Missing System Tag ID</li>}
+                              
+                              {/* MODE AWARE: Only show verification pending in verification mode */}
+                              {mode === 'verification' && issueAssets[issueIndex].status !== 'VERIFIED' && <li>Pending Physical Verification</li>}
+                              
+                              {['Bad condition', 'Poor', 'Burnt', 'Stolen'].includes(issueAssets[issueIndex].condition || '') && <li>Critical condition alert: {issueAssets[issueIndex].condition}</li>}
+                              
+                              {(() => {
+                                const a = issueAssets[issueIndex];
+                                const cat = (a.category || '').toLowerCase();
+                                const isVehicle = cat.includes('motor') || cat.includes('vehicle');
+                                
+                                if (isVehicle) {
+                                  const gaps = [];
+                                  if (!a.chassisNo || a.chassisNo === 'N/A') gaps.push('Chassis No');
+                                  if (!a.engineNo || a.engineNo === 'N/A') gaps.push('Engine No');
+                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
+                                } else {
+                                  const gaps = [];
+                                  if (!a.serialNumber || a.serialNumber === 'N/A') gaps.push('Serial Number');
+                                  if (!a.modelNumber || a.modelNumber === 'N/A') gaps.push('Model Number');
+                                  return gaps.map(g => <li key={g}>Missing {g}</li>);
+                                }
+                              })()}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <Card className="rounded-[2.5rem] border-2 border-dashed border-border p-20 text-center opacity-20"><Info className="h-12 w-12 mx-auto mb-4" /><p className="text-sm font-black uppercase tracking-widest">No issues found in current scope</p></Card>
                 )}
               </AnimatePresence>
             </div>
