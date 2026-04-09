@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Normalized to professional naming and context-aware selection.
- * Phase 1406: Integrated Verification Mode progress bars for folders and overall scope.
+ * Phase 1407: Implemented handleQuickUpdate for high-speed field assessment.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -219,6 +218,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsFormOpen(true);
   };
 
+  const handleQuickUpdate = async (id: string, updates: Partial<Asset>) => {
+    const asset = filteredAssets.find(a => a.id === id);
+    if (!asset) return;
+
+    const updatedAsset: Asset = {
+      ...asset,
+      ...updates,
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: userProfile?.displayName || 'Auditor',
+      lastModifiedByState: userProfile?.state
+    };
+
+    try {
+      await enqueueMutation('UPDATE', 'assets', updatedAsset);
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.map(a => a.id === id ? updatedAsset : a));
+      await refreshRegistry();
+    } catch (e) {
+      addNotification({ title: "Sync Interrupted", variant: "destructive" });
+    }
+  };
+
   const handleSaveGlobalHeaders = async () => {
     if (!isAdmin || !appSettings) return;
     setIsProcessing(true);
@@ -387,6 +408,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">Select All</label>
               </div>
 
+              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border">
+                <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg"><LayoutGrid className="h-4 w-4" /></Button>
+                <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg"><Columns className="h-4 w-4" /></Button>
+              </div>
+
               <AnimatePresence mode="wait">
                 {!isSearchExpanded ? (
                   <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
@@ -407,44 +433,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
       </div>
-
-      {/* Overall Progress - Only in Verification Mode & Not showing list */}
-      {isVerificationMode && !showList && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }} 
-          animate={{ opacity: 1, y: 0 }}
-          className="px-1 mb-6"
-        >
-          <Card className="bg-primary/5 border-2 border-primary/20 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden relative group">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <ShieldCheck className="h-32 w-32 text-primary" />
-            </div>
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Registry Verification Coverage</h3>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Aggregate progress across all project folders</p>
-              </div>
-              <div className="flex-1 max-w-md w-full space-y-4">
-                <div className="flex justify-between items-end">
-                  <span className="text-5xl font-black tracking-tighter text-primary">
-                    {totalCoverage}%
-                  </span>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Status Pulse</p>
-                    <p className="text-sm font-black uppercase text-foreground">
-                      {totalVerified} / {filteredAssets.length}
-                    </p>
-                  </div>
-                </div>
-                <Progress 
-                  value={totalCoverage} 
-                  className="h-3 shadow-inner bg-muted" 
-                />
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      )}
 
       {/* Surface */}
       <div className="flex-1 min-h-0 relative">
@@ -501,10 +489,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         selected={selectedAssetIds.has(asset.id)} 
                         onToggleSelect={handleToggleSelect} 
                         onToggleExpand={() => handleToggleExpand(asset.id)}
+                        onQuickUpdate={handleQuickUpdate}
                       />
                     </motion.div>
                   )) : (
-                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} />
+                    <RegistryTable 
+                      records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                      onInspect={handleEditAsset} 
+                      selectedIds={selectedAssetIds} 
+                      onToggleSelect={handleToggleSelect} 
+                      onSelectAll={handleSelectAll} 
+                      onToggleExpand={handleToggleExpand}
+                      onQuickUpdate={handleQuickUpdate}
+                    />
                   )}
                 </AnimatePresence>
               </div>

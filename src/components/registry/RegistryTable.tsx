@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryTable - High-Fidelity List Workstation.
- * Phase 905: Added long-press and right-click row selection triggers.
+ * Phase 1407: Integrated Verification Controls into the table layout.
  */
 
 import React from 'react';
@@ -23,7 +23,9 @@ import {
   List,
   ShieldCheck,
   Database,
-  Maximize2
+  Maximize2,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -39,6 +41,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLongPress } from '@/hooks/use-long-press';
+import { ASSET_CONDITIONS } from '@/lib/constants';
+import { Input } from '@/components/ui/input';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -47,6 +51,7 @@ interface RegistryTableProps {
   onToggleSelect: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
+  onQuickUpdate?: (id: string, updates: any) => void;
 }
 
 export function RegistryTable({ 
@@ -55,7 +60,8 @@ export function RegistryTable({
   selectedIds, 
   onToggleSelect, 
   onSelectAll,
-  onToggleExpand
+  onToggleExpand,
+  onQuickUpdate
 }: RegistryTableProps) {
   const { appSettings, headers: globalHeaders } = useAppState();
   const isMobile = useIsMobile();
@@ -81,7 +87,7 @@ export function RegistryTable({
         </div>
         
         <div className="flex-1 grid grid-cols-12 gap-4 sm:gap-6 ml-4 sm:ml-6 items-center">
-          {tableHeaders.slice(0, 4).map((header, idx) => (
+          {tableHeaders.slice(0, isVerificationMode ? 3 : 4).map((header, idx) => (
             <div 
               key={header.id} 
               className={cn(
@@ -92,7 +98,12 @@ export function RegistryTable({
               {header.displayName}
             </div>
           ))}
-          <div className="col-span-2" />
+          {isVerificationMode && (
+            <div className="col-span-6 flex gap-10">
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Verification Pulse</span>
+            </div>
+          )}
+          {!isVerificationMode && <div className="col-span-2" />}
         </div>
       </div>
 
@@ -102,7 +113,6 @@ export function RegistryTable({
           const syncStatus = (record.rawRow as any).syncStatus || 'local';
           const isSelected = selectedIds.has(record.id);
 
-          // Gestural Hooks
           const longPressProps = useLongPress(() => onToggleSelect(record.id));
           const handleContextMenu = (e: React.MouseEvent) => {
             e.preventDefault();
@@ -129,7 +139,7 @@ export function RegistryTable({
               </div>
 
               <div className="flex-1 grid grid-cols-12 gap-4 sm:gap-6 ml-4 sm:ml-6 items-center">
-                {tableHeaders.slice(0, 4).map((header, idx) => {
+                {tableHeaders.slice(0, isVerificationMode ? 3 : 4).map((header, idx) => {
                   const field = record.fields.find(f => f.headerId === header.id);
                   return (
                     <div 
@@ -158,9 +168,48 @@ export function RegistryTable({
                     </div>
                   );
                 })}
-                <div className="col-span-2 flex justify-end">
-                  <Maximize2 className="h-4 w-4 text-muted-foreground/20 group-hover/item:text-primary transition-colors" />
-                </div>
+
+                {isVerificationMode ? (
+                  <div className="col-span-8 flex items-center gap-4 pl-4 border-l border-border/40" onClick={e => e.stopPropagation()}>
+                    <Button 
+                      size="sm" 
+                      onClick={() => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' })}
+                      className={cn(
+                        "h-8 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all",
+                        status === 'VERIFIED' ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
+                      )}
+                    >
+                      {status === 'VERIFIED' ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : <XCircle className="h-3 w-3 mr-1.5" />}
+                      {status === 'VERIFIED' ? 'Verified' : 'Unverified'}
+                    </Button>
+
+                    <Select 
+                      value={String(record.rawRow.condition || '')} 
+                      onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
+                    >
+                      <SelectTrigger className="h-8 w-32 bg-muted/30 border-border/40 text-[9px] font-black uppercase rounded-lg">
+                        <SelectValue placeholder="Condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex-1 max-w-[200px] relative group/remark">
+                      <Input 
+                        placeholder="Remarks..." 
+                        className="h-8 text-[9px] font-medium bg-muted/20 border-border/40 pr-8"
+                        value={String(record.rawRow.remarks || '')}
+                        onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
+                      />
+                      <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 opacity-20 group-hover/remark:opacity-40 transition-opacity" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2 flex justify-end">
+                    <Maximize2 className="h-4 w-4 text-muted-foreground/20 group-hover/item:text-primary transition-colors" />
+                  </div>
+                )}
               </div>
             </div>
           );

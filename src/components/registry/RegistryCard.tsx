@@ -1,15 +1,19 @@
 /**
  * @fileOverview RegistryCard - High-Density UI Pulse.
- * Phase 905: Added long-press and right-click selection support.
+ * Phase 1407: Integrated high-speed verification controls (Red/Green Toggle, Condition, Remarks).
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2 } from 'lucide-react';
+import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
 import { useLongPress } from '@/hooks/use-long-press';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { ASSET_CONDITIONS } from '@/lib/constants';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -17,9 +21,19 @@ interface RegistryCardProps {
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   onToggleExpand?: () => void;
+  onQuickUpdate?: (id: string, updates: any) => void;
+  densityMode?: 'compact' | 'comfortable' | 'expanded';
 }
 
-export function RegistryCard({ record, onInspect, selected, onToggleSelect, onToggleExpand }: RegistryCardProps) {
+export function RegistryCard({ 
+  record, 
+  onInspect, 
+  selected, 
+  onToggleSelect, 
+  onToggleExpand,
+  onQuickUpdate,
+  densityMode = 'comfortable'
+}: RegistryCardProps) {
   const { appSettings, headers: globalHeaders } = useAppState();
 
   const isVerificationMode = appSettings?.appMode === 'verification';
@@ -39,7 +53,6 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, onTo
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
 
-  // Integrated Long-Press Selection
   const longPressProps = useLongPress(() => {
     onToggleSelect?.(record.id);
   });
@@ -52,20 +65,21 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, onTo
   return (
     <Card 
       className={cn(
-        "bg-card border border-border/60 rounded-xl overflow-hidden transition-all relative group h-full",
-        selected ? "ring-1 ring-primary border-primary/40 shadow-2xl" : "hover:border-primary/20",
+        "bg-card border border-border/60 rounded-xl overflow-hidden transition-all relative group h-full flex flex-col",
+        selected ? "ring-1 ring-primary border-primary/40 shadow-2xl" : "hover:border-primary/20 shadow-sm",
       )}
       {...longPressProps}
       onContextMenu={handleContextMenu}
     >
-      <CardContent className="p-0 flex flex-col h-full">
+      <CardContent className="p-0 flex flex-col flex-1">
+        {/* Header Pulse */}
         <div className="p-3.5 flex flex-col gap-1 border-b border-border/40 cursor-pointer" onClick={onToggleExpand}>
           <div className="flex items-center justify-between mb-1.5">
             <div 
               onClick={(e) => { e.stopPropagation(); onToggleSelect?.(record.id); }}
               className={cn(
                 "h-4.5 w-4.5 rounded-lg border transition-all flex items-center justify-center",
-                selected ? "bg-primary border-primary" : "border-white/10"
+                selected ? "bg-primary border-primary" : "border-border/40"
               )}
             >
               {selected && <Check className="h-3 w-3 text-black stroke-[4]" />}
@@ -88,11 +102,12 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, onTo
           <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">{tagField?.displayValue || 'NO TAG'}</span>
         </div>
 
+        {/* Data Grid */}
         <div className="divide-y divide-border/40 bg-white/[0.01] flex-1">
           {activeHeaders
             .filter(h => h.normalizedName !== 'asset_description' && h.normalizedName !== 'asset_id_code')
             .filter(h => isVerificationMode || !forcedFieldNames.includes(h.normalizedName))
-            .slice(0, 3)
+            .slice(0, densityMode === 'compact' ? 2 : 3)
             .map((header) => {
               const field = record.fields.find(f => f.headerId === header.id);
               return (
@@ -108,17 +123,49 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, onTo
             })}
         </div>
 
+        {/* Verification Hub */}
         {isVerificationMode && (
-          <div className="px-3.5 py-2 bg-white/[0.03] flex items-center justify-between border-t border-border/20">
+          <div className="p-3 bg-muted/20 border-t border-border/20 space-y-2.5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2">
-              <div className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-white/20"
-              )} />
-              <span className={cn(
-                "text-[8px] font-black uppercase tracking-widest",
-                status === 'VERIFIED' ? "text-green-500" : "text-white/40"
-              )}>{status}</span>
+              <Button 
+                size="sm" 
+                onClick={() => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' })}
+                className={cn(
+                  "flex-1 h-8 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all shadow-md",
+                  status === 'VERIFIED' 
+                    ? "bg-green-600 hover:bg-green-500 text-white" 
+                    : "bg-red-600 hover:bg-red-500 text-white"
+                )}
+              >
+                {status === 'VERIFIED' ? <CheckCircle2 className="mr-1.5 h-3 w-3" /> : <XCircle className="mr-1.5 h-3 w-3" />}
+                {status === 'VERIFIED' ? 'Verified' : 'Unverified'}
+              </Button>
+
+              <Select 
+                value={String(record.rawRow.condition || '')} 
+                onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
+              >
+                <SelectTrigger className="flex-1 h-8 bg-background border-border/40 text-[9px] font-black uppercase">
+                  <SelectValue placeholder="Condition" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border-border">
+                  {ASSET_CONDITIONS.map(c => (
+                    <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="relative group/remark">
+              <Input 
+                placeholder="Field observations..." 
+                className="h-8 text-[9px] font-medium bg-background border-border/40 pr-8"
+                value={String(record.rawRow.remarks || '')}
+                onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20">
+                <Edit3 className="h-3 w-3" />
+              </div>
             </div>
           </div>
         )}
