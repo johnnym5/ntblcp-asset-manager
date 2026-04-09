@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetDossier - The High-Fidelity Technical Registry Node.
  * Phase 1201: Implemented permanent header renaming within Asset Details.
+ * Phase 1205: Integrated Verification Hub for high-speed field assessment in Full View.
  */
 
 import React from 'react';
@@ -22,7 +23,9 @@ import {
   Columns,
   LayoutGrid,
   Eye,
-  ClipboardCheck
+  ClipboardCheck,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -32,6 +35,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAppState } from '@/contexts/app-state-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ASSET_CONDITIONS } from '@/lib/constants';
 
 const DetailField = ({ 
   headerId, 
@@ -125,15 +130,19 @@ const DetailField = ({
 export function AssetDossier({ 
   record, 
   onEdit, 
+  onQuickUpdate,
   className,
   isHeaderEditingMode 
 }: { 
   record: AssetRecord, 
   onEdit?: (id: string) => void, 
+  onQuickUpdate?: (id: string, updates: any) => void,
   className?: string,
   isHeaderEditingMode?: boolean
 }) {
-  const { headers, setHeaders } = useAppState();
+  const { headers, setHeaders, appSettings } = useAppState();
+  const isVerificationMode = appSettings?.appMode === 'verification';
+  const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
   const hasPhoto = !!(record.rawRow.photoUrl || record.rawRow.photoDataUri);
   const hasSignature = !!(record.rawRow.signatureUrl || record.rawRow.signatureDataUri);
@@ -223,6 +232,61 @@ export function AssetDossier({
       <div className="w-full lg:w-[280px] bg-card/30 flex flex-col shrink-0 border-t lg:border-t-0 border-border/40 min-h-0 overflow-hidden relative backdrop-blur-3xl">
         <div className="p-5 space-y-8">
           
+          {/* Verification Hub */}
+          {isVerificationMode && (
+            <div className="space-y-4 p-4 rounded-2xl bg-muted/30 border-2 border-primary/10 shadow-inner">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-primary/10 rounded-lg"><ClipboardCheck className="h-3.5 w-3.5 text-primary" /></div>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground">Verification Actions</h4>
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' })}
+                  className={cn(
+                    "w-full h-10 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] transition-all shadow-lg",
+                    status === 'VERIFIED' ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
+                  )}
+                >
+                  {status === 'VERIFIED' ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <XCircle className="mr-2 h-4 w-4" />}
+                  {status === 'VERIFIED' ? 'Verified' : 'Unverified'}
+                </Button>
+
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Asset Condition</label>
+                  <Select 
+                    value={String(record.rawRow.condition || '')} 
+                    onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
+                  >
+                    <SelectTrigger className="h-10 bg-background border-border/40 text-[9px] font-black uppercase rounded-xl">
+                      <SelectValue placeholder="Condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSET_CONDITIONS.map(c => (
+                        <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Auditor Remarks</label>
+                  <div className="relative group/remark">
+                    <Input 
+                      placeholder="Field observations..." 
+                      className="h-10 text-[9px] font-medium bg-background border-border/40 pr-10 rounded-xl"
+                      value={String(record.rawRow.remarks || '')}
+                      onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 group-hover/remark:opacity-40 transition-opacity">
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Fidelity Audit Workspace */}
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">

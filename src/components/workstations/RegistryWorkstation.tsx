@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Phase 1407: Implemented handleQuickUpdate for high-speed field assessment.
+ * Phase 1408: Extended quick verification controls to the Full View dossier overlay.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -27,12 +28,14 @@ import {
   GitMerge,
   Save,
   Edit3,
-  Trash2
+  Trash2,
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -442,6 +445,37 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           )}
         </AnimatePresence>
 
+        {isVerificationMode && !showList && (
+          <div className="px-1 mb-6">
+            <Card className="rounded-3xl border-2 border-primary/20 bg-primary/[0.02] p-6 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
+                <TrendingUp className="h-32 w-32 text-primary" />
+              </div>
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                <div className="flex items-center gap-5">
+                  <div className="p-4 bg-primary rounded-2xl shadow-xl shadow-primary/20">
+                    <ShieldCheck className="h-8 w-8 text-black" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black uppercase text-foreground tracking-tight">Verification Coverage</h3>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{totalVerified} of {filteredAssets.length} Records Confirmed</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-8 min-w-[200px]">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-primary">{totalCoverage}%</span></div>
+                    <Progress value={totalCoverage} className="h-2 bg-primary/10" />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-3xl font-black text-foreground">{totalCoverage}%</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Aggregate</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
         <ScrollArea className={cn("flex-1 px-1 h-full transition-all duration-500", expandedAssetId && "blur-sm grayscale-[0.2] pointer-events-none")}>
           {!showList ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
@@ -554,6 +588,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <AssetDossier 
                       record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} 
                       onEdit={handleEditAsset}
+                      onQuickUpdate={handleQuickUpdate}
                       isHeaderEditingMode={isHeaderEditingMode}
                     />
                   )}

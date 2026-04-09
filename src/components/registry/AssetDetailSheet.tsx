@@ -3,7 +3,7 @@
 /**
  * @fileOverview AssetDetailSheet - Professional Audit Dossier Wrapper.
  * Preserved for non-registry pages (GIS, Alerts, Gallery) that require a pop-up context.
- * Refactored to use the central AssetDossier component.
+ * Phase 1408: Added quick verification controls to the dossier overlay.
  */
 
 import React from 'react';
@@ -29,6 +29,11 @@ import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { AssetDossier } from './AssetDossier';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
+import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
+import type { Asset } from '@/types/domain';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -40,9 +45,34 @@ interface AssetDetailSheetProps {
 }
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
+  const { refreshRegistry, filteredAssets } = useAppState();
+  const { userProfile } = useAuth();
+
   if (!record) return null;
 
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
+
+  const handleQuickUpdate = async (id: string, updates: Partial<Asset>) => {
+    const asset = filteredAssets.find(a => a.id === id);
+    if (!asset) return;
+
+    const updatedAsset: Asset = {
+      ...asset,
+      ...updates,
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: userProfile?.displayName || 'Auditor',
+      lastModifiedByState: userProfile?.state
+    };
+
+    try {
+      await enqueueMutation('UPDATE', 'assets', updatedAsset);
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.map(a => a.id === id ? updatedAsset : a));
+      await refreshRegistry();
+    } catch (e) {
+      console.error("Dossier: Assessment update interrupted.");
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -86,7 +116,11 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
         <ScrollArea className="flex-1 custom-scrollbar">
           <div className="p-6">
-            <AssetDossier record={record} onEdit={onEdit} />
+            <AssetDossier 
+              record={record} 
+              onEdit={onEdit} 
+              onQuickUpdate={handleQuickUpdate}
+            />
           </div>
         </ScrollArea>
 
