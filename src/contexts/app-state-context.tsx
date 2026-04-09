@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Hardened for high-volume data handling and simplified business naming.
+ * Hardened for high-volume data handling and deterministic normalization.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -13,7 +13,7 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
-import { LocationEngine } from '@/services/location-engine';
+import { LocationEngine } from '@/lib/location-engine';
 import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
 import type { 
   Asset, 
@@ -266,7 +266,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     const counts = new Map<string, number>();
     assets.forEach(a => { 
       const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
-      counts.set(display, (counts.get(display) || 0) + 1); 
+      const fuzzy = getFuzzySignature(display);
+      // Group by fuzzy but use the most formatted display name
+      const existing = Array.from(counts.keys()).find(k => getFuzzySignature(k) === fuzzy);
+      const key = existing || display;
+      counts.set(key, (counts.get(key) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);

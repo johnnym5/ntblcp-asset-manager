@@ -9,6 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Creates a "Fuzzy Fingerprint" of a string for resilient matching.
+ * Normalizes "Akwa-Ibom", "AKWA IBOM", and "akwaibom" to "akwaibom".
  */
 export function getFuzzySignature(input: any): string {
   if (input === null || input === undefined) return "";

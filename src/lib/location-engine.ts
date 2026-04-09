@@ -1,5 +1,5 @@
 /**
- * @fileOverview Location Normalization & Matching Engine.
+ * @fileOverview Deterministic Location Normalization Engine.
  * Resolves raw input strings to canonical Nigerian administrative hierarchies.
  * Phase 300: Fully integrated getFuzzySignature for absolute naming resilience.
  */
@@ -36,7 +36,7 @@ export const LocationEngine = {
 
     const fuzzyInput = getFuzzySignature(raw);
     
-    // 1. Try Fuzzy State Match (Handles Akwaibom, AKWA IBOM, etc)
+    // 1. Try Fuzzy State Match (Handles Akwaibom, AKWA IBOM, Akwa-Ibom etc)
     const stateMatch = NIGERIAN_GEO_DATA.find(s => 
       getFuzzySignature(s.name) === fuzzyInput || 
       s.aliases.some(a => getFuzzySignature(a) === fuzzyInput)
@@ -46,7 +46,7 @@ export const LocationEngine = {
       return this.pulse(raw, stateMatch, 'HIGH', 'MATCHED');
     }
 
-    // 2. Try Fuzzy Capital Match
+    // 2. Try Fuzzy Capital Match (Handles Uyo, Ikeja, etc)
     const capitalMatch = NIGERIAN_GEO_DATA.find(s => getFuzzySignature(s.capital) === fuzzyInput);
     if (capitalMatch) {
       return this.pulse(raw, capitalMatch, 'HIGH', 'MATCHED');
