@@ -3,7 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to professional naming and context-aware selection.
- * Phase 1401: Relocated Import button to Settings and fixed filter variable destructuring.
+ * Phase 1405: Hardened responsiveness and selection bar visibility.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -12,17 +12,11 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { 
   Database,
-  Grid,
-  Edit3,
-  Trash2,
-  Loader2,
   X,
+  Loader2,
   ShieldCheck,
   Search,
   ArrowUpDown,
-  ChevronRight,
-  Plus,
-  RefreshCw,
   Filter,
   ArrowLeft,
   LayoutGrid,
@@ -30,15 +24,11 @@ import {
   Download,
   FileDown,
   Columns,
-  Zap,
-  CheckCircle2,
-  Activity,
   Maximize2,
-  Printer,
   GitMerge,
-  ArrowUpRight,
   Save,
-  FileUp
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,13 +111,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     assigneeOptions,
     selectedAssignees,
     setSelectedAssignees,
+    categoryOptions,
     conditionOptions,
     selectedConditions,
     setSelectedConditions,
     statusOptions,
     selectedStatuses,
     setSelectedStatuses,
-    categoryOptions,
     missingFieldFilter,
     setMissingFieldFilter
   } = useAppState();
