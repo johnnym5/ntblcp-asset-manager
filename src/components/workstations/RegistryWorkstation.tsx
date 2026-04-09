@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Overhauled for Selection Pulses & Batch Operational Workflows.
- * Phase 805: Fully adaptive Mobile/Desktop Floating Action Bar with scrollable stream.
- * Phase 806: Deployment Hardening - Responsive Grid & Focus Pulses.
+ * Phase 905: Implemented Inline Header Orchestration and gesture-aware selection pulses.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -146,7 +144,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
+  const [isHeaderEditingMode, setIsHeaderEditingMode] = useState(false);
   const [selectedAssetIdForEdit, setSelectedAssetIdForEdit] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -229,6 +227,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const handleToggleExpand = (id: string) => {
     setExpandedAssetId(expandedAssetId === id ? null : id);
+    setIsHeaderEditingMode(false);
   };
 
   const handleEditAsset = (id: string) => {
@@ -261,7 +260,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   };
 
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
-    // Implement category batch edit logic if needed
     addNotification({ title: "Folder pulse updated", variant: "success" });
     setIsCategoryBatchEditOpen(false);
   };
@@ -402,12 +400,33 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <div className="p-2 bg-primary/10 rounded-xl"><Database className="h-5 w-5 text-primary" /></div>
                   <h3 className="text-xl font-black uppercase text-foreground leading-none">Record Focus</h3>
                 </div>
-                <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10"><X className="h-5 w-5" /></button>
+                <div className="flex items-center gap-3">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
+                          className={cn("h-10 w-10 rounded-xl transition-all", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
+                        >
+                          <Columns className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-[8px] font-black uppercase">Field Orchestrator</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10"><X className="h-5 w-5" /></button>
+                </div>
               </div>
               <ScrollArea className="flex-1 custom-scrollbar">
                 <div className="p-8">
                   {processedAssets.find(a => a.id === expandedAssetId) && (
-                    <AssetDossier record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} onEdit={handleEditAsset} />
+                    <AssetDossier 
+                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} 
+                      onEdit={handleEditAsset}
+                      isHeaderEditingMode={isHeaderEditingMode}
+                    />
                   )}
                 </div>
               </ScrollArea>

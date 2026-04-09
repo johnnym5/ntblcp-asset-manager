@@ -1,7 +1,6 @@
 /**
  * @fileOverview RegistryCard - High-Density UI Pulse.
- * Enhanced with Overlay Expansion logic.
- * Phase 702: Updated to trigger focused expansion in parent workstation.
+ * Phase 905: Added long-press and right-click selection support.
  */
 
 import React from 'react';
@@ -10,6 +9,7 @@ import { Check, Globe, CloudOff, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
+import { useLongPress } from '@/hooks/use-long-press';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -39,12 +39,24 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, onTo
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
 
+  // Integrated Long-Press Selection
+  const longPressProps = useLongPress(() => {
+    onToggleSelect?.(record.id);
+  });
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onToggleSelect?.(record.id);
+  };
+
   return (
     <Card 
       className={cn(
         "bg-card border border-border/60 rounded-xl overflow-hidden transition-all relative group h-full",
         selected ? "ring-1 ring-primary border-primary/40 shadow-2xl" : "hover:border-primary/20",
       )}
+      {...longPressProps}
+      onContextMenu={handleContextMenu}
     >
       <CardContent className="p-0 flex flex-col h-full">
         <div className="p-3.5 flex flex-col gap-1 border-b border-border/40 cursor-pointer" onClick={onToggleExpand}>

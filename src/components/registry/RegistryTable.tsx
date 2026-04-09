@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryTable - High-Fidelity List Workstation.
- * Enhanced with Overlay Expansion triggers.
+ * Phase 905: Added long-press and right-click row selection triggers.
  */
 
 import React from 'react';
@@ -38,6 +38,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLongPress } from '@/hooks/use-long-press';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -101,6 +102,13 @@ export function RegistryTable({
           const syncStatus = (record.rawRow as any).syncStatus || 'local';
           const isSelected = selectedIds.has(record.id);
 
+          // Gestural Hooks
+          const longPressProps = useLongPress(() => onToggleSelect(record.id));
+          const handleContextMenu = (e: React.MouseEvent) => {
+            e.preventDefault();
+            onToggleSelect(record.id);
+          };
+
           return (
             <div 
               key={record.id} 
@@ -109,6 +117,8 @@ export function RegistryTable({
                 isSelected ? "border-primary/40 bg-primary/[0.02] shadow-2xl" : "border-border bg-card hover:border-primary/20"
               )}
               onClick={() => onToggleExpand(record.id)}
+              {...longPressProps}
+              onContextMenu={handleContextMenu}
             >
               <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                 <Checkbox 

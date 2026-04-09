@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AssetDossier - The High-Fidelity Technical Registry Node.
- * Extracted from the pop-up logic to provide a reusable, expanding inline dossier.
- * Phase 605: Implemented responsive dual-pane layout for inline workstation pulses.
+ * Phase 900: Implemented Inline Header Orchestration with Triple-Checkmark toggles.
  */
 
 import React from 'react';
@@ -20,42 +19,124 @@ import {
   CloudOff,
   ListTree,
   Edit3,
-  Info
+  Columns,
+  LayoutGrid,
+  Eye,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { AssetChecklist } from '@/components/asset-checklist';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useAppState } from '@/contexts/app-state-context';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-const DossierField = ({ label, value, icon: Icon, isSyncing }: { label: string, value: string, icon?: any, isSyncing?: boolean }) => (
-  <div className="p-3 flex flex-col gap-1 relative transition-all hover:bg-primary/[0.02] group/field border-b border-border/40 last:border-0">
-    <div className="flex items-center justify-between">
-      <span className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-40 group-hover/field:text-primary transition-colors">
-        {label}
-      </span>
-      {isSyncing && <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse" />}
+const DossierField = ({ 
+  headerId, 
+  label, 
+  value, 
+  icon: Icon, 
+  isSyncing, 
+  isEditing,
+  onToggleFlag 
+}: { 
+  headerId: string,
+  label: string, 
+  value: string, 
+  icon?: any, 
+  isSyncing?: boolean,
+  isEditing?: boolean,
+  onToggleFlag?: (flag: 'table' | 'quickView' | 'inChecklist') => void
+}) => {
+  const { headers } = useAppState();
+  const header = headers.find(h => h.id === headerId);
+
+  return (
+    <div className={cn(
+      "p-3.5 flex flex-col gap-1 relative transition-all group/field border-b border-border/40 last:border-0",
+      isEditing ? "bg-primary/[0.03] border-primary/10" : "hover:bg-primary/[0.01]"
+    )}>
+      {isEditing && header && (
+        <div className="flex items-center gap-4 mb-3 animate-in slide-in-from-top-1 duration-300">
+          <TooltipProvider>
+            <div className="flex items-center gap-3 bg-background/80 backdrop-blur-md p-1.5 px-3 rounded-lg border border-primary/20 shadow-sm">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-3.5 w-3.5 rounded-sm" />
+                    <LayoutGrid className="h-2.5 w-2.5 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Table Visibility</TooltipContent>
+              </Tooltip>
+              <div className="w-px h-3 bg-border" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox checked={header.quickView} onCheckedChange={() => onToggleFlag?.('quickView')} className="h-3.5 w-3.5 rounded-sm" />
+                    <Eye className="h-2.5 w-2.5 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Quick View Focus</TooltipContent>
+              </Tooltip>
+              <div className="w-px h-3 bg-border" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox checked={header.inChecklist} onCheckedChange={() => onToggleFlag?.('inChecklist')} className="h-3.5 w-3.5 rounded-sm" />
+                    <ClipboardCheck className="h-2.5 w-2.5 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Fidelity Checklist</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <span className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-40 group-hover/field:text-primary transition-colors">
+          {label}
+        </span>
+        {isSyncing && <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse" />}
+      </div>
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="h-3 w-3 text-muted-foreground/20 group-hover/field:text-primary/40 transition-colors" />}
+        <p className="text-[11px] font-black uppercase tracking-tight text-foreground leading-tight break-words">
+          {value || '---'}
+        </p>
+      </div>
     </div>
-    <div className="flex items-center gap-2">
-      {Icon && <Icon className="h-3 w-3 text-muted-foreground/20 group-hover/field:text-primary/40 transition-colors" />}
-      <p className="text-[11px] font-black uppercase tracking-tight text-foreground leading-tight break-words">
-        {value || '---'}
-      </p>
-    </div>
-  </div>
-);
+  );
+};
 
 export function AssetDossier({ 
   record, 
   onEdit, 
-  className 
+  className,
+  isHeaderEditingMode 
 }: { 
   record: AssetRecord, 
   onEdit?: (id: string) => void, 
-  className?: string 
+  className?: string,
+  isHeaderEditingMode?: boolean
 }) {
+  const { headers, setHeaders } = useAppState();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
   const hasPhoto = !!(record.rawRow.photoUrl || record.rawRow.photoDataUri);
   const hasSignature = !!(record.rawRow.signatureUrl || record.rawRow.signatureDataUri);
+
+  const handleToggleHeaderFlag = (headerId: string, flag: 'table' | 'quickView' | 'inChecklist') => {
+    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, [flag]: !h[flag] } : h));
+  };
+
+  const visibleFields = isHeaderEditingMode 
+    ? record.fields 
+    : record.fields.filter(f => {
+        const header = headers.find(h => h.id === f.headerId);
+        return header?.quickView;
+      });
 
   return (
     <div className={cn(
@@ -87,14 +168,18 @@ export function AssetDossier({
 
           {/* Technical Parameters Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {record.fields.map((field) => {
-              const header = record.headers.find(h => h.id === field.headerId);
+            {visibleFields.map((field) => {
+              const header = headers.find(h => h.id === field.headerId);
+              if (!header) return null;
               return (
                 <DossierField 
                   key={field.headerId} 
-                  label={header?.displayName || 'Param'} 
+                  headerId={header.id}
+                  label={header.displayName} 
                   value={field.displayValue} 
                   isSyncing={syncStatus === 'local'}
+                  isEditing={isHeaderEditingMode}
+                  onToggleFlag={(flag) => handleToggleHeaderFlag(header.id, flag)}
                 />
               );
             })}
