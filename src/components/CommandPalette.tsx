@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Universal Command Search.
- * Phase 2: Linked state to global context for mobile accessibility via header trigger.
+ * Phase 1401: Normalized naming to professional Asset Manager standards.
  */
 
 import React, { useEffect } from 'react';
@@ -27,7 +27,8 @@ import {
   Package,
   ClipboardList,
   ShieldAlert,
-  Search
+  Search,
+  FolderOpen
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -61,11 +62,11 @@ export function CommandPalette() {
         <CommandGroup heading="Main Navigation">
           <CommandItem onSelect={() => runCommand(() => setActiveView('DASHBOARD'))}>
             <LayoutDashboard className="mr-2 h-4 w-4" />
-            <span>Dashboard</span>
+            <span>Intelligence Hub</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => setActiveView('REGISTRY'))}>
-            <ClipboardList className="mr-2 h-4 w-4" />
-            <span>Registry</span>
+            <FolderOpen className="mr-2 h-4 w-4" />
+            <span>Asset Hub</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => setActiveView('ALERTS'))}>
             <ShieldAlert className="mr-2 h-4 w-4 text-destructive" />
@@ -78,11 +79,11 @@ export function CommandPalette() {
         <CommandGroup heading="Inventory Operations">
           <CommandItem onSelect={() => runCommand(() => setActiveView('IMPORT'))}>
             <FileUp className="mr-2 h-4 w-4" />
-            <span>Upload Records</span>
+            <span>Import Assets</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => refreshRegistry())}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            <span>Sync Pulse</span>
+            <span>Synchronize All</span>
           </CommandItem>
         </CommandGroup>
 
@@ -91,11 +92,11 @@ export function CommandPalette() {
         <CommandGroup heading="Audit & Reports">
           <CommandItem onSelect={() => runCommand(() => setActiveView('VERIFY'))}>
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            <span>Records to Review</span>
+            <span>Verification Queue</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => setActiveView('REPORTS'))}>
             <FileText className="mr-2 h-4 w-4" />
-            <span>Reports</span>
+            <span>Executive Reports</span>
           </CommandItem>
         </CommandGroup>
 
@@ -105,11 +106,11 @@ export function CommandPalette() {
             <CommandGroup heading="Admin Tools">
               <CommandItem onSelect={() => runCommand(() => setActiveView('USERS'))}>
                 <Users className="mr-2 h-4 w-4" />
-                <span>Auditors & Users</span>
+                <span>User Directory</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => setActiveView('SETTINGS'))}>
                 <Users className="mr-2 h-4 w-4" />
-                <span>Global Settings</span>
+                <span>Preferences</span>
               </CommandItem>
             </CommandGroup>
           </>

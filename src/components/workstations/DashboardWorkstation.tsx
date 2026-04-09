@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Dashboard Workstation - Intelligence Hub.
- * Optimized for high-fidelity inventory monitoring.
+ * @fileOverview Intelligence Hub - Executive Overview.
+ * Phase 1401: Normalized naming and added prominent Import Assets shortcut.
  */
 
 import React from 'react';
@@ -108,7 +108,7 @@ export function DashboardWorkstation() {
                 title="Synchronize Data"
                 options={[
                   { label: 'Download Updates', icon: Download, onClick: manualDownload },
-                  { label: 'Refresh Registry', icon: RefreshCw, onClick: refreshRegistry }
+                  { label: 'Synchronize All', icon: RefreshCw, onClick: refreshRegistry }
                 ]}
               >
                 <TooltipProvider>
@@ -124,7 +124,7 @@ export function DashboardWorkstation() {
                         <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Refresh Database</TooltipContent>
+                    <TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </TactileMenu>
@@ -151,44 +151,32 @@ export function DashboardWorkstation() {
             <div className="lg:col-span-4 space-y-6">
               <div className="flex items-center gap-2 px-1">
                 <Zap className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Operational shortcuts</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Quick Tools</h3>
               </div>
               <Card className="bg-card border-border rounded-[2rem] overflow-hidden shadow-2xl">
                 <div className="p-6 border-b border-border bg-muted/10">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                    <DatabaseZap className="h-4 w-4" /> Management Tools
+                    <DatabaseZap className="h-4 w-4" /> Operations
                   </h4>
                 </div>
                 <CardContent className="p-6 space-y-3">
-                  <TactileMenu
-                    title="Configuration"
-                    options={[
-                      { label: 'Preferences', icon: Palette, onClick: () => setActiveView('SETTINGS') },
-                      { label: 'User Directory', icon: Users, onClick: () => setActiveView('USERS') }
-                    ]}
-                  >
-                    <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group">
-                      <Settings className="h-4 w-4 text-primary group-hover:rotate-90 transition-transform" /> Preferences
-                    </Button>
-                  </TactileMenu>
+                  <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group">
+                    <FileUp className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Import Assets
+                  </Button>
 
-                  <TactileMenu
-                    title="Registry Actions"
-                    options={[
-                      { label: 'Import Excel', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-                      { label: 'Browse Assets', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
-                    ]}
-                  >
-                    <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
-                      <FolderOpen className="h-4 w-4 text-primary" /> Browse Assets
-                    </Button>
-                  </TactileMenu>
+                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
+                    <FolderOpen className="h-4 w-4 text-primary" /> Browse Assets
+                  </Button>
                   
                   {isVerificationMode && (
                     <Button onClick={() => setActiveView('VERIFY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 text-green-600 border-green-500/20">
                       <ClipboardCheck className="h-4 w-4" /> Verification Queue
                     </Button>
                   )}
+
+                  <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
+                    <Settings className="h-4 w-4 text-primary" /> Preferences
+                  </Button>
                   
                   {isAdmin && (
                     <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 mt-4">

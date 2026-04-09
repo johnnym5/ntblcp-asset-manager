@@ -3,7 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Implements seamless workstation transitions and multi-function navigation.
- * Phase 1400: Added long-press workstation menu to the back button.
+ * Phase 1401: Normalized naming to professional Asset Manager standards.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -40,7 +40,8 @@ import {
   FileText,
   ShieldAlert,
   SearchCode,
-  Monitor
+  Monitor,
+  FileUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -175,15 +176,16 @@ export default function SPAHub() {
                 <TactileMenu 
                   title="Navigate To"
                   options={[
-                    { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+                    { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
                     { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    { label: 'Verification', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') },
-                    { label: 'Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
+                    { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+                    { label: 'Field Verification', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') },
+                    { label: 'Executive Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
                     { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-                    { label: 'Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+                    { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
                     { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') },
                     ...(isAdmin ? [
-                      { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+                      { label: 'System Preferences', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
                     ] : [])
                   ]}
                 >
@@ -200,7 +202,7 @@ export default function SPAHub() {
             options={[
               { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              { label: 'View History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
+              { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -223,11 +225,11 @@ export default function SPAHub() {
 
         <div className="flex items-center gap-3 sm:gap-5">
           <TactileMenu
-            title="Synchronize Data"
+            title="Registry Parity"
             options={[
               { label: 'Download Updates', icon: Download, onClick: manualDownload },
               { label: 'Upload Changes', icon: Upload, onClick: manualUpload },
-              { label: 'Force Parity Sync', icon: RefreshCw, onClick: refreshRegistry }
+              { label: 'Synchronize All', icon: RefreshCw, onClick: refreshRegistry }
             ]}
           >
             <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
@@ -237,24 +239,24 @@ export default function SPAHub() {
           </TactileMenu>
 
           <TactileMenu
-            title="Network Logic"
+            title="Network Status"
             options={[
               { label: 'Connect to Cloud', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
-              { label: 'Disconnect (Offline)', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
+              { label: 'Work Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
             ]}
           >
             <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
               <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]")} />
-              <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+              <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? 'ONLINE' : 'OFFLINE')}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </button>
           </TactileMenu>
           
           <TactileMenu
             title="System Alerts"
             options={[
-              { label: 'Open Center', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Mark as Read', icon: CheckCircle2, onClick: markAllAsRead },
-              { label: 'Clear Archive', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Mark All as Read', icon: CheckCircle2, onClick: markAllAsRead },
+              { label: 'Clear Notification History', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
             <div className="relative">
@@ -292,7 +294,7 @@ export default function SPAHub() {
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
                 <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
-                  <AnimatePresence>
+                  <AnimatePresence initial={false}>
                     <motion.div 
                       key={activeView} 
                       initial={{ opacity: 0, scale: 0.99, y: 10 }} 

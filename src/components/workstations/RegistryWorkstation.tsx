@@ -1,10 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Normalized to clear business naming and context-aware selection.
- * Phase 1352: Fixed ReferenceError by including all filter state in destructuring.
+ * Normalized to professional naming and context-aware selection.
+ * Phase 1401: Added "Import Assets" to header and fixed filter variable destructuring.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -38,7 +37,8 @@ import {
   Printer,
   GitMerge,
   ArrowUpRight,
-  Save
+  Save,
+  FileUp
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -115,7 +115,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     manualDownload,
     manualUpload,
     isSyncing,
-    // Destructuring missing variables required by AssetFilterSheet
     locationOptions,
     selectedLocations,
     setSelectedLocations,
@@ -238,7 +237,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       setIsHeaderEditingMode(false);
-      addNotification({ title: "Field Layout Saved", description: "The registry arrangement is now permanent.", variant: "success" });
+      addNotification({ title: "Layout Saved", variant: "success" });
     } catch (e) {
       addNotification({ title: "Save Failed", variant: "destructive" });
     } finally {
@@ -263,7 +262,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      addNotification({ title: "Update Successful", variant: "success" });
+      addNotification({ title: "Batch Update Successful", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
@@ -314,7 +313,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsMergeDialogOpen(false);
-      addNotification({ title: "Move Successful", variant: "success" });
+      addNotification({ title: "Records Moved", variant: "success" });
     } finally {
       setIsProcessing(false);
     }
@@ -329,7 +328,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsAssetDeleteOpen(false);
-      addNotification({ title: "Records Removed", variant: "destructive" });
+      addNotification({ title: "Records Deleted", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -383,17 +382,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
-              <Checkbox 
-                id="sel-all-master" 
-                checked={showList ? (selectedAssetIds.size === paginatedAssets.length && paginatedAssets.length > 0) : (selectedCategories.length === categories.length && categories.length > 0)} 
-                onCheckedChange={(c) => showList ? handleSelectAll(!!c) : setSelectedCategories(c ? categories : [])} 
-                className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
-              />
-              <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">Select All</label>
-            </div>
-
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="h-10 px-4 rounded-lg border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-primary/10 transition-all shrink-0">
+                <FileUp className="h-4 w-4" /> Import Assets
+              </Button>
+
+              <div className="w-px h-6 bg-border mx-2 shrink-0 hidden sm:block" />
+
+              <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
+                <Checkbox 
+                  id="sel-all-master" 
+                  checked={showList ? (selectedAssetIds.size === paginatedAssets.length && paginatedAssets.length > 0) : (selectedCategories.length === categories.length && categories.length > 0)} 
+                  onCheckedChange={(c) => showList ? handleSelectAll(!!c) : setSelectedCategories(c ? categories : [])} 
+                  className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
+                />
+                <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">Select All</label>
+              </div>
+
               <AnimatePresence mode="wait">
                 {!isSearchExpanded ? (
                   <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
@@ -407,14 +412,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <TactileMenu
-                  title="Filter Logic"
-                  options={[
-                    { label: 'Clear All Filters', icon: X, onClick: () => { setSelectedLocations([]); setSelectedAssignees([]); setSelectedStatuses([]); setSelectedConditions([]); setMissingFieldFilter(''); setSearchTerm(''); } }
-                  ]}
-                >
-                  <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
-                </TactileMenu>
+                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
                 <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
               </div>
             </div>
@@ -555,8 +553,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <TactileMenu
                   title="Synchronize Selection"
                   options={[
-                    { label: 'Download from Cloud', icon: Download, onClick: manualDownload },
-                    { label: 'Upload to Cloud', icon: CloudUpload, onClick: manualUpload }
+                    { label: 'Download Updates', icon: Download, onClick: manualDownload },
+                    { label: 'Upload Changes', icon: CloudUpload, onClick: manualUpload }
                   ]}
                 >
                   <div className="flex gap-2 shrink-0">
