@@ -32,7 +32,8 @@ import {
   Maximize2,
   SearchCode,
   FileWarning,
-  LayoutGrid
+  LayoutGrid,
+  Eye
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -107,7 +108,7 @@ export function DashboardWorkstation() {
     <div className="space-y-10 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
       
       {/* HUB HEADER */}
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-50 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
             <div className="p-2.5 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
