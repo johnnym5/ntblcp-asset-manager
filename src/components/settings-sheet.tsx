@@ -3,7 +3,7 @@
 /**
  * @fileOverview SettingsSheet - High-Fidelity Project & Sheet Orchestrator.
  * Phase 157: Finalized functional wiring for project action pulse.
- * Phase 158: Updated Scan button to navigate to Import workstation.
+ * Phase 158: Relocated Import button to Project & Sheet section.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -51,7 +51,7 @@ import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 
 interface SettingsSheetProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
@@ -263,7 +263,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                       {isActive && (
                         <div className="px-6 pb-8 pt-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500 border-t border-white/5 bg-white/[0.01]">
                           <div className="space-y-4">
-                            <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Group Pulse definitions</h4>
+                            <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Group definitions</h4>
                             <div className="space-y-2.5">
                               {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
                                 Object.keys(grant.sheetDefinitions).map(sheetName => (
@@ -306,7 +306,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                               onClick={() => { setActiveView('IMPORT'); onOpenChange(false); }}
                               className="flex-1 h-11 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5 text-white/80 transition-all active:scale-95"
                             >
-                              <ScanSearch className="h-3.5 w-3.5" /> Scan & Import Data
+                              <ScanSearch className="h-3.5 w-3.5" /> Import Assets
                             </Button>
                           </div>
                         </div>

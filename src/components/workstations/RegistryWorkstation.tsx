@@ -3,7 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to professional naming and context-aware selection.
- * Phase 1401: Added "Import Assets" to header and fixed filter variable destructuring.
+ * Phase 1401: Relocated Import button to Settings and fixed filter variable destructuring.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -383,12 +383,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
-              <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="h-10 px-4 rounded-lg border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-primary/10 transition-all shrink-0">
-                <FileUp className="h-4 w-4" /> Import Assets
-              </Button>
-
-              <div className="w-px h-6 bg-border mx-2 shrink-0 hidden sm:block" />
-
               <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
                 <Checkbox 
                   id="sel-all-master" 

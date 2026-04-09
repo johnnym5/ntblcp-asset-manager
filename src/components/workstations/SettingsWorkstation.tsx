@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Control Center.
  * Cleaned naming and simplified workflows.
+ * Phase 158: Relocated Import button to Project & Sheet section.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -361,9 +362,14 @@ export function SettingsWorkstation() {
                             </div>
                           ))}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="w-full h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
-                          <FileUp className="h-3.5 w-3.5" /> Import Template
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
+                            <FileUp className="h-3.5 w-3.5" /> Import Template
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
+                            <ScanSearch className="h-3.5 w-3.5" /> Import Assets
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </Card>
