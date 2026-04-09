@@ -1,8 +1,7 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
- * Phase 701: Relaxed density requirements to prevent data loss in legacy transfers.
- * Phase 702: Hardened header detection for "ASSETS TAG NO" variants.
+ * Phase 703: Hardened for Additions and Year-based markers.
  */
 
 import { RowClassification } from './types';
@@ -18,7 +17,7 @@ const KNOWN_MARKERS = [
   'PMU OFFICE EQUIPMENT', 'ADDITIONAL ASSETS', 'GX-IV', 'TRANSFERRED ASSETS',
   'LSTBLCP_', 'LSMOH', 'IHVN_', 'COMPUTERS', 'IT-EQUIPMENTS', 'INHERITED ASSESTS',
   'FHI360', 'GENEXPERT MACHINES', 'ADDITIONS', 'MOTORBIKES', 'PDX', 'TB LAMP',
-  'TRUENAT', 'SAMSUNG GALAXY TABLETS', 'ECG MACHINE'
+  'TRUENAT', 'SAMSUNG GALAXY TABLETS', 'ECG MACHINE', '2024', '2025'
 ];
 
 export function classifyRow(row: any[]): RowClassification {
@@ -34,7 +33,6 @@ export function classifyRow(row: any[]): RowClassification {
   const isNumericColA = firstCellRaw !== '' && !isNaN(Number(firstCellRaw));
 
   // 1. SCHEMA_HEADER
-  // Recognize "ASSETS TAG NO" and similar as anchors even if they aren't strictly Col A.
   const normalizedAnchors = SCHEMA_ANCHORS.map(a => a.replace(/\s+/g, ''));
   if (normalizedAnchors.some(anchor => firstCellNoSpace === anchor || firstCellNoSpace.startsWith(anchor))) {
     if (populatedCount >= 3) {
@@ -56,7 +54,6 @@ export function classifyRow(row: any[]): RowClassification {
   }
 
   // 3. DATA_ROW
-  // Lowered requirements: if it starts with a number or has decent density, it's an asset.
   if (isNumericColA || (populatedCount >= 3)) {
     return 'DATA_ROW';
   }

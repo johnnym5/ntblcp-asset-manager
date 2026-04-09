@@ -3,8 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
- * Phase 1002: Deployment Stability Pulse. Hardened metadata key sanitization.
- * Phase 1003: Integrated Centralized Naming Normalization Pulse.
+ * Phase 1004: Added support for 20-column synthetic templates (Additional Assets).
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -41,10 +40,12 @@ export class ParserEngine {
 
     data.forEach((row, idx) => {
       const type = classifyRow(row);
+      
       if (type === 'GROUP_HEADER') {
         if (activeGroup) activeGroup.endRow = idx - 1;
         pendingGroupLabel = String(row[0] || '').trim();
       }
+      
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row, 'real_template');
         const tpl = this.templates.get(signature)!;
@@ -52,7 +53,9 @@ export class ParserEngine {
         discovered.push(activeGroup);
         pendingGroupLabel = null; 
       }
+      
       if (type === 'DATA_ROW' && pendingGroupLabel) {
+        // Handle Headerless Data Blocks
         const matchedTpl = this.matchOrGenerateTemplate(row);
         activeGroup = this.createNewGroup(pendingGroupLabel, matchedTpl, 'inferred', idx, sheetName);
         discovered.push(activeGroup);
@@ -135,24 +138,25 @@ export class ParserEngine {
         case 'assignee_location': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'model_number': asset.modelNumber = strVal; break;
+        case 'purchase_price_ngn': asset.value = parseFloat(strVal.replace(/[^0-9.]/g, '')) || 0; break;
+        case 'date_purchased_received': asset.purchaseDate = strVal; break;
+        case 'condition': asset.condition = strVal; break;
+        case 'remarks': asset.remarks = strVal; break;
         default: 
           const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]\n\r]/g, '_').trim();
           asset.metadata[safeKey] = val;
       }
     });
 
-    // Integrated Deterministic Normalization
+    // Normalization
     if (asset.location) {
       const pulse = LocationEngine.normalize(asset.location);
       asset.location = pulse.normalized;
       asset.normalizedState = pulse.state;
       asset.normalizedZone = pulse.zone;
-      asset.locationConfidence = pulse.confidence;
-      asset.locationStatus = pulse.status;
     }
 
     if (asset.custodian) {
-      // Normalize Assignee: Title Case + Fuzzy Signature check
       asset.custodian = asset.custodian.trim().replace(/\b\w/g, (l: string) => l.toUpperCase());
     }
 
@@ -163,7 +167,7 @@ export class ParserEngine {
       asset.validation.logs.push({
         rowNumber: rowNum + 1,
         type: 'empty_row',
-        message: 'Identification pulse missing (No Description, Tag ID, or Serial discovered).',
+        message: 'No identification fields found.',
         rawData: row
       });
     }
@@ -209,8 +213,9 @@ export class ParserEngine {
   }
 
   private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
+    // Check if we have an existing template with similar column count
     for (const tpl of this.templates.values()) {
-      if (Math.abs(tpl.columnCount - row.length) <= 2) return tpl;
+      if (Math.abs(tpl.columnCount - row.length) <= 1) return tpl;
     }
 
     const signature = `SYNTH_${row.length}`;
@@ -229,6 +234,16 @@ export class ParserEngine {
   }
 
   private getSyntheticHeaders(count: number): string[] {
+    // 20-column template identified in "Additional Assets" / "Additions" groups
+    if (count >= 19 && count <= 21) {
+      return [
+        'S/N', 'Location', 'Assignee', 'Asset Description', 'Asset ID Code',
+        'Asset Class', 'Manufacturer', 'Internal Code', 'Serial Number', 'Model Number',
+        'Date Received', 'Transfer Type', 'Transfer Method', 'Purchase price (Naira)',
+        'Purchase Price [USD)', 'Funder', 'Useful Life (Years)', 'Condition', 'Remarks', 'Source Category'
+      ];
+    }
+    
     const canonical = ['S/N', 'Location', 'Assignee (Location)', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Received', 'Purchase price (Naira)'];
     return Array.from({ length: count }, (_, i) => i < canonical.length ? canonical[i] : `Column ${i + 1}`);
   }

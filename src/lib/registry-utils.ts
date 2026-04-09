@@ -1,8 +1,7 @@
-
 /**
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
- * Phase 807: Hardened fuzzy mapping logic for absolute field parity.
+ * Phase 808: Added normalization for prices and synthetic additions headers.
  */
 
 import type { Asset } from "@/types/domain";
@@ -25,7 +24,8 @@ export function normalizeHeaderName(name: string): string {
   if (n === "s/n" || n === "sn") return "sn";
   if (n === "serial number" || n === "serial numbers") return "serial_number";
   if (n === "model number" || n === "model numbers" || n === "model no") return "model_number";
-  if (n === "date purchased or received" || n === "year of purchase") return "date_purchased_received";
+  if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "date_purchased_received";
+  if (n.includes("useful life")) return "useful_life_years";
 
   return n
     .replace(/[^a-z0-9]/g, "_")
@@ -82,34 +82,12 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
 ];
 
 /**
- * Registry Presets for Arranged Views.
- */
-export const REGISTRY_PRESETS: RegistryPreset[] = [
-  {
-    id: "quick",
-    name: "Quick View",
-    description: "Optimized for fast field scanning.",
-    visibleHeaderNames: ["sn", "location", "assignee_location", "asset_description", "asset_id_code", "serial_number", "condition", "row_number"],
-    densityMode: "compact"
-  },
-  {
-    id: "full",
-    name: "Full View",
-    description: "Total registry transparency.",
-    visibleHeaderNames: DEFAULT_REGISTRY_HEADERS.map(h => h.normalizedName),
-    densityMode: "expanded"
-  }
-];
-
-/**
  * Transforms a Domain Asset to an AssetRecord for the high-density grid.
- * Improved with fuzzy metadata search for absolute field parity.
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = "";
     
-    // 1. Resolve from standard domain properties
     switch(header.normalizedName) {
       case "sn": rawValue = asset.sn; break;
       case "location": rawValue = asset.location; break;
@@ -130,15 +108,11 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
         rawValue = "";
     }
 
-    // 2. Fuzzy Metadata Crawl: If the primary property is empty, search unmapped columns
-    const isActuallyEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim() === "---" || String(rawValue).trim().toLowerCase() === "nil" || String(rawValue).trim().toLowerCase() === "n/a";
+    const isActuallyEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "nil" || String(rawValue).trim().toLowerCase() === "n/a";
     
     if (isActuallyEmpty) {
       const meta = asset.metadata || {};
-      // Exact match
       rawValue = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName] || "";
-      
-      // Fuzzy match (handles casing variations in Excel)
       if (!rawValue) {
         const fuzzyHeader = getFuzzySignature(header.displayName);
         const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
