@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Optimized for clear selection logic and simple naming.
+ * Normalized to clear business naming and context-aware selection.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -77,6 +77,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/component
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import type { Asset } from '@/types/domain';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -97,8 +98,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     activeGrantId,
     filters,
     setFilters,
-    isLogicFilterOpen,
-    setIsLogicFilterOpen,
+    isFilterOpen,
+    setIsFilterOpen,
     isSortOpen,
     setIsSortOpen,
     itemsPerPage,
@@ -110,7 +111,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     manualDownload,
     manualUpload,
     isSyncing,
-    optionsMap = {}
+    optionsMap = {},
+    locationOptions,
+    assigneeOptions,
+    conditionOptions,
+    statusOptions,
+    categoryOptions,
+    selectedLocations,
+    setSelectedLocations,
+    selectedAssignees,
+    setSelectedAssignees,
+    selectedStatuses,
+    setSelectedStatuses,
+    selectedConditions,
+    setSelectedConditions,
+    missingFieldFilter,
+    setMissingFieldFilter
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -227,7 +243,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      addNotification({ title: "Batch Update Successful", variant: "success" });
+      addNotification({ title: "Update Successful", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
@@ -278,7 +294,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsMergeDialogOpen(false);
-      addNotification({ title: "Assets Moved Successfully", variant: "success" });
+      addNotification({ title: "Move Successful", variant: "success" });
     } finally {
       setIsProcessing(false);
     }
@@ -371,7 +387,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
+                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
                 <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
               </div>
             </div>
@@ -516,7 +532,29 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
       <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={handleSaveAssetBatch} />
-      <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
+      <AssetFilterSheet 
+        isOpen={isFilterOpen} 
+        onOpenChange={setIsFilterOpen} 
+        isAdmin={isAdmin} 
+        locationOptions={locationOptions} 
+        selectedLocations={selectedLocations} 
+        setSelectedLocations={setSelectedLocations} 
+        assigneeOptions={assigneeOptions} 
+        selectedAssignees={selectedAssignees} 
+        categoryOptions={categoryOptions} 
+        selectedCategories={selectedCategories} 
+        setSelectedCategories={setSelectedCategories} 
+        conditionOptions={conditionOptions} 
+        selectedConditions={selectedConditions} 
+        setSelectedConditions={setSelectedConditions} 
+        statusOptions={statusOptions} 
+        selectedStatuses={selectedStatuses} 
+        setSelectedStatuses={setSelectedStatuses} 
+        missingFieldFilter={missingFieldFilter} 
+        setMissingFieldFilter={setMissingFieldFilter} 
+        searchTerm={searchTerm} 
+        setSearchTerm={setSearchTerm} 
+      />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
 
       {/* Dialogs */}

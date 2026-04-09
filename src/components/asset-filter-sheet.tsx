@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Filter Engine.
- * Supports multi-select criteria across all registry dimensions.
+ * Supports multi-select criteria across all registry dimensions including Description and Category.
  */
 
 import React from 'react';
@@ -14,7 +14,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Check, Search, Filter } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Label } from './ui/label';
 import type { OptionType } from '@/contexts/app-state-context';
@@ -32,6 +33,10 @@ interface AssetFilterSheetProps {
   selectedAssignees: string[];
   setSelectedAssignees: (val: string[]) => void;
   
+  categoryOptions: OptionType[];
+  selectedCategories: string[];
+  setSelectedCategories: (val: string[]) => void;
+
   conditionOptions: OptionType[];
   selectedConditions: string[];
   setSelectedConditions: (val: string[]) => void;
@@ -42,11 +47,14 @@ interface AssetFilterSheetProps {
 
   missingFieldFilter: string;
   setMissingFieldFilter: (val: string) => void;
+
+  searchTerm: string;
+  setSearchTerm: (val: string) => void;
 }
 
 const MISSING_FIELD_OPTS = [
   { label: 'None', value: '' },
-  { label: 'Asset Description', value: 'description' },
+  { label: 'Description', value: 'description' },
   { label: 'Asset Class', value: 'category' },
   { label: 'S/N', value: 'sn' },
   { label: 'Serial Number', value: 'serialNumber' },
@@ -135,6 +143,9 @@ export function AssetFilterSheet({
   assigneeOptions,
   selectedAssignees,
   setSelectedAssignees,
+  categoryOptions,
+  selectedCategories,
+  setSelectedCategories,
   conditionOptions,
   selectedConditions,
   setSelectedConditions,
@@ -143,59 +154,82 @@ export function AssetFilterSheet({
   setSelectedStatuses,
   missingFieldFilter,
   setMissingFieldFilter,
+  searchTerm,
+  setSearchTerm,
 }: AssetFilterSheetProps) {
   
   const handleClearAll = () => {
     setSelectedLocations([]);
     setSelectedAssignees([]);
+    setSelectedCategories([]);
     setSelectedConditions([]);
     setSelectedStatuses([]);
     setMissingFieldFilter('');
+    setSearchTerm('');
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
+      <DialogContent className="max-w-4xl flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         <div className="p-10 pb-6 border-b border-white/5 bg-white/[0.02] shrink-0">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Assets</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-3">
+              <Filter className="text-primary h-6 w-6" /> Filter Registry
+            </DialogTitle>
             <DialogDescription className="text-[10px] font-black uppercase text-white/40 tracking-widest mt-1">
-              Select criteria to refine the list
+              Refine your asset list by selecting criteria
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="flex-1 bg-black max-h-[70vh] overflow-y-auto custom-scrollbar">
-          <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="space-y-10">
-              {isAdmin && (
-                <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
-              )}
-              <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
+          <div className="p-10 space-y-10">
+            {/* Unified Search in Filter Sheet */}
+            <div className="space-y-3">
+              <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Description Search</Label>
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-colors" />
+                <Input 
+                  placeholder="Filter by description keywords..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-14 pl-12 rounded-2xl bg-[#0A0A0A] border-2 border-white/5 focus-visible:border-primary/40 focus-visible:ring-0 text-white font-medium shadow-inner"
+                />
+              </div>
             </div>
-            
-            <div className="space-y-10">
-              <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
-              <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
-              <div className="space-y-4">
-                <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Missing Data</Label>
-                <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2 flex flex-wrap gap-2">
-                  {MISSING_FIELD_OPTS.map((opt) => {
-                    const isSelected = missingFieldFilter === opt.value;
-                    return (
-                      <button 
-                        key={`missing-${opt.label}`}
-                        onClick={() => setMissingFieldFilter(opt.value)}
-                        className={cn(
-                          "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 transition-all",
-                          isSelected ? "bg-primary border-primary text-black" : "bg-white/5 border-transparent text-white/40 hover:border-white/10"
-                        )}
-                      >
-                        <span className="text-[10px] font-black uppercase tracking-tight">{opt.label}</span>
-                      </button>
-                    );
-                  })}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="space-y-10">
+                <FilterSection title="Asset Category" options={categoryOptions} selected={selectedCategories} onChange={setSelectedCategories} />
+                {isAdmin && (
+                  <FilterSection title="Location / Region" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+                )}
+                <FilterSection title="Assignee / User" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
+              </div>
+              
+              <div className="space-y-10">
+                <FilterSection title="Physical Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+                <FilterSection title="Verification Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
+
+                <div className="space-y-4">
+                  <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Missing Data</Label>
+                  <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2 flex flex-wrap gap-2">
+                    {MISSING_FIELD_OPTS.map((opt) => {
+                      const isSelected = missingFieldFilter === opt.value;
+                      return (
+                        <button 
+                          key={`missing-${opt.label}`}
+                          onClick={() => setMissingFieldFilter(opt.value)}
+                          className={cn(
+                            "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 transition-all",
+                            isSelected ? "bg-primary border-primary text-black" : "bg-white/5 border-transparent text-white/40 hover:border-white/10"
+                          )}
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-tight">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -208,13 +242,13 @@ export function AssetFilterSheet({
             onClick={handleClearAll}
             className="h-14 px-8 rounded-2xl text-white/40 font-black uppercase text-[10px] tracking-[0.2em] hover:text-white"
           >
-            Clear Filters
+            Clear All
           </Button>
           <Button 
             onClick={() => onOpenChange(false)}
             className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform active:scale-95"
           >
-            Apply Filters
+            Update Results
           </Button>
         </div>
       </DialogContent>

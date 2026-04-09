@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Hardened for high-volume data handling and adaptive workstation logic.
- * Phase 1500: Production hardening - fixed missing metric definitions and improved sync resilience.
+ * Hardened for high-volume data handling and simplified business naming.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -77,11 +76,10 @@ interface AppStateContextType {
   assigneeOptions: OptionType[];
   conditionOptions: OptionType[];
   statusOptions: OptionType[];
+  categoryOptions: OptionType[];
 
   isFilterOpen: boolean;
   setIsFilterOpen: (open: boolean) => void;
-  isLogicFilterOpen: boolean;
-  setIsLogicFilterOpen: (open: boolean) => void;
   isSortOpen: boolean;
   setIsSortOpen: (open: boolean) => void;
   filters: HeaderFilter[];
@@ -142,7 +140,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isLogicFilterOpen, setIsLogicFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
@@ -174,7 +171,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
     } catch (e) { 
-      console.error("Registry State Pulse Error:", e); 
+      console.error("Registry State Update Error:", e); 
     }
   }, []);
 
@@ -238,6 +235,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.custodian)));
     }
 
+    if (selectedCategories.length > 0) {
+      results = results.filter(a => selectedCategories.includes(a.category));
+    }
+
     if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
     if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
@@ -245,12 +246,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (searchTerm) {
       const fuzzySearch = getFuzzySignature(searchTerm);
       results = results.filter(a => {
-        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian}`;
+        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
         return getFuzzySignature(hay).includes(fuzzySearch);
       });
     }
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter]);
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories]);
 
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -265,6 +266,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     const counts = new Map<string, number>();
     assets.forEach(a => { 
       const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
+      counts.set(display, (counts.get(display) || 0) + 1); 
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { 
+      const display = a.category || 'Uncategorized';
       counts.set(display, (counts.get(display) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
@@ -306,12 +316,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
           const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
           await storage.saveAssets([...otherAssets, ...taggedRemote]);
-          addNotification({ title: "Sync Successful", variant: "success" });
+          addNotification({ title: "Update Successful", variant: "success" });
         }
       }
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Sync Latency Detected", variant: "destructive" });
+      addNotification({ title: "Update Latency Detected", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -322,7 +332,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       await processSyncQueue();
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Upload Pulse Latent", variant: "destructive" });
+      addNotification({ title: "Upload Latency Detected", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -339,15 +349,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
-      locationOptions, assigneeOptions, conditionOptions, statusOptions,
-      isFilterOpen, setIsFilterOpen, isLogicFilterOpen, setIsLogicFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
+      locationOptions, assigneeOptions, conditionOptions, statusOptions, categoryOptions,
+      isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
       isCommandPaletteOpen, setIsCommandPaletteOpen,
       selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
       selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveViewStatus('REGISTRY'); },
       setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveViewStatus('REGISTRY'); },
       isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
-      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0)
+      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0)
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}
