@@ -77,7 +77,6 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/component
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import type { Asset } from '@/types/domain';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TactileMenu } from '@/components/TactileMenu';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -441,7 +440,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               <div className="p-6 border-b border-border bg-muted/10 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-primary/10 rounded-xl"><Database className="h-5 w-5 text-primary" /></div>
-                  <h3 className="text-xl font-black uppercase text-foreground leading-none">Record Focus</h3>
+                  <h3 className="text-xl font-black uppercase text-foreground leading-none">Asset Details</h3>
                 </div>
                 <div className="flex items-center gap-3">
                   <TooltipProvider>
@@ -456,7 +455,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                           <Columns className="h-5 w-5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent className="text-[8px] font-black uppercase">Setup Fields</TooltipContent>
+                      <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10"><X className="h-5 w-5" /></button>
@@ -499,8 +498,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 )}
                 
                 <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><FileDown className="h-4 w-4" /> Export</Button>
-                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><Download className="h-4 w-4" /> Sync Down</Button>
-                <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><CloudUpload className="h-4 w-4" /> Sync Up</Button>
+                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><Download className="h-4 w-4" /> Download</Button>
+                <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><CloudUpload className="h-4 w-4" /> Upload</Button>
                 <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
                 {isAdmin && (
                   <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>

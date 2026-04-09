@@ -35,7 +35,8 @@ import {
   User, 
   Activity,
   ArrowRightLeft,
-  X
+  X,
+  Tag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
@@ -50,6 +51,7 @@ export interface BatchUpdateData {
   condition?: string;
   verifiedStatus?: 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
   description?: string;
+  assetIdCode?: string;
 }
 
 interface AssetBatchEditFormProps {
@@ -78,6 +80,9 @@ export function AssetBatchEditForm({
   const [applyDescription, setApplyDescription] = useState(false);
   const [description, setDescription] = useState('');
 
+  const [applyTag, setApplyTag] = useState(false);
+  const [assetIdCode, setAssetIdCode] = useState('');
+
   const [applyCondition, setApplyCondition] = useState(false);
   const [condition, setCondition] = useState('');
 
@@ -89,6 +94,7 @@ export function AssetBatchEditForm({
     const updates: BatchUpdateData = {};
     if (applyLocation && isAdmin) updates.location = location;
     if (applyDescription && isAdmin) updates.description = description;
+    if (applyTag && isAdmin) updates.assetIdCode = assetIdCode;
     if (applyCondition) updates.condition = condition;
     if (applyStatus) updates.verifiedStatus = status;
 
@@ -105,6 +111,8 @@ export function AssetBatchEditForm({
     setLocation('');
     setApplyDescription(false);
     setDescription('');
+    setApplyTag(false);
+    setAssetIdCode('');
     setApplyCondition(false);
     setCondition('');
     setApplyStatus(false);
@@ -116,7 +124,7 @@ export function AssetBatchEditForm({
     onOpenChange(open);
   };
   
-  const canSave = (applyLocation && isAdmin) || (applyDescription && isAdmin) || applyCondition || applyStatus;
+  const canSave = (applyLocation && isAdmin) || (applyDescription && isAdmin) || (applyTag && isAdmin) || applyCondition || applyStatus;
 
   const FieldOption = ({ 
     id, 
@@ -173,32 +181,41 @@ export function AssetBatchEditForm({
               Batch Edit
             </SheetTitle>
             <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-              Updating {selectedAssetCount} records simultaneously.
+              Updating {selectedAssetCount} shared registry attributes.
             </SheetDescription>
           </SheetHeader>
         </div>
 
         <ScrollArea className="flex-1 bg-background">
           <div className="p-8 space-y-6">
-            <FieldOption id="desc" label="Description Overwrite" isActive={applyDescription} onToggle={setApplyDescription} disabled={!isAdmin} icon={FileText}>
+            <FieldOption id="desc" label="Asset Description" isActive={applyDescription} onToggle={setApplyDescription} disabled={!isAdmin} icon={FileText}>
               <Input 
                 value={description} 
                 onChange={(e) => setDescription(e.target.value)} 
-                placeholder="Global description..."
+                placeholder="Overwrite descriptions..."
                 className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
               />
             </FieldOption>
 
-            <FieldOption id="loc" label="Update Location" isActive={applyLocation} onToggle={setApplyLocation} disabled={!isAdmin} icon={MapPin}>
+            <FieldOption id="tag" label="Asset ID / Tag" isActive={applyTag} onToggle={setApplyTag} disabled={!isAdmin} icon={Tag}>
+              <Input 
+                value={assetIdCode} 
+                onChange={(e) => setAssetIdCode(e.target.value)} 
+                placeholder="Overwrite IDs..."
+                className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
+              />
+            </FieldOption>
+
+            <FieldOption id="loc" label="Location" isActive={applyLocation} onToggle={setApplyLocation} disabled={!isAdmin} icon={MapPin}>
               <Input 
                 value={location} 
                 onChange={(e) => setLocation(e.target.value)} 
-                placeholder="New state/facility..."
+                placeholder="New state or facility..."
                 className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
               />
             </FieldOption>
 
-            <FieldOption id="cond" label="Condition State" isActive={applyCondition} onToggle={setApplyCondition} icon={Activity}>
+            <FieldOption id="cond" label="Condition" isActive={applyCondition} onToggle={setApplyCondition} icon={Activity}>
               <Select onValueChange={setCondition} value={condition}>
                 <SelectTrigger className="h-12 rounded-xl bg-background border-2 focus:ring-primary/20 font-bold text-xs">
                   <SelectValue placeholder="Select condition..." />
@@ -209,7 +226,7 @@ export function AssetBatchEditForm({
               </Select>
             </FieldOption>
 
-            <FieldOption id="stat" label="Verification Status" isActive={applyStatus} onToggle={setApplyStatus} icon={ShieldCheck}>
+            <FieldOption id="stat" label="Status" isActive={applyStatus} onToggle={setApplyStatus} icon={ShieldCheck}>
               <Select onValueChange={(v) => setStatus(v as any)} value={status}>
                 <SelectTrigger className="h-12 rounded-xl bg-background border-2 focus:ring-primary/20 font-black text-[10px] uppercase tracking-widest">
                   <SelectValue placeholder="Select status..." />

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1306: Normalized naming scheme and restricted edit access.
+ * Normalized naming scheme and restricted access controls.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -199,19 +199,19 @@ export default function SPAHub() {
           <TactileMenu
             title="Synchronize"
             options={[
-              { label: 'Synchronize Data', icon: Download, onClick: manualDownload },
-              { label: 'Upload Changes', icon: Upload, onClick: manualUpload },
+              { label: 'Download Data', icon: Download, onClick: manualDownload },
+              { label: 'Upload Data', icon: Upload, onClick: manualUpload },
               { label: 'Refresh Registry', icon: RefreshCw, onClick: refreshRegistry }
             ]}
           >
             <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Data</TooltipContent></Tooltip></TooltipProvider>
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent></Tooltip></TooltipProvider>
               <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>
             </div>
           </TactileMenu>
 
           <TactileMenu
-            title="Connectivity"
+            title="Network Status"
             options={[
               { label: 'Switch to Online', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
               { label: 'Switch to Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
