@@ -3,6 +3,7 @@
 /**
  * @fileOverview Inventory Pulse Dashboard - High-Fidelity Metric Hub.
  * Implements exactly 10 business-critical asset anchors with detailed descriptions.
+ * Phase 1505: Locked Pending Action card to Verification Mode and updated navigation.
  */
 
 import React, { useMemo } from 'react';
@@ -185,16 +186,18 @@ export function AssetSummaryDashboard() {
                     />
                 )}
 
-                {/* 2. Pending Action */}
-                <PulseCard 
-                    label="Pending Action"
-                    description="Assets currently marked as unverified and requiring field inspection."
-                    count={metrics.pending}
-                    icon={Activity}
-                    color="bg-blue-600"
-                    onClick={() => navigateTo('VERIFY')}
-                    variant="blue"
-                />
+                {/* 2. Pending Action - Locked to Verification Mode */}
+                {isVerificationMode && (
+                    <PulseCard 
+                        label="Pending Action"
+                        description="Assets currently marked as unverified and requiring field inspection."
+                        count={metrics.pending}
+                        icon={Activity}
+                        color="bg-blue-600"
+                        onClick={() => navigateTo('REGISTRY', undefined, 'UNVERIFIED')}
+                        variant="blue"
+                    />
+                )}
 
                 {/* 3. Missing Asset ID */}
                 <PulseCard 
