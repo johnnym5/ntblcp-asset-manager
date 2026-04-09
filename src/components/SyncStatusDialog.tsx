@@ -64,10 +64,10 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         {/* Header Ribbon */}
-        <div className="px-10 py-6 flex items-center gap-3">
+        <DialogHeader className="px-10 py-6 flex flex-row items-center gap-3 space-y-0">
           <Zap className="h-4 w-4 text-primary fill-current" />
-          <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80">Sync Status</h2>
-        </div>
+          <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status</DialogTitle>
+        </DialogHeader>
 
         {/* Main Control Surface */}
         <div className="px-10 pb-10 space-y-12">
