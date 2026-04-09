@@ -2,11 +2,8 @@
 
 /**
  * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
- * Phase 1600: Transformed grid into a dynamic carousel.
- * Phase 1601: Added individual pulses for all technical headers, condition groups, and remarks.
- * Phase 1602: Removed count > 0 filter to show all headers as requested.
- * Phase 1603: Added "Fidelity Nominal" state for zero-count pulses.
- * Phase 1604: Category-aware ID gaps: excludes vehicles from Serial/Model, targets them for Chassis/Engine.
+ * Phase 1605: Category-Aware Technical ID gaps (excluding vehicles from serial/model).
+ * Phase 1606: Fixed missing icon imports.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -145,7 +142,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-bad',
                 label: 'Critical Condition',
                 description: 'Assets in poor condition requiring repair or replacement.',
-                count: assets.filter(a => a.conditionGroup === 'Bad' || ['Bad condition', 'Poor', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
+                count: assets.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
                 icon: Wrench,
                 color: 'bg-orange-600',
                 token: 'CONDITION_BAD',
@@ -155,7 +152,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-stolen',
                 label: 'Stolen Pulses',
                 description: 'Confirmed physical losses from regional sites.',
-                count: assets.filter(a => a.conditionGroup === 'Stolen' || a.condition === 'Stolen').length,
+                count: assets.filter(a => a.condition === 'Stolen').length,
                 icon: AlertCircle,
                 color: 'bg-red-700',
                 token: 'CONDITION_STOLEN',
@@ -165,7 +162,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-obsolete',
                 label: 'Obsolete Registry',
                 description: 'Assets that have reached the end of operational life.',
-                count: assets.filter(a => a.conditionGroup === 'Obsolete' || a.condition === 'Obsolete').length,
+                count: assets.filter(a => a.condition === 'Obsolete').length,
                 icon: Box,
                 color: 'bg-muted-foreground',
                 token: 'CONDITION_OBSOLETE',
@@ -175,7 +172,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-unsalvageable',
                 label: 'Unsalvageable',
                 description: 'Burnt or destroyed items ready for write-off.',
-                count: assets.filter(a => a.conditionGroup === 'Unsalvageable' || ['Unsalvageable', 'Burnt', 'Writeoff'].includes(a.condition || '')).length,
+                count: assets.filter(a => ['Unsalvageable', 'Burnt', 'Writeoff'].includes(a.condition || '')).length,
                 icon: Trash2,
                 color: 'bg-red-900',
                 token: 'CONDITION_UNSALVAGEABLE',
@@ -236,7 +233,7 @@ export function AssetSummaryDashboard() {
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="icon" onClick={prevPulse} disabled={scrollIndex === 0} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronLeft className="h-5 w-5" /></Button>
                     <div className="px-4 py-1.5 rounded-full bg-muted/50 border border-border shadow-inner">
-                        <span className="text-[10px] font-mono font-black">{scrollIndex + 1} / {pulses.length}</span>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground">{scrollIndex + 1} / {pulses.length}</span>
                     </div>
                     <Button variant="ghost" size="icon" onClick={nextPulse} disabled={scrollIndex === pulses.length - 1} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronRight className="h-5 w-5" /></Button>
                 </div>

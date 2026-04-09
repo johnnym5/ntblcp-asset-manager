@@ -3,7 +3,7 @@
 /**
  * @fileOverview SyncStatusDialog - High-Fidelity Sync Management Workstation.
  * Recreated to match the exact visual pulse from the user's screenshot.
- * Phase 1100: Real-time queue counting and connectivity orchestration.
+ * Phase 1101: Resolved DialogTitle accessibility error.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -64,13 +64,13 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         {/* Header Ribbon */}
-        <DialogHeader className="px-10 py-6 flex flex-row items-center gap-3 space-y-0">
+        <DialogHeader className="px-10 py-6 flex flex-row items-center gap-3 space-y-0 border-b border-white/5">
           <Zap className="h-4 w-4 text-primary fill-current" />
-          <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status</DialogTitle>
+          <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status Hub</DialogTitle>
         </DialogHeader>
 
         {/* Main Control Surface */}
-        <div className="px-10 pb-10 space-y-12">
+        <div className="px-10 pb-10 space-y-12 mt-8">
           {/* Top Section: Connectivity */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
@@ -78,7 +78,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                 "p-5 rounded-[1.5rem] transition-all duration-500 shadow-inner",
                 isOnline ? "bg-green-500/10 text-green-500 shadow-green-500/5" : "bg-red-500/10 text-red-500"
               )}>
-                <Wifi className={cn("h-10 w-10", isOnline && "animate-pulse")} />
+                {isOnline ? <Wifi className="h-10 w-10 animate-pulse" /> : <WifiOff className="h-10 w-10" />}
               </div>
               <div className="space-y-1">
                 <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Pending Changes</h3>
@@ -86,7 +86,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                   "text-[10px] font-black uppercase tracking-widest",
                   isOnline ? "text-green-500/60" : "text-red-500/60"
                 )}>
-                  Online Status: {isOnline ? 'Active' : 'Disconnected'}
+                  Network Pulse: {isOnline ? 'Active' : 'Disconnected'}
                 </p>
               </div>
             </div>

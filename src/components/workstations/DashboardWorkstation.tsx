@@ -2,9 +2,8 @@
 
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
- * Phase 1507: Prioritized At-a-Glance and locked Verification issues to Verification Mode.
- * Phase 1508: Corrected all missing icon references and prioritized carousels at top.
- * Phase 1509: Integrated Operational Tools into the Protocol Badge and removed dedicated section.
+ * Phase 1510: Fully optimized for deployment stability.
+ * Prioritized At-a-Glance and locked Verification issues to Verification Mode.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -80,20 +79,17 @@ export function DashboardWorkstation() {
       const isUnverified = mode === 'verification' && a.status !== 'VERIFIED';
       
       const isBadCondition = ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '');
-      const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() === '';
       
+      // Technical ID gaps check
+      const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() !== '';
       const cat = (a.category || '').toLowerCase();
       const isVehicle = cat.includes('motor') || cat.includes('vehicle');
       
       let hasTechId = false;
       if (isVehicle) {
-        // Vehicles use Chassis & Engine
-        hasTechId = !!a.chassisNo && a.chassisNo !== 'N/A' && a.chassisNo.trim() !== '' && 
-                    !!a.engineNo && a.engineNo !== 'N/A' && a.engineNo.trim() !== '';
+        hasTechId = !!a.chassisNo && a.chassisNo !== 'N/A' && !!a.engineNo && a.engineNo !== 'N/A';
       } else {
-        // Others use Serial & Model
-        hasTechId = !!a.serialNumber && a.serialNumber !== 'N/A' && a.serialNumber.trim() !== '' && 
-                    !!a.modelNumber && a.modelNumber !== 'N/A' && a.modelNumber.trim() !== '';
+        hasTechId = !!a.serialNumber && a.serialNumber !== 'N/A' && !!a.modelNumber && a.modelNumber !== 'N/A';
       }
 
       return isUnverified || isBadCondition || !hasAssetId || !hasTechId;
@@ -249,7 +245,7 @@ export function DashboardWorkstation() {
       <div className="px-1">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10 rounded-[3rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl shadow-primary/5 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
-            <modeInfo.icon className="h-40 w-40 text-primary" />
+            {React.createElement(modeInfo.icon, { className: "h-40 w-40 text-primary" })}
           </div>
           <div className="flex items-center gap-8 relative z-10 text-center md:text-left flex-col md:flex-row">
             <div className="p-6 bg-primary rounded-[2rem] shadow-2xl shadow-primary/30">

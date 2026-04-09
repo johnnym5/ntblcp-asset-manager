@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview AssetDossier - Professional Technical Registry Hub.
- * Phase 1500: Overhauled hierarchy to prioritize clear Headers and stacked Details.
- * Phase 1501: Integrated inline verification sidebar for high-speed audits.
- * Phase 1502: Fixed missing ScrollArea import.
+ * Phase 1510: Fully optimized for deployment stability.
  */
 
 import React from 'react';
@@ -164,7 +162,7 @@ export function AssetDossier({
               <Button 
                 onClick={() => onQuickUpdate?.(record.id, { status: isVerified ? 'UNVERIFIED' : 'VERIFIED' })}
                 className={cn(
-                  "w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg",
+                  "w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-md",
                   isVerified ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
                 )}
               >

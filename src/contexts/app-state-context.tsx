@@ -2,11 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1303: Category-Aware Technical ID Gap filtering (Chassis/Engine for vehicles vs Serial/Model for others).
- * Phase 1304: Corrected filteredAssets logic for diagnostic tokens to prevent "0 Assets" bug.
- * Phase 1305: Expanded diagnostic tokens for high-fidelity carousel pulses.
- * Phase 1306: Added support for MISSING_MODEL token.
- * Phase 1307: Hardened category-aware exclusion for technical ID gaps.
+ * Phase 1308: Final category-aware Technical ID gap resolution.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -256,19 +252,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return cat.includes('motor') || cat.includes('vehicle');
       };
 
-      // Diagnostic Token Resolution - Strict Category Alignment
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
         results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
       } else if (searchTerm === 'MISSING_MODEL') {
-        // Only Equipment (No Vehicles)
-        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === ''));
+        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A'));
       } else if (searchTerm === 'MISSING_CHASSIS') {
-        // Only Vehicles
         results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A'));
       } else if (searchTerm === 'MISSING_ENGINE') {
-        // Only Vehicles
         results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A'));
       } else if (searchTerm === 'WITH_REMARKS') {
         results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
@@ -278,8 +270,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         const group = searchTerm.replace('CONDITION_', '').replace(/^\w/, c => c.toUpperCase());
         results = results.filter(a => a.conditionGroup === group);
       } else if (searchTerm === 'MISSING_SERIAL') {
-        // Only Equipment (No Vehicles)
-        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
+        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A'));
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
       } else {
@@ -299,11 +290,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const norm = LocationEngine.normalize(a.location);
       const fuzzy = getFuzzySignature(norm.normalized);
       const existing = map.get(fuzzy);
-      if (existing) {
-        existing.count++;
-      } else {
-        map.set(fuzzy, { label: norm.normalized, count: 1 });
-      }
+      if (existing) existing.count++;
+      else map.set(fuzzy, { label: norm.normalized, count: 1 });
     });
     return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
@@ -314,39 +302,27 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
       const fuzzy = getFuzzySignature(display);
       const existing = map.get(fuzzy);
-      if (existing) {
-        existing.count++;
-      } else {
-        map.set(fuzzy, { label: display, count: 1 });
-      }
+      if (existing) existing.count++;
+      else map.set(fuzzy, { label: display, count: 1 });
     });
     return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const categoryOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { 
-      const display = a.category || 'Uncategorized';
-      counts.set(display, (counts.get(display) || 0) + 1); 
-    });
+    assets.forEach(a => { counts.set(a.category, (counts.get(a.category) || 0) + 1); });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const conditionOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { 
-      const display = a.condition || 'Unassessed';
-      counts.set(display, (counts.get(display) || 0) + 1); 
-    });
+    assets.forEach(a => { counts.set(a.condition, (counts.get(a.condition) || 0) + 1); });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const statusOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { 
-      const display = a.status || 'UNVERIFIED';
-      counts.set(display, (counts.get(display) || 0) + 1); 
-    });
+    assets.forEach(a => { counts.set(a.status, (counts.get(a.status) || 0) + 1); });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 

@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 1505: Implemented independent folder template resolution.
- * Phase 1506: Hardened selection bar visibility gating.
+ * Phase 1510: Fully optimized for deployment stability.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -152,10 +151,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
 
-  /**
-   * DYNAMIC HEADER RESOLUTION
-   * Syncs the workstation headers with the folder's template when explored.
-   */
   useEffect(() => {
     if (selectedCategories.length === 1 && activeGrant) {
       const cat = selectedCategories[0];
