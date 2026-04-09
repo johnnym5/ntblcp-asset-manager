@@ -3,7 +3,8 @@
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
  * Phase 1412: Integrated Issue Scanner and At-a-Glance random asset carousels.
- * Phase 1413: Added Mode Header and expanded Operational Tools.
+ * Phase 1413: Added Bold Mode Header and expanded Operational Tools.
+ * Phase 1414: Fixed missing ArrowRight import.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -29,6 +30,7 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   Info,
   Maximize2,
   SearchCode,
@@ -304,7 +306,7 @@ export function DashboardWorkstation() {
                               <Badge className={cn("h-5 px-2 text-[8px] font-black uppercase", glanceAssets[glanceIndex].status === 'VERIFIED' ? "bg-green-600" : "bg-orange-600")}>{glanceAssets[glanceIndex].status}</Badge>
                             </div>
                           </div>
-                          <Button variant="ghost" className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest text-primary hover:bg-primary/10 w-full sm:w-auto">View Full Dossier <Maximize2 className="ml-2 h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest text-primary hover:bg-primary/10 w-full sm:w-auto">View Full Profile <Maximize2 className="ml-2 h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
                     </Card>
@@ -338,7 +340,7 @@ export function DashboardWorkstation() {
                     <h4 className="text-lg font-black uppercase text-foreground tracking-tight">Activity History</h4>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed max-w-xs">Immutable trace of every modification pulse within the project register.</p>
                   </div>
-                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-primary gap-2">Explore Ledger <ArrowRight className="h-3 w-3" /></Button>
+                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-primary gap-2">Explore History <ArrowRight className="h-3 w-3" /></Button>
                 </Card>
               </div>
               
@@ -353,7 +355,7 @@ export function DashboardWorkstation() {
                     <h4 className="text-lg font-black uppercase text-foreground tracking-tight">Executive Documentation</h4>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed max-w-xs">Automated Travel Report generation and data quality compliance pulses.</p>
                   </div>
-                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-blue-600 gap-2">Open Hub <ArrowRight className="h-3 w-3" /></Button>
+                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-blue-600 gap-2">Open Reports <ArrowRight className="h-3 w-3" /></Button>
                 </Card>
               </div>
             </div>

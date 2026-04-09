@@ -5,6 +5,7 @@
  * Implements seamless workstation transitions and multi-function navigation.
  * Normalized naming to professional Asset Manager standards.
  * Phase 1410: Integrated transient 5-second Notification Toasts.
+ * Phase 1414: Removed redundant VERIFY view and consolidated navigation.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
