@@ -3,7 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Hardened for high-volume data handling and deterministic normalization.
- * Phase 1300: Integrated Deterministic Normalization Engine for Filters.
+ * Phase 1301: Integrated Diagnostic Search Tokens for Dashboard Navigation.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -244,11 +244,20 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
-      const fuzzySearch = getFuzzySignature(searchTerm);
-      results = results.filter(a => {
-        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
-        return getFuzzySignature(hay).includes(fuzzySearch);
-      });
+      // Diagnostic Token Resolution
+      if (searchTerm === 'MISSING_ID') {
+        results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
+      } else if (searchTerm === 'MISSING_SERIAL') {
+        results = results.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '');
+      } else if (searchTerm === 'CONDITION_BAD') {
+        results = results.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
+      } else {
+        const fuzzySearch = getFuzzySignature(searchTerm);
+        results = results.filter(a => {
+          const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
+          return getFuzzySignature(hay).includes(fuzzySearch);
+        });
+      }
     }
     return results;
   }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories]);

@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
- * Normalized naming and added prominent Import Assets shortcut.
+ * Phase 1412: Integrated Issue Scanner and At-a-Glance random asset carousels.
  */
 
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard,
   RefreshCw,
@@ -25,26 +25,26 @@ import {
   AlertCircle,
   Download,
   Palette,
-  Users
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Maximize2,
+  SearchCode,
+  FileWarning
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
-import { ReportsWorkstation } from './ReportsWorkstation';
-import { SyncQueueWorkstation } from './SyncQueueWorkstation';
-import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { TactileMenu } from '@/components/TactileMenu';
+import { motion, AnimatePresence } from 'framer-motion';
+import { transformAssetToRecord } from '@/lib/registry-utils';
+import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
+import type { Asset } from '@/types/domain';
 
 export function DashboardWorkstation() {
   const { 
@@ -53,15 +53,54 @@ export function DashboardWorkstation() {
     manualDownload, 
     isSyncing, 
     isOnline,
-    refreshRegistry
+    refreshRegistry,
+    assets,
+    headers
   } = useAppState();
   
   const { userProfile } = useAuth();
   
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
-  const canEdit = isAdmin || !!userProfile?.canEditAssets;
-  const isReportingMode = appSettings?.appMode === 'reporting';
   const isVerificationMode = appSettings?.appMode === 'verification';
+
+  // --- Carousel State & Logic ---
+  const [issueIndex, setIssueIndex] = useState(0);
+  const [glanceIndex, setGlanceIndex] = useState(0);
+  const [randomSeed, setRandomSeed] = useState(0);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // 1. Issue Scanner Assets (Assets with issues)
+  const issueAssets = useMemo(() => {
+    const list = assets.filter(a => 
+      a.status !== 'VERIFIED' || 
+      ['Bad condition', 'Poor', 'Burnt', 'Stolen'].includes(a.condition || '') || 
+      !a.assetIdCode || a.assetIdCode === 'N/A'
+    );
+    return [...list].sort(() => 0.5 - Math.random()).slice(0, 5);
+  }, [assets, randomSeed]);
+
+  // 2. At a Glance Assets (Random sample)
+  const glanceAssets = useMemo(() => {
+    return [...assets].sort(() => 0.5 - Math.random()).slice(0, 5);
+  }, [assets, randomSeed]);
+
+  const handleRefreshRandom = () => {
+    setRandomSeed(prev => prev + 1);
+    setIssueIndex(0);
+    setGlanceIndex(0);
+  };
+
+  const handleInspect = (id: string) => {
+    setSelectedAssetId(id);
+    setIsDetailOpen(true);
+  };
+
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
   return (
     <div className="space-y-10 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
@@ -77,59 +116,33 @@ export function DashboardWorkstation() {
               <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">
                 Intelligence Hub
               </h2>
-              <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.3em] leading-none">
+              <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">
                 {appSettings?.appMode || 'STANDARD'} WORKSTATION
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="flex-1 lg:flex-none bg-muted/30 p-1 rounded-xl border border-border flex items-center shrink-0">
-              <div className="flex items-center gap-1 w-full">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="flex-1 lg:flex-none px-6 h-8 rounded-lg font-black uppercase text-[9px] tracking-widest bg-background text-foreground shadow-sm"
-                >
-                  Summary
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setActiveView('REGISTRY')}
-                  className="flex-1 lg:flex-none px-6 h-8 rounded-lg font-black uppercase text-[9px] tracking-widest text-muted-foreground hover:text-foreground transition-all"
-                >
-                  Records
-                </Button>
-              </div>
-            </div>
+          <div className="flex items-center gap-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleRefreshRandom} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2">
+                    <RefreshCw className="h-3.5 w-3.5 mr-2" /> Refresh Carousels
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Get 5 new random sets</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <div className="flex items-center gap-1.5 shrink-0">
-              <TactileMenu
-                title="Synchronize Data"
-                options={[
-                  { label: 'Download Updates', icon: Download, onClick: manualDownload },
-                  { label: 'Synchronize All', icon: RefreshCw, onClick: refreshRegistry }
-                ]}
-              >
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={manualDownload} 
-                        disabled={isSyncing || !isOnline}
-                        className="rounded-xl h-10 w-10 bg-muted border border-border text-muted-foreground hover:text-primary shrink-0 transition-colors"
-                      >
-                        <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </TactileMenu>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={manualDownload} 
+              disabled={isSyncing || !isOnline}
+              className="rounded-xl h-10 w-10 bg-muted border border-border text-muted-foreground hover:text-primary transition-colors"
+            >
+              <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+            </Button>
           </div>
         </div>
       </div>
@@ -140,64 +153,130 @@ export function DashboardWorkstation() {
           {/* ANALYTICS SECTION */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-1">
-                  <Activity className="h-3 w-3 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Inventory Pulse</h3>
-                </div>
-                <AssetSummaryDashboard />
-              </div>
+              <AssetSummaryDashboard />
             </div>
             
             <div className="lg:col-span-4 space-y-6">
               <div className="flex items-center gap-2 px-1">
                 <Zap className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Quick Tools</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Operational Tools</h3>
               </div>
-              <Card className="bg-card border-border rounded-[2rem] overflow-hidden shadow-2xl">
-                <div className="p-6 border-b border-border bg-muted/10">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                    <DatabaseZap className="h-4 w-4" /> Operations
-                  </h4>
-                </div>
+              <Card className="bg-card border-border rounded-[2.5rem] overflow-hidden shadow-2xl">
                 <CardContent className="p-6 space-y-3">
                   {isAdmin && (
-                    <Button 
-                      onClick={() => setActiveView('IMPORT')} 
-                      variant="outline" 
-                      className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group"
-                    >
+                    <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 group">
                       <FileUp className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Import Assets
                     </Button>
                   )}
-
-                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
-                    <FolderOpen className="h-4 w-4 text-primary" /> Browse Assets
+                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                    <FolderOpen className="h-4 w-4 text-primary" /> Asset Hub
                   </Button>
-                  
-                  {isVerificationMode && (
-                    <Button onClick={() => setActiveView('VERIFY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 text-green-600 border-green-500/20">
-                      <ClipboardCheck className="h-4 w-4" /> Verification Queue
-                    </Button>
-                  )}
-
-                  <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
-                    <Settings className="h-4 w-4 text-primary" /> App Settings
+                  <Button onClick={() => setActiveView('GROUPS')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                    <LayoutGrid className="h-4 w-4 text-primary" /> Manage Folders
                   </Button>
-                  
-                  {isAdmin && (
-                    <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 mt-4">
-                      <div className="flex items-center gap-3 mb-1">
-                        <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-[9px] font-black uppercase text-primary tracking-widest">Administrative Mode</span>
-                      </div>
-                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                        Full registry modification clearance active.
-                      </p>
-                    </div>
-                  )}
+                  <Button onClick={() => setActiveView('ANOMALIES')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                    <SearchCode className="h-4 w-4 text-primary" /> Pattern Anomalies
+                  </Button>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+
+          {/* DYNAMIC CAROUSELS */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            
+            {/* 1. ISSUE SCANNER */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-red-500/10 rounded-lg border border-red-500/20"><FileWarning className="h-4 w-4 text-red-600" /></div>
+                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight">Issue Scanner</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" disabled={issueIndex === 0} onClick={() => setIssueIndex(i => i - 1)} className="h-8 w-8 rounded-full border border-border"><ChevronLeft className="h-4 w-4" /></Button>
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground">{issueIndex + 1} / {issueAssets.length || 1}</span>
+                  <Button variant="ghost" size="icon" disabled={issueIndex === issueAssets.length - 1} onClick={() => setIssueIndex(i => i + 1)} className="h-8 w-8 rounded-full border border-border"><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {issueAssets.length > 0 ? (
+                  <motion.div key={`issue-${issueIndex}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                    <Card className="rounded-[2.5rem] border-2 border-red-500/20 bg-red-500/[0.02] p-8 shadow-3xl group cursor-pointer" onClick={() => handleInspect(issueAssets[issueIndex].id)}>
+                      <div className="flex flex-col sm:flex-row items-center gap-8">
+                        <div className="p-6 bg-white rounded-[2rem] border-2 border-red-500/10 shadow-inner shrink-0 relative">
+                          <Activity className="h-12 w-12 text-red-600" />
+                          <Badge className="absolute -top-3 -right-3 bg-red-600 text-white font-black text-[8px] px-2 h-6 border-2 border-black">URGENT</Badge>
+                        </div>
+                        <div className="space-y-4 flex-1 text-center sm:text-left">
+                          <div className="space-y-1">
+                            <h4 className="text-xl font-black uppercase text-foreground leading-tight line-clamp-2">{issueAssets[issueIndex].description}</h4>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{issueAssets[issueIndex].location} &bull; {issueAssets[issueIndex].category}</p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 space-y-2">
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-red-600"><AlertCircle className="h-3 w-3" /> Potential Issues Detected:</div>
+                            <ul className="text-[9px] font-bold text-muted-foreground uppercase list-disc pl-4 space-y-1">
+                              {!issueAssets[issueIndex].assetIdCode && <li>Missing System Tag ID</li>}
+                              {issueAssets[issueIndex].status !== 'VERIFIED' && <li>Pending Physical Verification</li>}
+                              {['Bad condition', 'Poor', 'Burnt', 'Stolen'].includes(issueAssets[issueIndex].condition || '') && <li>Critical condition alert: {issueAssets[issueIndex].condition}</li>}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <Card className="rounded-[2.5rem] border-2 border-dashed border-border p-20 text-center opacity-20"><Info className="h-12 w-12 mx-auto mb-4" /><p className="text-sm font-black uppercase tracking-widest">No issues found in sample</p></Card>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* 2. AT A GLANCE */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20"><Eye className="h-4 w-4 text-primary" /></div>
+                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight">At a Glance</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" disabled={glanceIndex === 0} onClick={() => setGlanceIndex(i => i - 1)} className="h-8 w-8 rounded-full border border-border"><ChevronLeft className="h-4 w-4" /></Button>
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground">{glanceIndex + 1} / {glanceAssets.length || 1}</span>
+                  <Button variant="ghost" size="icon" disabled={glanceIndex === glanceAssets.length - 1} onClick={() => setGlanceIndex(i => i + 1)} className="h-8 w-8 rounded-full border border-border"><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {glanceAssets.length > 0 ? (
+                  <motion.div key={`glance-${glanceIndex}`} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}>
+                    <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card p-8 shadow-3xl group cursor-pointer" onClick={() => handleInspect(glanceAssets[glanceIndex].id)}>
+                      <div className="flex flex-col sm:flex-row items-center gap-8">
+                        <div className="p-6 bg-muted/30 rounded-[2rem] border-2 border-border/40 shadow-inner shrink-0">
+                          <LayoutGrid className="h-12 w-12 text-primary/40" />
+                        </div>
+                        <div className="space-y-4 flex-1 text-center sm:text-left">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Sample Profile</span>
+                            <h4 className="text-xl font-black uppercase text-foreground leading-tight line-clamp-2">{glanceAssets[glanceIndex].description}</h4>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-0.5">
+                              <p className="text-[8px] font-black text-muted-foreground uppercase opacity-40">Assigned State</p>
+                              <p className="text-xs font-black uppercase truncate">{glanceAssets[glanceIndex].location}</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-[8px] font-black text-muted-foreground uppercase opacity-40">Status Pulse</p>
+                              <Badge className={cn("h-5 px-2 text-[8px] font-black uppercase", glanceAssets[glanceIndex].status === 'VERIFIED' ? "bg-green-600" : "bg-orange-600")}>{glanceAssets[glanceIndex].status}</Badge>
+                            </div>
+                          </div>
+                          <Button variant="ghost" className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest text-primary hover:bg-primary/10 w-full sm:w-auto">View Full Dossier <Maximize2 className="ml-2 h-3.5 w-3.5" /></Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <Card className="rounded-[2.5rem] border-2 border-dashed border-border p-20 text-center opacity-20"><Search className="h-12 w-12 mx-auto mb-4" /><p className="text-sm font-black uppercase tracking-widest">Registry Silent</p></Card>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
@@ -206,65 +285,40 @@ export function DashboardWorkstation() {
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 <div className="p-1.5 bg-muted rounded-lg border border-border"><Monitor className="h-4 w-4 text-primary" /></div>
-                <h3 className="text-base font-black uppercase text-foreground tracking-tight">System Status</h3>
+                <h3 className="text-base font-black uppercase text-foreground tracking-tight">Infrastructure Monitor</h3>
               </div>
-              <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[8px] font-black tracking-widest">Active Connection</Badge>
+              <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[8px] font-black tracking-widest">System Operational</Badge>
             </div>
 
-            <div className={cn(
-              "grid grid-cols-1 gap-8 items-start",
-              isReportingMode ? "xl:grid-cols-2" : "grid-cols-1"
-            )}>
-              {isReportingMode && (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 px-1">
-                    <FileText className="h-3.5 w-3.5 text-blue-500" />
-                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting Hub</h3>
-                  </div>
-                  <div className="p-1 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/10 shadow-inner">
-                    <ReportsWorkstation isEmbedded={true} />
-                  </div>
-                </div>
-              )}
-              
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-1">
                   <Activity className="h-3.5 w-3.5 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Synchronization Status</h3>
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Synchronization Ledger</h3>
                 </div>
-                
-                <div className="grid grid-cols-1 gap-6">
-                  <SyncQueueWorkstation isEmbedded={true} />
-                  
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="audit-log" className="border-none">
-                      <Card className="bg-card border border-border rounded-[2rem] overflow-hidden shadow-xl">
-                        <AccordionTrigger className="hover:no-underline p-0 [&[data-state=open]>div>div>svg]:rotate-180">
-                          <div className="p-5 flex items-center justify-between w-full pr-6">
-                            <div className="flex items-center gap-3">
-                              <History className="h-4 w-4 text-primary" />
-                              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Activity History</h4>
-                            </div>
-                            <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">OPEN LOGS</Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-0 pt-0 border-t border-border">
-                          <AuditLogWorkstation isEmbedded={true} />
-                          <div className="p-4 bg-muted/5 flex justify-end">
-                             <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => setActiveView('AUDIT_LOG')}
-                              className="h-7 px-3 rounded-md font-black uppercase text-[8px] text-primary hover:bg-primary/10"
-                            >
-                              View Full History
-                            </Button>
-                          </div>
-                        </AccordionContent>
-                      </Card>
-                    </AccordionItem>
-                  </Accordion>
+                <Card className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-xl p-8 flex flex-col items-center justify-center text-center space-y-6 group cursor-pointer hover:border-primary/20 transition-all" onClick={() => setActiveView('AUDIT_LOG')}>
+                  <div className="p-6 bg-primary/10 rounded-full group-hover:scale-110 transition-transform"><History className="h-10 w-10 text-primary" /></div>
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-black uppercase text-foreground tracking-tight">Activity History</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed max-w-xs">Immutable trace of every modification pulse within the project register.</p>
+                  </div>
+                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-primary gap-2">Explore Ledger <ArrowRight className="h-3 w-3" /></Button>
+                </Card>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 px-1">
+                  <FileText className="h-3.5 w-3.5 text-blue-500" />
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting Extraction</h3>
                 </div>
+                <Card className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-xl p-8 flex flex-col items-center justify-center text-center space-y-6 group cursor-pointer hover:border-blue-500/20 transition-all" onClick={() => setActiveView('REPORTS')}>
+                  <div className="p-6 bg-blue-500/10 rounded-full group-hover:scale-110 transition-transform"><FileText className="h-10 w-10 text-blue-600" /></div>
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-black uppercase text-foreground tracking-tight">Executive Documentation</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed max-w-xs">Automated Travel Report generation and data quality compliance pulses.</p>
+                  </div>
+                  <Button variant="ghost" className="font-black uppercase text-[10px] tracking-widest text-blue-600 gap-2">Open Hub <ArrowRight className="h-3 w-3" /></Button>
+                </Card>
               </div>
             </div>
           </div>
@@ -273,13 +327,20 @@ export function DashboardWorkstation() {
           <div className="pt-12 border-t border-border flex flex-col items-center gap-4 opacity-30">
             <div className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
-              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Asset Manager v5.0.4</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Assetain v5.0.4</span>
             </div>
-            <p className="text-[8px] font-medium uppercase tracking-widest italic text-center">Professional Registry Enterprise System</p>
+            <p className="text-[8px] font-medium uppercase tracking-widest italic text-center">Professional Asset Management Enterprise System</p>
           </div>
 
         </div>
       </div>
+
+      <AssetDetailSheet 
+        isOpen={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+        record={selectedRecord}
+        onEdit={(id) => setActiveView('REGISTRY')}
+      />
     </div>
   );
 }
