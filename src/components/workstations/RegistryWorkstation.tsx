@@ -1,9 +1,10 @@
+
 'use client';
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to clear business naming and context-aware selection.
- * Phase 1351: Implemented Save Layout logic for permanent header persistence.
+ * Phase 1352: Fixed ReferenceError by including all filter state in destructuring.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -113,7 +114,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSearchTerm,
     manualDownload,
     manualUpload,
-    isSyncing
+    isSyncing,
+    // Destructuring missing variables required by AssetFilterSheet
+    locationOptions,
+    selectedLocations,
+    setSelectedLocations,
+    assigneeOptions,
+    selectedAssignees,
+    setSelectedAssignees,
+    conditionOptions,
+    selectedConditions,
+    setSelectedConditions,
+    statusOptions,
+    selectedStatuses,
+    setSelectedStatuses,
+    categoryOptions,
+    missingFieldFilter,
+    setMissingFieldFilter
   } = useAppState();
   
   const { userProfile } = useAuth();

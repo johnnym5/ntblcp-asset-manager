@@ -1,9 +1,10 @@
+
 'use client';
 
 /**
  * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
- * Hardened for absolute data resolution resilience.
- * Phase 407: Implemented Safe Property Lookup with metadata fallbacks.
+ * Hardened for absolute data resolution resilience using fuzzy lookup logic.
+ * Phase 408: Fully synchronized with fuzzy mapping pulse for PDX parity.
  */
 
 import React from 'react';
@@ -13,7 +14,7 @@ import {
   Info
 } from 'lucide-react';
 import type { Asset } from '@/types/domain';
-import { cn } from '@/lib/utils';
+import { cn, getFuzzySignature } from '@/lib/utils';
 import { useAppState } from '@/contexts/app-state-context';
 
 interface AssetChecklistProps {
@@ -68,36 +69,33 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
       case "condition": val = values.condition; break;
       case "remarks": val = values.remarks; break;
       default:
-        // Fall through to metadata search
         val = undefined;
     }
 
-    // 2. Metadata Search Pulse (If domain prop was empty or unmapped)
-    const isEmptyProperty = val === undefined || val === null || String(val).trim() === "" || String(val).trim() === "---";
-    if (isEmptyProperty) {
+    // 2. Fuzzy Metadata Crawl: If domain prop was empty or unmapped, search metadata
+    const isActuallyEmpty = val === undefined || val === null || String(val).trim() === "" || String(val).trim() === "---" || String(val).trim().toLowerCase() === "nil" || String(val).trim().toLowerCase() === "n/a";
+    
+    if (isActuallyEmpty) {
       const meta = values.metadata || {};
-      val = meta[header.rawName] || meta[header.normalizedName];
       
-      // 3. Case-insensitive metadata crawl
-      if (val === undefined || val === null) {
-        const searchKey = header.rawName.toLowerCase();
-        const normKey = header.normalizedName.toLowerCase();
-        for (const k of Object.keys(meta)) {
-          const lk = k.toLowerCase();
-          if (lk === searchKey || lk === normKey) {
-            val = meta[k];
-            break;
-          }
-        }
+      // Exact Match Pulse
+      val = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName];
+      
+      // Fuzzy Crawl Pulse (Handles casing variations)
+      if (val === undefined || val === null || val === "") {
+        const fuzzyHeader = getFuzzySignature(header.displayName);
+        const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
+        if (matchedKey) val = meta[matchedKey];
       }
     }
 
-    // 4. Robust "Completed" validation check
+    // 3. Final validation check
     const sVal = String(val || '').trim().toLowerCase();
     const isMissing = !val || 
                       sVal === "" || 
                       sVal === "---" || 
                       sVal === "n/a" || 
+                      sVal === "nil" ||
                       sVal === "none" || 
                       sVal === "undefined" || 
                       sVal === "null" || 

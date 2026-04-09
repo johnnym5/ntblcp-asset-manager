@@ -1,11 +1,13 @@
+
 /**
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
- * Phase 806: Hardened transform logic for absolute field parity.
+ * Phase 807: Hardened fuzzy mapping logic for absolute field parity.
  */
 
 import type { Asset } from "@/types/domain";
 import type { RegistryHeader, AssetRecord, RegistryFieldValue, DataType, RegistryPreset } from "@/types/registry";
+import { getFuzzySignature } from "./utils";
 
 /**
  * Normalizes source headers to canonical snake_case keys.
@@ -22,6 +24,7 @@ export function normalizeHeaderName(name: string): string {
   if (n.includes("asset class") || n.includes("classification")) return "asset_class";
   if (n === "s/n" || n === "sn") return "sn";
   if (n === "serial number" || n === "serial numbers") return "serial_number";
+  if (n === "model number" || n === "model numbers" || n === "model no") return "model_number";
   if (n === "date purchased or received" || n === "year of purchase") return "date_purchased_received";
 
   return n
@@ -100,12 +103,13 @@ export const REGISTRY_PRESETS: RegistryPreset[] = [
 
 /**
  * Transforms a Domain Asset to an AssetRecord for the high-density grid.
+ * Improved with fuzzy metadata search for absolute field parity.
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = "";
     
-    // Resolve value with resilient fallback pulse
+    // 1. Resolve from standard domain properties
     switch(header.normalizedName) {
       case "sn": rawValue = asset.sn; break;
       case "location": rawValue = asset.location; break;
@@ -123,14 +127,23 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
       default:
-        const metadata = asset.metadata || {};
-        rawValue = metadata[header.rawName] || metadata[header.normalizedName] || "";
+        rawValue = "";
     }
 
-    // Metadata fallback if promoted property is empty
-    if (rawValue === undefined || rawValue === null || rawValue === "") {
+    // 2. Fuzzy Metadata Crawl: If the primary property is empty, search unmapped columns
+    const isActuallyEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim() === "---" || String(rawValue).trim().toLowerCase() === "nil" || String(rawValue).trim().toLowerCase() === "n/a";
+    
+    if (isActuallyEmpty) {
       const meta = asset.metadata || {};
-      rawValue = meta[header.rawName] || meta[header.normalizedName] || "";
+      // Exact match
+      rawValue = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName] || "";
+      
+      // Fuzzy match (handles casing variations in Excel)
+      if (!rawValue) {
+        const fuzzyHeader = getFuzzySignature(header.displayName);
+        const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
+        if (matchedKey) rawValue = meta[matchedKey];
+      }
     }
 
     return {
@@ -160,13 +173,17 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
 }
 
 function formatDisplayValue(val: any, type: DataType): string {
-  if (val === null || val === undefined || val === "") return "---";
+  if (val === null || val === undefined || String(val).trim() === "" || String(val).trim().toLowerCase() === "nil") return "---";
   if (type === "currency") {
     const num = Number(val);
     return isNaN(num) ? String(val) : new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(num);
   }
   if (type === "date") {
-    try { return new Date(val).toLocaleDateString(); } catch(e) { return String(val); }
+    try { 
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleDateString(); 
+    } catch(e) { return String(val); }
   }
   return String(val);
 }
