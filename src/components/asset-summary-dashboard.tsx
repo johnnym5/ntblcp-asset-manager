@@ -6,6 +6,7 @@
  * Phase 1601: Added individual pulses for all technical headers, condition groups, and remarks.
  * Phase 1602: Removed count > 0 filter to show all headers as requested.
  * Phase 1603: Added "Fidelity Nominal" state for zero-count pulses.
+ * Phase 1604: Category-aware ID gaps: excludes vehicles from Serial/Model, targets them for Chassis/Engine.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -101,8 +102,8 @@ export function AssetSummaryDashboard() {
             {
                 id: 'missing-model',
                 label: 'Model No Gaps',
-                description: 'Assets missing specific model identification.',
-                count: assets.filter(a => !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '').length,
+                description: 'Equipment items missing specific model identification.',
+                count: assets.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '')).length,
                 icon: Info,
                 color: 'bg-amber-500',
                 token: 'MISSING_MODEL',

@@ -6,6 +6,7 @@
  * Phase 1304: Corrected filteredAssets logic for diagnostic tokens to prevent "0 Assets" bug.
  * Phase 1305: Expanded diagnostic tokens for high-fidelity carousel pulses.
  * Phase 1306: Added support for MISSING_MODEL token.
+ * Phase 1307: Hardened category-aware exclusion for technical ID gaps.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -255,16 +256,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return cat.includes('motor') || cat.includes('vehicle');
       };
 
-      // Diagnostic Token Resolution
+      // Diagnostic Token Resolution - Strict Category Alignment
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
         results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
       } else if (searchTerm === 'MISSING_MODEL') {
-        results = results.filter(a => !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '');
+        // Only Equipment (No Vehicles)
+        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === ''));
       } else if (searchTerm === 'MISSING_CHASSIS') {
+        // Only Vehicles
         results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A'));
       } else if (searchTerm === 'MISSING_ENGINE') {
+        // Only Vehicles
         results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A'));
       } else if (searchTerm === 'WITH_REMARKS') {
         results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
@@ -274,6 +278,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         const group = searchTerm.replace('CONDITION_', '').replace(/^\w/, c => c.toUpperCase());
         results = results.filter(a => a.conditionGroup === group);
       } else if (searchTerm === 'MISSING_SERIAL') {
+        // Only Equipment (No Vehicles)
         results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
