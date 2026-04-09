@@ -110,7 +110,7 @@ export function CommandPalette() {
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => setActiveView('SETTINGS'))}>
                 <Users className="mr-2 h-4 w-4" />
-                <span>Preferences</span>
+                <span>App Settings</span>
               </CommandItem>
             </CommandGroup>
           </>

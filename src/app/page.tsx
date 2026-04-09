@@ -3,7 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Implements seamless workstation transitions and multi-function navigation.
- * Phase 1401: Normalized naming to professional Asset Manager standards.
+ * Normalized naming to professional Asset Manager standards.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -125,7 +125,7 @@ export default function SPAHub() {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userProfile?.isAdmin;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
@@ -185,7 +185,7 @@ export default function SPAHub() {
                     { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
                     { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') },
                     ...(isAdmin ? [
-                      { label: 'System Preferences', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+                      { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
                     ] : [])
                   ]}
                 >
@@ -202,6 +202,7 @@ export default function SPAHub() {
             options={[
               { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
+              { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
               { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >
@@ -252,11 +253,11 @@ export default function SPAHub() {
           </TactileMenu>
           
           <TactileMenu
-            title="System Alerts"
+            title="System Notifications"
             options={[
-              { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Mark All as Read', icon: CheckCircle2, onClick: markAllAsRead },
-              { label: 'Clear Notification History', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'View All', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Mark All Read', icon: CheckCircle2, onClick: markAllAsRead },
+              { label: 'Clear History', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
             <div className="relative">
@@ -280,7 +281,7 @@ export default function SPAHub() {
                 <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Preferences</span></DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
             </DropdownMenuContent>
