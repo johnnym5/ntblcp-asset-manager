@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 907: Integrated Tactile Menus for header actions.
+ * Phase 908: Integrated targeted Sync and Export pulses in the adaptive batch bar.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -138,6 +138,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     goBack,
     searchTerm,
     setSearchTerm,
+    manualDownload,
+    manualUpload,
+    isSyncing,
     optionsMap = {}
   } = useAppState();
   
@@ -353,6 +356,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleSelectionExport = async () => {
+    const selectedAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
+    if (selectedAssets.length === 0) return;
+    try {
+      await ExcelService.exportRegistry(selectedAssets, headers);
+      addNotification({ title: "Selection Exported", variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Export Failed", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-4 h-full flex flex-col relative pb-safe">
       {/* Controller Header */}
@@ -550,7 +564,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   options={[
                     { label: showList && selectedAssetIds.size === 1 ? 'Edit Record' : 'Batch Edit', icon: Edit3, onClick: () => showList ? (selectedAssetIds.size === 1 ? handleEditAsset(Array.from(selectedAssetIds)[0]) : setIsAssetBatchEditOpen(true)) : setIsCategoryBatchEditOpen(true) },
                     { label: 'Merge Selection', icon: GitMerge, onClick: () => setIsMergeDialogOpen(true) },
-                    { label: 'Export Selection', icon: FileDown, onClick: () => {} },
+                    { label: 'Export Selection', icon: FileDown, onClick: handleSelectionExport },
+                    { label: 'Download from Cloud', icon: Download, onClick: manualDownload },
+                    { label: 'Upload to Cloud', icon: CloudUpload, onClick: manualUpload },
                     { label: 'Print Labels', icon: Printer, onClick: () => {} },
                     { label: 'Delete Records', icon: Trash2, onClick: () => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true), destructive: true }
                   ]}
@@ -561,6 +577,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
                   )}
                 </TactileMenu>
+                
+                {showList && (
+                  <>
+                    <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><FileDown className="h-4 w-4" /> Export</Button>
+                    <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><Download className="h-4 w-4" /> Sync Down</Button>
+                    <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><CloudUpload className="h-4 w-4" /> Sync Up</Button>
+                  </>
+                )}
+
                 <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
                 <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
               </div>
