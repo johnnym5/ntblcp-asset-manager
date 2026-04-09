@@ -137,6 +137,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const canEdit = isAdmin || !!userProfile?.canEditAssets;
+  const isVerificationMode = appSettings?.appMode === 'verification';
+  
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
 
   const groupStats = useMemo(() => {
@@ -215,7 +218,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       for (const asset of targetAssets) {
         const updated = {
           ...asset,
-          ...(data.status && { status: data.status.toUpperCase() as any }),
+          ...(data.verifiedStatus && { status: data.verifiedStatus.toUpperCase() as any }),
           ...(data.condition && { condition: data.condition }),
           ...(data.location && { location: data.location }),
           lastModified: new Date().toISOString(),
@@ -229,6 +232,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
+    }
+  };
+
+  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+    setIsProcessing(true);
+    try {
+      const targetAssets = filteredAssets.filter(a => selectedCategories.includes(a.category));
+      for (const asset of targetAssets) {
+        const updated = {
+          ...asset,
+          ...(data.status && { status: data.status.toUpperCase() as any }),
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: userProfile?.displayName || 'Batch Editor'
+        };
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+      await refreshRegistry();
+      setSelectedCategories([]);
+      addNotification({ title: "Folder Update Successful", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+      setIsCategoryBatchEditOpen(false);
     }
   };
 
@@ -464,16 +489,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
                 {showList && selectedAssetIds.size === 1 ? (
-                  <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>
+                  (canEdit || isVerificationMode) && (
+                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>
+                  )
                 ) : (
-                  <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
+                  canEdit && (
+                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
+                  )
                 )}
                 
                 <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><FileDown className="h-4 w-4" /> Export</Button>
                 <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><Download className="h-4 w-4" /> Sync Down</Button>
                 <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><CloudUpload className="h-4 w-4" /> Sync Up</Button>
                 <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
-                <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+                {isAdmin && (
+                  <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+                )}
               </div>
               <ScrollBar orientation="horizontal" className="invisible" />
             </ScrollArea>
@@ -483,6 +514,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </AnimatePresence>
 
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
       <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={handleSaveAssetBatch} />
       <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />

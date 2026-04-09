@@ -104,7 +104,7 @@ export function DashboardWorkstation() {
             
             <div className="flex items-center gap-1.5 shrink-0">
               <TactileMenu
-                title="Sync Options"
+                title="Synchronize"
                 options={[
                   { label: 'Check Cloud Updates', icon: Download, onClick: manualDownload },
                   { label: 'Refresh Data', icon: RefreshCw, onClick: refreshRegistry }
@@ -123,7 +123,7 @@ export function DashboardWorkstation() {
                         <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Refresh Database</TooltipContent>
+                    <TooltipContent className="text-[8px] font-black uppercase">Synchronize Database</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </TactileMenu>
@@ -141,7 +141,7 @@ export function DashboardWorkstation() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
                   <Activity className="h-3 w-3 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Key Statistics</h3>
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Registry Status</h3>
                 </div>
                 <AssetSummaryDashboard />
               </div>
@@ -160,9 +160,9 @@ export function DashboardWorkstation() {
                 </div>
                 <CardContent className="p-6 space-y-3">
                   <TactileMenu
-                    title="System Tools"
+                    title="System Settings"
                     options={[
-                      { label: 'General Settings', icon: Palette, onClick: () => setActiveView('SETTINGS') },
+                      { label: 'App Configuration', icon: Palette, onClick: () => setActiveView('SETTINGS') },
                       { label: 'User Directory', icon: Users, onClick: () => setActiveView('USERS') }
                     ]}
                   >
@@ -172,10 +172,10 @@ export function DashboardWorkstation() {
                   </TactileMenu>
 
                   <TactileMenu
-                    title="Registry Tools"
+                    title="Registry Options"
                     options={[
                       { label: 'Import Excel', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-                      { label: 'View All Folders', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
+                      { label: 'Browse Folders', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
                     ]}
                   >
                     <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
@@ -196,7 +196,7 @@ export function DashboardWorkstation() {
                         <span className="text-[9px] font-black uppercase text-primary tracking-widest">Admin Access</span>
                       </div>
                       <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                        Full administrative permissions are active.
+                        Full administrative permissions are enabled.
                       </p>
                     </div>
                   )}
@@ -210,7 +210,7 @@ export function DashboardWorkstation() {
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 <div className="p-1.5 bg-muted rounded-lg border border-border"><Monitor className="h-4 w-4 text-primary" /></div>
-                <h3 className="text-base font-black uppercase text-foreground tracking-tight">System Status</h3>
+                <h3 className="text-base font-black uppercase text-foreground tracking-tight">Environment Status</h3>
               </div>
               <Badge variant="outline" className="border-border text-muted-foreground uppercase text-[8px] font-black tracking-widest">Connected</Badge>
             </div>
@@ -223,7 +223,7 @@ export function DashboardWorkstation() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 px-1">
                     <FileText className="h-3.5 w-3.5 text-blue-500" />
-                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting Tools</h3>
+                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Reporting Suite</h3>
                   </div>
                   <div className="p-1 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/10 shadow-inner">
                     <ReportsWorkstation isEmbedded={true} />
@@ -234,7 +234,7 @@ export function DashboardWorkstation() {
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-1">
                   <History className="h-3.5 w-3.5 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Data Integrity</h3>
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Data Fidelity</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-6">
@@ -247,9 +247,9 @@ export function DashboardWorkstation() {
                           <div className="p-5 flex items-center justify-between w-full pr-6">
                             <div className="flex items-center gap-3">
                               <History className="h-4 w-4 text-primary" />
-                              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Recent Activity</h4>
+                              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Activity History</h4>
                             </div>
-                            <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">VIEW LOGS</Badge>
+                            <Badge variant="outline" className="text-[7px] font-black border-white/10 uppercase px-2 py-0.5">VIEW HISTORY</Badge>
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="p-0 pt-0 border-t border-border">
@@ -261,7 +261,7 @@ export function DashboardWorkstation() {
                               onClick={() => setActiveView('AUDIT_LOG')}
                               className="h-7 px-3 rounded-md font-black uppercase text-[8px] text-primary hover:bg-primary/10"
                             >
-                              Open Activity History
+                              Open Activity Ledger
                             </Button>
                           </div>
                         </AccordionContent>
@@ -279,7 +279,7 @@ export function DashboardWorkstation() {
               <LayoutDashboard className="h-4 w-4" />
               <span className="text-[10px] font-black uppercase tracking-[0.4em]">Assetain Manager v5.0.4</span>
             </div>
-            <p className="text-[8px] font-medium uppercase tracking-widest italic">Professional Asset Management System</p>
+            <p className="text-[8px] font-medium uppercase tracking-widest italic">Professional Registry System</p>
           </div>
 
         </div>

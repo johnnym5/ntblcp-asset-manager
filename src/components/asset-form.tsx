@@ -148,7 +148,6 @@ export default function AssetForm({
     if (externalReadOnly) return true;
     if (isAdmin) return false;
     
-    // Normal User logic
     const verificationFields = ['status', 'condition', 'remarks'];
     
     // If verification mode is active, allow those fields even if canEditAssets is false

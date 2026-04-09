@@ -48,7 +48,8 @@ export interface BatchUpdateData {
   location?: string;
   custodian?: string;
   condition?: string;
-  status?: 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
+  verifiedStatus?: 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
+  description?: string;
 }
 
 interface AssetBatchEditFormProps {
@@ -68,14 +69,14 @@ export function AssetBatchEditForm({
   const { userProfile } = useAuth();
   const { appSettings } = useAppState();
   
-  const isAdmin = userProfile?.isAdmin || false;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   // Field Selection States
   const [applyLocation, setApplyLocation] = useState(false);
   const [location, setLocation] = useState('');
 
-  const [applyCustodian, setApplyCustodian] = useState(false);
-  const [custodian, setCustodian] = useState('');
+  const [applyDescription, setApplyDescription] = useState(false);
+  const [description, setDescription] = useState('');
 
   const [applyCondition, setApplyCondition] = useState(false);
   const [condition, setCondition] = useState('');
@@ -87,9 +88,9 @@ export function AssetBatchEditForm({
     setIsSaving(true);
     const updates: BatchUpdateData = {};
     if (applyLocation && isAdmin) updates.location = location;
-    if (applyCustodian) updates.custodian = custodian;
+    if (applyDescription && isAdmin) updates.description = description;
     if (applyCondition) updates.condition = condition;
-    if (applyStatus) updates.status = status;
+    if (applyStatus) updates.verifiedStatus = status;
 
     try {
       await onSave(updates);
@@ -102,8 +103,8 @@ export function AssetBatchEditForm({
   const resetForm = () => {
     setApplyLocation(false);
     setLocation('');
-    setApplyCustodian(false);
-    setCustodian('');
+    setApplyDescription(false);
+    setDescription('');
     setApplyCondition(false);
     setCondition('');
     setApplyStatus(false);
@@ -115,9 +116,9 @@ export function AssetBatchEditForm({
     onOpenChange(open);
   };
   
-  const canSave = (applyLocation && isAdmin) || applyCustodian || applyCondition || applyStatus;
+  const canSave = (applyLocation && isAdmin) || (applyDescription && isAdmin) || applyCondition || applyStatus;
 
-  const FieldPulse = ({ 
+  const FieldOption = ({ 
     id, 
     label, 
     isActive, 
@@ -169,35 +170,35 @@ export function AssetBatchEditForm({
               <div className="p-2 bg-primary/10 rounded-xl">
                 <ArrowRightLeft className="text-primary h-6 w-6" />
               </div>
-              Bulk Edit Pulse
+              Batch Edit
             </SheetTitle>
             <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-              Broadcasting modifications to {selectedAssetCount} selected records.
+              Updating {selectedAssetCount} records simultaneously.
             </SheetDescription>
           </SheetHeader>
         </div>
 
         <ScrollArea className="flex-1 bg-background">
           <div className="p-8 space-y-6">
-            <FieldPulse id="loc" label="Regional Scope" isActive={applyLocation} onToggle={setApplyLocation} disabled={!isAdmin} icon={MapPin}>
+            <FieldOption id="desc" label="Description Overwrite" isActive={applyDescription} onToggle={setApplyDescription} disabled={!isAdmin} icon={FileText}>
+              <Input 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                placeholder="Global description..."
+                className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
+              />
+            </FieldOption>
+
+            <FieldOption id="loc" label="Update Location" isActive={applyLocation} onToggle={setApplyLocation} disabled={!isAdmin} icon={MapPin}>
               <Input 
                 value={location} 
                 onChange={(e) => setLocation(e.target.value)} 
-                placeholder="Enter target location..."
+                placeholder="New state/facility..."
                 className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
               />
-            </FieldPulse>
+            </FieldOption>
 
-            <FieldPulse id="cust" label="Custodian / Assignee" isActive={applyCustodian} onToggle={setApplyCustodian} icon={User}>
-              <Input 
-                value={custodian} 
-                onChange={(e) => setCustodian(e.target.value)} 
-                placeholder="Enter new assignee..."
-                className="h-12 rounded-xl bg-background border-2 focus-visible:ring-primary/20 font-bold text-xs" 
-              />
-            </FieldPulse>
-
-            <FieldPulse id="cond" label="Condition Assessment" isActive={applyCondition} onToggle={setApplyCondition} icon={Activity}>
+            <FieldOption id="cond" label="Condition State" isActive={applyCondition} onToggle={setApplyCondition} icon={Activity}>
               <Select onValueChange={setCondition} value={condition}>
                 <SelectTrigger className="h-12 rounded-xl bg-background border-2 focus:ring-primary/20 font-bold text-xs">
                   <SelectValue placeholder="Select condition..." />
@@ -206,9 +207,9 @@ export function AssetBatchEditForm({
                   {ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond} className="text-xs font-bold">{cond}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </FieldPulse>
+            </FieldOption>
 
-            <FieldPulse id="stat" label="Verification Pulse" isActive={applyStatus} onToggle={setApplyStatus} icon={ShieldCheck}>
+            <FieldOption id="stat" label="Verification Status" isActive={applyStatus} onToggle={setApplyStatus} icon={ShieldCheck}>
               <Select onValueChange={(v) => setStatus(v as any)} value={status}>
                 <SelectTrigger className="h-12 rounded-xl bg-background border-2 focus:ring-primary/20 font-black text-[10px] uppercase tracking-widest">
                   <SelectValue placeholder="Select status..." />
@@ -219,13 +220,13 @@ export function AssetBatchEditForm({
                   <SelectItem value="DISCREPANCY" className="text-[10px] font-black uppercase tracking-widest">DISCREPANCY</SelectItem>
                 </SelectContent>
               </Select>
-            </FieldPulse>
+            </FieldOption>
           </div>
         </ScrollArea>
 
         <SheetFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
           <SheetClose asChild>
-            <Button variant="ghost" className="flex-1 h-12 font-bold rounded-2xl">Discard Action</Button>
+            <Button variant="ghost" className="flex-1 h-12 font-bold rounded-2xl">Discard</Button>
           </SheetClose>
           <Button 
             onClick={handleSubmit} 
@@ -233,7 +234,7 @@ export function AssetBatchEditForm({
             className="flex-1 h-12 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            Apply Logic Pulse
+            Save Batch
           </Button>
         </SheetFooter>
       </SheetContent>

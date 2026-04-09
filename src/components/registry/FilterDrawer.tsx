@@ -89,11 +89,11 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <ListFilter className="text-primary h-6 w-6" />
                 </div>
-                Logic Engine
+                Filter Options
               </DialogTitle>
             </div>
             <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
-              Multi-select criteria for all registry dimensions.
+              Select criteria to refine the asset register.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -116,8 +116,8 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
               <div className="py-24 text-center opacity-20 flex flex-col items-center gap-6 border-4 border-dashed border-white/5 rounded-[3rem]">
                 <Database className="h-16 w-16 text-white" />
                 <div className="space-y-1">
-                  <h4 className="text-xl font-black uppercase text-white">Registry Pulse Silent</h4>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Import data to discover filter pulses.</p>
+                  <h4 className="text-xl font-black uppercase text-white">Register Empty</h4>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Import records to enable filtering.</p>
                 </div>
               </div>
             ) : (
@@ -141,7 +141,7 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
                             <span className="text-xs font-black uppercase tracking-widest text-white">{header.displayName}</span>
                             {selected.length > 0 && (
                               <span className="text-[9px] font-black text-primary uppercase tracking-tighter">
-                                {selected.length} values selected
+                                {selected.length} items selected
                               </span>
                             )}
                           </div>
@@ -152,7 +152,7 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
                               onClick={(e) => { e.stopPropagation(); clearFilter(header.id); }}
                               className="h-7 px-2 text-[8px] font-black uppercase hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
                             >
-                              Clear
+                              Reset
                             </Button>
                           )}
                         </div>
@@ -197,13 +197,13 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
             onClick={() => setLocalFilters([])}
             className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl text-white/40 hover:bg-destructive/10 hover:text-destructive transition-all"
           >
-            <X className="mr-2 h-3.5 w-3.5" /> Purge Logic
+            <X className="mr-2 h-3.5 w-3.5" /> Clear All
           </Button>
           <Button 
             onClick={applyFilters}
             className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-black"
           >
-            Apply Filter Pulse
+            Update Filter View
           </Button>
         </DialogFooter>
       </DialogContent>

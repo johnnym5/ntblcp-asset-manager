@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1306: Implemented global Tactile Menus for header actions.
+ * Phase 1306: Normalized naming scheme and restricted edit access.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -170,7 +170,7 @@ export default function SPAHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="Registry Navigation"
+            title="Navigation"
             options={[
               { label: 'Go to Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Open Asset Hub', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
@@ -180,8 +180,8 @@ export default function SPAHub() {
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
               <Boxes className="h-5 w-5" />
               <div className="hidden xs:flex flex-col text-left">
-                <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'MANAGER'}</span>
+                <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Asset Manager</h1>
+                <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'STANDARD'}</span>
               </div>
             </button>
           </TactileMenu>
@@ -190,31 +190,31 @@ export default function SPAHub() {
         <div className="flex-1 flex items-center justify-center mx-4 sm:mx-12">
           <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
             <Search className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">{isMobile ? 'Search...' : 'Universal Registry Search...'}</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">{isMobile ? 'Search...' : 'Search Registry...'}</span>
             <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
           </button>
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
           <TactileMenu
-            title="Sync Control"
+            title="Synchronize"
             options={[
-              { label: 'Fetch Cloud Data', icon: Download, onClick: manualDownload },
-              { label: 'Broadcast Changes', icon: Upload, onClick: manualUpload },
-              { label: 'Force Parity Refresh', icon: RefreshCw, onClick: refreshRegistry }
+              { label: 'Synchronize Data', icon: Download, onClick: manualDownload },
+              { label: 'Upload Changes', icon: Upload, onClick: manualUpload },
+              { label: 'Refresh Registry', icon: RefreshCw, onClick: refreshRegistry }
             ]}
           >
             <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Down</TooltipContent></Tooltip></TooltipProvider>
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Up</TooltipContent></Tooltip></TooltipProvider>
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Data</TooltipContent></Tooltip></TooltipProvider>
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>
             </div>
           </TactileMenu>
 
           <TactileMenu
-            title="Connection Node"
+            title="Connectivity"
             options={[
-              { label: 'Go Online', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
-              { label: 'Work Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
+              { label: 'Switch to Online', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
+              { label: 'Switch to Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
             ]}
           >
             <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
@@ -224,11 +224,11 @@ export default function SPAHub() {
           </TactileMenu>
           
           <TactileMenu
-            title="Alert Options"
+            title="Notifications"
             options={[
-              { label: 'Open Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Mark all as Read', icon: CheckCircle2, onClick: markAllAsRead },
-              { label: 'Clear Archive', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'Open Center', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Mark as Read', icon: CheckCircle2, onClick: markAllAsRead },
+              { label: 'Clear All', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
             <div className="relative">
