@@ -8,6 +8,7 @@
  * Phase 1018: Integrated Application Mode switcher into General Settings.
  * Phase 1019: Implemented Dirty Check logic for Save Changes pulse.
  * Phase 1020: Added 'reporting' mode to appMode switcher.
+ * Phase 1021: Integrated Identity & Password Manager in General tab.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -88,7 +89,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export function SettingsWorkstation() {
   const { 
@@ -105,15 +108,22 @@ export function SettingsWorkstation() {
   
   const { userProfile } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
+  // Header Manager State
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+
+  // Password Manager State
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -151,6 +161,32 @@ export function SettingsWorkstation() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleUpdateMyPassword = async () => {
+    if (!newPassword || newPassword.length < 4) {
+      toast({ variant: "destructive", title: "Security Alert", description: "Passphrase must be at least 4 characters." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ variant: "destructive", title: "Logic Pulse Mismatch", description: "Confirming pulse does not match the original." });
+      return;
+    }
+
+    if (!draftSettings || !userProfile) return;
+
+    const updatedUsers = draftSettings.authorizedUsers.map(u => {
+      if (u.loginName === userProfile.loginName) {
+        return { ...u, password: newPassword };
+      }
+      return u;
+    });
+
+    handleSettingChange('authorizedUsers', updatedUsers);
+    setIsPasswordDialogOpen(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    addNotification({ title: "Passphrase Staged", description: "Changes queued. Commit settings to finalize security pulse.", variant: "success" });
   };
 
   const handleAddProject = () => {
@@ -254,6 +290,42 @@ export function SettingsWorkstation() {
               <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
                 <Moon className="h-4 w-4" /> Dark Mode
               </Button>
+            </div>
+          </SettingSection>
+
+          <SettingSection title="Account Security" description="Credentials & Access Pulse" icon={KeyRound}>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border group hover:border-primary/20 transition-all">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-black uppercase tracking-tight">Identity Passphrase</Label>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 italic">Modify your personal access credentials.</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest border-2 hover:bg-primary/10 hover:text-primary transition-all"
+                  onClick={() => setIsPasswordDialogOpen(true)}
+                >
+                  Update Passphrase
+                </Button>
+              </div>
+
+              {isAdmin && (
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/10 group hover:border-primary/30 transition-all">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <ShieldIcon className="h-3.5 w-3.5 text-primary" />
+                      <Label className="text-xs font-black uppercase tracking-tight text-primary">Global Password Manager</Label>
+                    </div>
+                    <p className="text-[9px] font-bold text-primary/60 uppercase tracking-widest italic">Manage credentials for all system auditors.</p>
+                  </div>
+                  <TabsList className="bg-transparent h-auto p-0 border-none">
+                    <TabsTrigger value="users" className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest bg-primary text-black shadow-lg hover:scale-105 active:scale-95 transition-all">
+                      Manage Users
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              )}
             </div>
           </SettingSection>
 
@@ -416,10 +488,69 @@ export function SettingsWorkstation() {
               }
               return grant;
             });
-            handleSettingChange('grants', updatedGrants);
+            const nextSettings = { ...draftSettings, grants: updatedGrants };
+            setDraftSettings(nextSettings);
           }}
         />
       )}
+
+      {/* Password Update Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="max-w-md rounded-[2.5rem] border-primary/10 shadow-3xl bg-background text-foreground p-0 overflow-hidden">
+          <div className="p-8 pb-4 bg-muted/20 border-b">
+            <DialogHeader>
+              <div className="flex items-center gap-4 mb-2">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <KeyRound className="h-6 w-6 text-primary" />
+                </div>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Update Passphrase</DialogTitle>
+              </div>
+              <DialogDescription className="font-bold uppercase text-[10px] tracking-widest opacity-60">
+                Modify your identity access credentials.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 pl-1">New System Passphrase</Label>
+              <Input 
+                type="password" 
+                value={newPassword} 
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 font-bold transition-all shadow-inner"
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest opacity-40 pl-1">Confirm Identity Pulse</Label>
+              <Input 
+                type="password" 
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 font-bold transition-all shadow-inner"
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-3 items-start">
+              <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-[9px] font-medium text-muted-foreground italic leading-relaxed">
+                Changes will be staged locally. You must save the global configuration pulse to finalize this update.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
+            <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)} className="flex-1 h-12 font-bold rounded-xl">Abort</Button>
+            <Button 
+              onClick={handleUpdateMyPassword}
+              className="flex-[2] h-12 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-black"
+            >
+              Stage New Passphrase
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Tabs>
   );
 }
