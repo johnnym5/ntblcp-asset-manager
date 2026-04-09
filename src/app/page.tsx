@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1303: Linked header search button directly to Command Palette for unified global search.
- * Phase 1304: Gated verification views based on appMode.
+ * Phase 1305: Production hardening - adaptive headers and bottom-safe action bars.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -17,10 +16,6 @@ import {
   Bell, 
   Settings as SettingsIcon,
   Search,
-  X,
-  Download,
-  Upload,
-  Filter,
   CheckCircle2,
   AlertCircle,
   Info,
@@ -33,10 +28,14 @@ import {
   ClipboardCheck,
   User as UserIcon,
   ChevronDown,
-  Command
+  Command,
+  Download,
+  Upload,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn, sanitizeSearch } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
@@ -68,29 +67,25 @@ import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { storage } from '@/offline/storage';
-import { FirestoreService } from '@/services/firebase/firestore';
 
 function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
-  
   return (
     <motion.div
       initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, y: -5 }}
       className={cn(
-        "absolute top-full right-0 mt-2 w-56 p-2 rounded-lg border shadow-2xl z-[100] flex items-center gap-2 backdrop-blur-xl",
+        "absolute top-full right-0 mt-2 w-64 p-3 rounded-xl border shadow-3xl z-[100] flex items-center gap-3 backdrop-blur-3xl",
         notification.variant === 'destructive' ? "bg-destructive border-destructive text-destructive-foreground" :
         notification.variant === 'success' ? "bg-green-600 border-green-500 text-white" :
-        "bg-card border-border text-foreground"
+        "bg-card/90 border-border text-foreground"
       )}
     >
-      <div className="shrink-0">
-        <Icon className="h-3 w-3" />
-      </div>
+      <div className="p-1.5 bg-white/10 rounded-lg shrink-0"><Icon className="h-4 w-4" /></div>
       <div className="flex-1 min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
-        <p className="text-[7px] font-medium opacity-80 line-clamp-1 mt-0.5">{notification.description}</p>
+        <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
+        <p className="text-[8px] font-medium opacity-80 line-clamp-1 mt-1">{notification.description}</p>
       </div>
     </motion.div>
   );
@@ -103,32 +98,13 @@ export default function SPAHub() {
     setActiveView, 
     isOnline, 
     setIsOnline,
-    searchTerm,
-    setSearchTerm,
-    isFilterOpen,
-    setIsFilterOpen,
     manualDownload,
     manualUpload,
     isSyncing,
     appSettings,
     setAppSettings,
-    locationOptions,
-    selectedLocations,
-    setSelectedLocations,
-    assigneeOptions,
-    selectedAssignees,
-    setSelectedAssignees,
-    conditionOptions,
-    selectedConditions,
-    setSelectedConditions,
-    statusOptions,
-    selectedStatuses,
-    setSelectedStatuses,
-    missingFieldFilter,
-    setMissingFieldFilter,
     goBack,
     selectedCategories,
-    activeFilterCount,
     setIsCommandPaletteOpen
   } = useAppState();
   
@@ -140,8 +116,6 @@ export default function SPAHub() {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const isVerificationMode = appSettings?.appMode === 'verification';
-
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -150,222 +124,113 @@ export default function SPAHub() {
       case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return isVerificationMode ? <VerifyWorkstation /> : <DashboardWorkstation />;
+      case 'VERIFY': return appSettings?.appMode === 'verification' ? <VerifyWorkstation /> : <DashboardWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
-      case 'REPORTS': return <ReportsWorkstation isEmbedded={true} />; 
+      case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
-  }, [activeView, isVerificationMode]);
+  }, [activeView, appSettings?.appMode]);
 
   useEffect(() => {
-    if (profileSetupComplete) {
-      const isFreshLogin = sessionStorage.getItem('assetain-fresh-login') === 'true';
-      if (isFreshLogin) setIsWelcomeOpen(true);
-    }
+    if (profileSetupComplete && sessionStorage.getItem('assetain-fresh-login') === 'true') setIsWelcomeOpen(true);
   }, [profileSetupComplete]);
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollViewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollViewport) scrollViewport.scrollTop = 0;
-    }
-  }, [activeView]);
 
   useEffect(() => {
     if (lastAddedId) {
       const latest = notifications.find(n => n.id === lastAddedId);
       if (latest) {
         setActiveToast(latest);
-        const timer = setTimeout(() => setActiveToast(null), 3000);
+        const timer = setTimeout(() => setActiveToast(null), 4000);
         return () => clearTimeout(timer);
       }
     }
   }, [lastAddedId, notifications]);
 
-  const handleOnboardingComplete = async () => {
-    setIsWelcomeOpen(false);
-    sessionStorage.removeItem('assetain-fresh-login');
-    if (appSettings) {
-      const nextSettings = { ...appSettings, onboardingComplete: true };
-      setAppSettings(nextSettings);
-      await storage.saveSettings(nextSettings);
-    }
-  };
-
-  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
-
-  const showTooltips = appSettings?.showHelpTooltips !== false;
-  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden">
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
-      <WelcomeExperience isOpen={isWelcomeOpen} onComplete={handleOnboardingComplete} />
+      <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
-      <AssetFilterSheet 
-        isOpen={isFilterOpen}
-        onOpenChange={setIsFilterOpen}
-        isAdmin={isAdmin}
-        locationOptions={locationOptions}
-        selectedLocations={selectedLocations}
-        setSelectedLocations={setSelectedLocations}
-        assigneeOptions={assigneeOptions}
-        selectedAssignees={selectedAssignees}
-        setSelectedAssignees={setSelectedAssignees}
-        conditionOptions={conditionOptions}
-        selectedConditions={selectedConditions}
-        setSelectedConditions={setSelectedConditions}
-        statusOptions={statusOptions}
-        selectedStatuses={selectedStatuses}
-        setSelectedStatuses={setSelectedStatuses}
-        missingFieldFilter={missingFieldFilter}
-        setMissingFieldFilter={setMissingFieldFilter}
-      />
-      
-      <header className="h-11 border-b border-border flex items-center justify-between px-4 sm:px-6 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
-        <div className="flex items-center gap-2 sm:gap-6">
+      <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
+        <div className="flex items-center gap-4 sm:gap-8">
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
-              <motion.button
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                onClick={goBack}
-                className="h-8 w-8 flex items-center justify-center bg-muted/50 rounded-lg text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse"
-              >
-                <ChevronLeft className="h-4 w-4" />
+              <motion.button initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse">
+                <ChevronLeft className="h-5 w-5" />
               </motion.button>
             )}
           </AnimatePresence>
 
-          <TooltipProvider disableHoverableContent={!showTooltips}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-all text-primary group tactile-pulse">
-                  <Boxes className="h-3.5 w-3.5" />
-                  <div className="flex flex-col text-left">
-                    <h1 className="text-[10px] font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                    <span className="text-[6px] font-black uppercase text-primary tracking-[0.2em] mt-0.5 opacity-60">Manager</span>
-                  </div>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-[8px] font-black uppercase">Home</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <div className="hidden lg:flex items-center gap-2.5 pl-4 border-l border-border">
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Welcome,</span>
-            <span className="text-[10px] font-black uppercase text-foreground tracking-tight">
-              {userProfile?.displayName}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center mx-2 sm:mx-8">
-          <button
-            onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-3 px-4 py-1 bg-muted/30 border border-border rounded-lg text-foreground/40 hover:text-primary hover:border-primary/20 transition-all group h-8 max-w-[350px] w-full"
-          >
-            <Search className="h-3 w-3" />
-            <span className="text-[8px] font-black uppercase tracking-widest text-left flex-1">Search Registry...</span>
-            <kbd className="hidden sm:inline-flex h-4 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[8px] font-medium opacity-60 ml-2">
-              <span className="text-[10px]">⌘</span>K
-            </kbd>
+          <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
+            <Boxes className="h-5 w-5" />
+            <div className="hidden xs:flex flex-col text-left">
+              <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
+              <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'MANAGER'}</span>
+            </div>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden sm:flex items-center bg-muted/30 p-0.5 rounded-lg border border-border">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-foreground/40 hover:text-primary">
-                    <Download className="h-2.5 w-2.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Download</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-6 w-6 rounded-md hover:bg-primary/10 text-foreground/40 hover:text-primary">
-                    <Upload className="h-2.5 w-2.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Upload</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+        <div className="flex-1 flex items-center justify-center mx-4 sm:mx-12">
+          <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full">
+            <Search className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">{isMobile ? 'Search...' : 'Universal Registry Search...'}</span>
+            <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2">⌘K</kbd>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 sm:gap-5">
+          <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Down</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Up</TooltipContent></Tooltip></TooltipProvider>
           </div>
 
-          <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-1.5 group tactile-pulse px-1 sm:px-2">
-            <div className={cn("h-1 w-1 rounded-full", isOnline ? "bg-green-500" : "bg-red-500")} />
-            <span className={cn("text-[7px] font-black uppercase tracking-widest", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
+            <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]")} />
+            <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </button>
           
-          <button onClick={() => setIsCommandPaletteOpen(true)} className="p-1.5 bg-muted rounded-md text-foreground/40 hover:text-primary transition-all">
-            <Command className="h-3 w-3" />
-          </button>
-
-          <button onClick={() => setIsHelpOpen(true)} className="p-1.5 bg-muted rounded-md text-foreground/40 hover:text-primary transition-all">
-            <HelpCircle className="h-3 w-3" />
-          </button>
-
           <div className="relative">
-            <button onClick={() => setIsNotificationsOpen(true)} className="relative p-1.5 bg-muted rounded-md text-foreground/40 hover:text-foreground transition-all">
-              <Bell className="h-3 w-3" />
-              {unreadCount > 0 && <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-600 rounded-full border border-background" />}
+            <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative">
+              <Bell className="h-4.5 w-4.5" />
+              {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
             </button>
-            <AnimatePresence>
-              {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
-            </AnimatePresence>
+            <AnimatePresence>{activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}</AnimatePresence>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-7 w-7 sm:h-7 sm:w-7 rounded-full border border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[9px] hover:border-primary/40 transition-all shrink-0">
+              <button className="h-9 w-9 rounded-full border-2 border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[11px] hover:border-primary/40 transition-all shrink-0 shadow-lg">
                 {userProfile?.displayName?.[0] || 'U'}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 bg-card border-border text-card-foreground rounded-lg shadow-3xl p-1">
-              <DropdownMenuLabel className="p-2">
-                <p className="text-[9px] font-black uppercase">{userProfile?.displayName}</p>
-                <p className="text-[7px] font-bold text-muted-foreground uppercase mt-0.5">{userProfile?.role}</p>
+            <DropdownMenuContent align="end" className="w-56 bg-card border-border rounded-2xl shadow-3xl p-1.5">
+              <DropdownMenuLabel className="p-3">
+                <p className="text-[11px] font-black uppercase">{userProfile?.displayName}</p>
+                <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-1.5 rounded-md focus:bg-primary/10 focus:text-primary m-0.5">
-                <SettingsIcon className="mr-2 h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase">App Settings</span>
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">App Settings</span></DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="p-1.5 rounded-md focus:bg-red-600 focus:text-white m-0.5 text-red-500">
-                <LogOut className="mr-2 h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase">Sign Out</span>
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      <div className="flex-1 relative flex flex-col p-2 sm:p-2 overflow-hidden bg-background">
-        <div className="flex-1 flex flex-col border border-border rounded-xl bg-card/30 overflow-hidden relative">
+      <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background">
+        <div className="flex-1 flex flex-col border border-border rounded-[2.5rem] bg-card/30 overflow-hidden relative shadow-inner">
           <ErrorBoundary module={activeView}>
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
-                <div className="flex-1 p-2 sm:p-4 lg:p-4 max-w-[1600px] mx-auto w-full">
+                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb- safe">
                   <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeView}
-                      initial={{ opacity: 0, scale: 0.99, y: 4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.99, y: -4 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      className="h-full w-full"
-                    >
+                    <motion.div key={activeView} initial={{ opacity: 0, scale: 0.99, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.99, y: -10 }} transition={{ duration: 0.25 }} className="h-full w-full">
                       {CurrentWorkstation}
                     </motion.div>
                   </AnimatePresence>

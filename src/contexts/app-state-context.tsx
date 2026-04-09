@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1108: Centralized Header management in AppSettings for real-time synchronization.
- * Phase 1109: Hardened initial header pulse with default mapping fallback.
+ * Hardened for high-volume data handling and adaptive workstation logic.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -129,7 +128,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
   
-  // Header state initialized with authoritative defaults
   const [headers, setHeaders] = useState<RegistryHeader[]>(
     DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[]
   );
@@ -175,7 +173,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
     } catch (e) { 
-      console.error("Registry Refresh Failure", e); 
+      console.error("Registry State Pulse Error:", e); 
     }
   }, []);
 
@@ -186,11 +184,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
   }, []);
 
-  useEffect(() => {
-    if (isHydrated) {
-      refreshRegistry();
-    }
-  }, [isHydrated, refreshRegistry]);
+  useEffect(() => { if (isHydrated) refreshRegistry(); }, [isHydrated, refreshRegistry]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -214,8 +208,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     });
     if (db && isOnline) {
-      const settingsRef = doc(db, 'config', 'settings');
-      const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
+      const unsubscribe = onSnapshot(doc(db, 'config', 'settings'), (snapshot) => {
         if (snapshot.exists()) {
           const remoteSettings = snapshot.data() as AppSettings;
           setAppSettings(remoteSettings);
@@ -230,28 +223,18 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isHydrated, isOnline]);
 
-  const activeFilterCount = useMemo(() => {
-    return selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  }, [selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
-
   const filteredAssets = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     let results = [...source];
 
     if (selectedLocations.length > 0) {
       const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
-      results = results.filter(a => {
-        const assetFuzzy = getFuzzySignature(a.location);
-        return selectedFuzzy.includes(assetFuzzy);
-      });
+      results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.location)));
     }
 
     if (selectedAssignees.length > 0) {
       const selectedFuzzy = selectedAssignees.map(a => getFuzzySignature(a));
-      results = results.filter(a => {
-        const assetFuzzy = getFuzzySignature(a.custodian);
-        return selectedFuzzy.includes(assetFuzzy);
-      });
+      results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.custodian)));
     }
 
     if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
@@ -261,15 +244,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (searchTerm) {
       const fuzzySearch = getFuzzySignature(searchTerm);
       results = results.filter(a => {
-        const fieldsToSearch = [
-          a.description,
-          a.assetIdCode,
-          a.serialNumber,
-          a.location,
-          a.custodian,
-          a.category
-        ];
-        return fieldsToSearch.some(f => getFuzzySignature(f).includes(fuzzySearch));
+        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian}`;
+        return getFuzzySignature(hay).includes(fuzzySearch);
       });
     }
     return results;
@@ -277,59 +253,42 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    const canonicalMap = new Map<string, string>();
-
     assets.forEach(a => { 
-      const pulse = LocationEngine.normalize(a.location);
-      const display = pulse.normalized;
-      const fuzzy = getFuzzySignature(display);
-      
-      if (!canonicalMap.has(fuzzy)) canonicalMap.set(fuzzy, display);
-      const finalDisplay = canonicalMap.get(fuzzy)!;
-      counts.set(finalDisplay, (counts.get(finalDisplay) || 0) + 1); 
+      const display = LocationEngine.normalize(a.location).normalized;
+      counts.set(display, (counts.get(display) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const assigneeOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    const canonicalMap = new Map<string, string>();
-
     assets.forEach(a => { 
-      const raw = a.custodian || 'Unassigned';
-      const display = raw.trim().replace(/\b\w/g, l => l.toUpperCase());
-      const fuzzy = getFuzzySignature(display);
-
-      if (!canonicalMap.has(fuzzy)) canonicalMap.set(fuzzy, display);
-      const finalDisplay = canonicalMap.get(fuzzy)!;
-      counts.set(finalDisplay, (counts.get(finalDisplay) || 0) + 1); 
+      const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
+      counts.set(display, (counts.get(display) || 0) + 1); 
     });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const conditionOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { const val = a.condition || 'Unassessed'; counts.set(val, (counts.get(val) || 0) + 1); });
+    assets.forEach(a => { 
+      const display = a.condition || 'Unassessed';
+      counts.set(display, (counts.get(display) || 0) + 1); 
+    });
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const statusOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    assets.forEach(a => { const val = a.status || 'UNVERIFIED'; counts.set(val, (counts.get(val) || 0) + 1); });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+    assets.forEach(a => { 
+      const display = a.status || 'UNVERIFIED';
+      counts.set(display, (counts.get(display) || 0) + 1); 
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
-  const setActiveView = useCallback((view: WorkstationView) => {
-    setActiveViewStatus(view);
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      params.set('v', view.toLowerCase());
-      router.push(`/?${params.toString()}`, { scroll: false });
-    }
-  }, [router]);
-
   const manualDownload = useCallback(async () => {
-    if (!isOnline) { addNotification({ title: "Offline Scope", variant: "destructive" }); return; }
+    if (!isOnline) return;
     const userSession = localStorage.getItem('assetain-user-session');
     const profile = userSession ? JSON.parse(userSession) : null;
     const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
@@ -343,17 +302,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
           const localAssets = await storage.getAssets();
-          let nextAssets;
           const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-          if (stateScopes) {
-            const scopeSet = new Set(stateScopes.map(s => getFuzzySignature(s)));
-            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || !scopeSet.has(getFuzzySignature(a.location)));
-            nextAssets = [...otherAssets, ...taggedRemote];
-          } else {
-            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
-            nextAssets = [...otherAssets, ...taggedRemote];
-          }
-          await storage.saveAssets(nextAssets);
+          const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+          await storage.saveAssets([...otherAssets, ...taggedRemote]);
           addNotification({ title: "Sync Successful", variant: "success" });
         }
       }
@@ -361,45 +312,14 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
-  const manualUpload = useCallback(async () => {
-    if (!isOnline) { addNotification({ title: "Upload Failed", variant: "destructive" }); return; }
-    addNotification({ title: "Upload Initiated" });
-    await processSyncQueue();
-    await refreshRegistry();
-  }, [isOnline, refreshRegistry]);
-
-  const goBack = useCallback(() => {
-    if (activeView === 'REGISTRY' && isExplored) {
-      setIsExplored(false);
-      setSelectedCategoriesStatus([]);
-    } else if (activeView === 'REGISTRY' && selectedCategories.length > 0) {
-      setSelectedCategoriesStatus([]);
-    } else {
-      setActiveView('DASHBOARD');
-    }
-  }, [activeView, isExplored, selectedCategories, setActiveView]);
-
   return (
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
-      setActiveGrantId: async (id) => {
-        if (!appSettings) return;
-        const next = { ...appSettings, activeGrantId: id };
-        await storage.saveSettings(next);
-        if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id });
-        setAppSettings(next);
-        await refreshRegistry();
-      },
-      setReadAuthority: async (node) => {
-        if (!appSettings) return;
-        const next = { ...appSettings, readAuthority: node };
-        setAppSettings(next);
-        await storage.saveSettings(next);
-        if (isOnline) await FirestoreService.updateSettings({ readAuthority: node });
-        await refreshRegistry();
-      },
+      activeGrantId, activeView, setActiveView: (v) => { setActiveViewStatus(v); if (typeof window !== 'undefined') { const p = new URLSearchParams(window.location.search); p.set('v', v.toLowerCase()); router.push(`/?${p.toString()}`, { scroll: false }); } },
+      refreshRegistry, manualDownload, manualUpload: async () => { if (!isOnline) return; await processSyncQueue(); await refreshRegistry(); },
+      setActiveGrantId: async (id) => { if (!appSettings) return; const next = { ...appSettings, activeGrantId: id }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id }); setAppSettings(next); await refreshRegistry(); },
+      setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
@@ -409,10 +329,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       isFilterOpen, setIsFilterOpen, isLogicFilterOpen, setIsLogicFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
       isCommandPaletteOpen, setIsCommandPaletteOpen,
       selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
-      selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveView('REGISTRY'); },
-      setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveView('REGISTRY'); },
+      selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveViewStatus('REGISTRY'); },
+      setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveViewStatus('REGISTRY'); },
       isExplored, setIsExplored,
-      itemsPerPage, setItemsPerPage, goBack, activeFilterCount
+      itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
+      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0)
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}

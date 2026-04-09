@@ -4,6 +4,7 @@
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Overhauled for Selection Pulses & Batch Operational Workflows.
  * Phase 805: Fully adaptive Mobile/Desktop Floating Action Bar with scrollable stream.
+ * Phase 806: Deployment Hardening - Responsive Grid & Focus Pulses.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -40,7 +41,8 @@ import {
   Zap,
   CheckCircle2,
   Activity,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Maximize2
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -108,9 +110,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     filteredAssets,
-    dataSource,
-    searchTerm,
-    setSearchTerm,
     headers,
     setHeaders,
     refreshRegistry,
@@ -136,11 +135,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setItemsPerPage,
     activeFilterCount,
     goBack,
-    manualDownload
+    searchTerm,
+    setSearchTerm
   } = useAppState();
   
   const { userProfile } = useAuth();
   const isMobile = useIsMobile();
+  
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -152,7 +153,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Category & Asset Actions State
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isAssetBatchEditOpen, setIsAssetBatchEditOpen] = useState(false);
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
@@ -183,9 +183,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     const allInProject = Object.keys(activeGrant.sheetDefinitions || {}).sort();
     return allInProject.filter(cat => {
       const stats = groupStats[cat];
-      const hasData = stats && stats.total > 0;
-      const isManuallyEnabled = appSettings?.enabledSheets?.includes(cat);
-      return hasData || isManuallyEnabled;
+      return (stats && stats.total > 0) || appSettings?.enabledSheets?.includes(cat);
     });
   }, [activeGrant, groupStats, appSettings?.enabledSheets]);
 
@@ -201,7 +199,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           switch(sortHeader.normalizedName) {
             case "sn": return item.sn || "";
             case "asset_description": return item.description || "";
-            default: return String((item.metadata as any)?.[sortHeader.rawName] || (item.metadata as any)?.[sortHeader.normalizedName] || "");
+            default: return String((item.metadata as any)?.[sortHeader.rawName] || "");
           }
         };
         const valA = String(getVal(a));
@@ -218,11 +216,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const showList = isExplored || viewAll;
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
-    } else {
-      setSelectedAssetIds(new Set());
-    }
+    if (checked) setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
+    else setSelectedAssetIds(new Set());
   };
 
   const handleToggleSelect = (id: string) => {
@@ -240,32 +235,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsFormOpen(true);
   };
 
-  const optionsMap = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    headers.forEach(header => {
-      const uniqueValues = new Set<string>();
-      filteredAssets.forEach(asset => {
-        let val: any = "";
-        switch(header.normalizedName) {
-          case "sn": val = asset.sn; break;
-          case "location": val = asset.location; break;
-          case "asset_description": val = asset.description; break;
-          case "asset_id_code": val = asset.assetIdCode; break;
-          case "asset_class": val = asset.category; break;
-          case "condition": val = asset.condition; break;
-          default:
-            val = (asset.metadata as any)?.[header.rawName] || (asset.metadata as any)?.[header.normalizedName];
-        }
-        if (val !== undefined && val !== null && String(val).trim() !== "") {
-          uniqueValues.add(String(val).trim());
-        }
-      });
-      map[header.id] = Array.from(uniqueValues).sort();
-    });
-    return map;
-  }, [filteredAssets, headers]);
-
-  // Asset Actions
   const handleSaveAssetBatch = async (data: BatchUpdateData) => {
     setIsProcessing(true);
     try {
@@ -283,37 +252,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      addNotification({ title: "Asset Batch Updated", variant: "success" });
+      addNotification({ title: "Batch Update Applied", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
-    }
-  };
-
-  const handleExportAssets = async () => {
-    try {
-      const assetsToExport = filteredAssets.filter(a => selectedAssetIds.has(a.id));
-      await ExcelService.exportRegistry(assetsToExport, headers);
-      addNotification({ title: "Excel Export Generated", variant: "success" });
-    } catch (e) {
-      addNotification({ title: "Export Pulse Failed", variant: "destructive" });
-    }
-  };
-
-  const handlePurgeAssets = async () => {
-    setIsProcessing(true);
-    try {
-      for (const id of Array.from(selectedAssetIds)) {
-        await enqueueMutation('DELETE', 'assets', { id });
-      }
-      const currentLocal = await storage.getAssets();
-      await storage.saveAssets(currentLocal.filter(a => !selectedAssetIds.has(a.id)));
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      setIsAssetDeleteOpen(false);
-      addNotification({ title: "Registry Records Purged", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -323,126 +265,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setCurrentPage(1);
   };
 
-  const handleToggleCategorySelection = (cat: string) => {
-    const next = selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat];
-    setSelectedCategories(next);
-  };
-
-  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
-    setIsProcessing(true);
-    try {
-      const targetAssets = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      for (const asset of targetAssets) {
-        const updated = {
-          ...asset,
-          ...(data.status && { status: data.status.toUpperCase() as any }),
-          lastModified: new Date().toISOString(),
-          lastModifiedBy: userProfile?.displayName || 'Batch Processor'
-        };
-        await enqueueMutation('UPDATE', 'assets', updated);
-      }
-      await refreshRegistry();
-      addNotification({ title: "Folders Updated Successfully", variant: "success" });
-    } finally {
-      setIsProcessing(false);
-      setIsCategoryBatchEditOpen(false);
-    }
-  };
-
-  const handleExportCategories = async () => {
-    try {
-      const assetsToExport = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      await ExcelService.exportRegistry(assetsToExport, headers);
-      addNotification({ title: "Excel Export Complete", variant: "success" });
-    } catch (e) {
-      addNotification({ title: "Export Failed", variant: "destructive" });
-    }
-  };
-
-  const handleMergeCategories = async () => {
-    if (!targetMergeCategory) return;
-    setIsProcessing(true);
-    try {
-      const assetsToMerge = filteredAssets.filter(a => selectedCategories.includes(a.category));
-      for (const asset of assetsToMerge) {
-        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
-      }
-      await refreshRegistry();
-      setSelectedCategories([]);
-      setIsMergeDialogOpen(false);
-      addNotification({ title: `Merged into ${targetMergeCategory}`, variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleMergeAssets = async () => {
-    if (!targetMergeCategory) return;
-    setIsProcessing(true);
-    try {
-      const assetsToMerge = filteredAssets.filter(a => selectedAssetIds.has(a.id));
-      for (const asset of assetsToMerge) {
-        await enqueueMutation('UPDATE', 'assets', { ...asset, category: targetMergeCategory });
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      setIsMergeDialogOpen(false);
-      addNotification({ title: `Migration to ${targetMergeCategory} complete`, variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleExecutePurge = async () => {
-    if (categoriesToPurge.length === 0 && selectedCategories.length === 0) return;
-    const targets = categoriesToPurge.length > 0 ? categoriesToPurge : selectedCategories;
-    
-    setIsProcessing(true);
-    try {
-      const idsToDelete = filteredAssets.filter(a => targets.includes(a.category)).map(a => a.id);
-      for (const id of idsToDelete) await enqueueMutation('DELETE', 'assets', { id });
-      const currentLocal = await storage.getAssets();
-      await storage.saveAssets(currentLocal.filter(a => !idsToDelete.includes(a.id)));
-      await refreshRegistry();
-      setSelectedCategories([]);
-      setCategoriesToPurge([]);
-      setIsPurgeDialogOpen(false);
-      addNotification({ title: "Folders Removed", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleRenameCommit = async () => {
-    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrant) return;
-    setIsProcessing(true);
-    try {
-      const assetsToUpdate = filteredAssets.filter(a => a.category === categoryToRename);
-      for (const asset of assetsToUpdate) await enqueueMutation('UPDATE', 'assets', { ...asset, category: newCategoryName.trim() });
-      
-      const newSheetDefs = { ...activeGrant.sheetDefinitions };
-      newSheetDefs[newCategoryName.trim()] = { ...newSheetDefs[categoryToRename], name: newCategoryName.trim() };
-      delete newSheetDefs[categoryToRename];
-
-      const nextSettings = { 
-        ...appSettings, 
-        grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefs } : g) 
-      };
-      
-      await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings(nextSettings);
-      setAppSettings(nextSettings);
-      await refreshRegistry();
-      setIsRenameDialogOpen(false);
-      addNotification({ title: "Folder Renamed", variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   return (
-    <div className="space-y-4 h-full flex flex-col relative">
-      {/* 1. Controller Header */}
+    <div className="space-y-4 h-full flex flex-col relative pb-safe">
+      {/* Controller Header */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -464,31 +289,25 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
               )}
             </AnimatePresence>
-            
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none">
+              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[200px]">
                 {showList ? (selectedCategories[0] || 'Asset List') : (activeGrant?.name || 'Asset Hub')}
               </h2>
-              <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
-                {showList 
-                  ? `${processedAssets.length} RECORDS IN THIS FOLDER` 
-                  : `${filteredAssets.length} TOTAL ASSETS IN SCOPE`}
+              <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                {showList ? `${processedAssets.length} RECORDS` : `${filteredAssets.length} TOTAL IN SCOPE`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
               <Checkbox 
                 id="sel-all-master" 
                 checked={showList ? (selectedAssetIds.size === paginatedAssets.length && paginatedAssets.length > 0) : (selectedCategories.length === categories.length && categories.length > 0)} 
-                onCheckedChange={(c) => {
-                  if (showList) handleSelectAll(!!c);
-                  else setSelectedCategories(c ? categories : []);
-                }} 
-                className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
+                onCheckedChange={(c) => showList ? handleSelectAll(!!c) : setSelectedCategories(c ? categories : [])} 
+                className="h-5 w-5 rounded-lg border-2 border-border" 
               />
-              <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase tracking-widest text-muted-foreground cursor-pointer">Select All</label>
+              <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">All</label>
             </div>
 
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
@@ -496,120 +315,50 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 {!isSearchExpanded ? (
                   <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
                 ) : (
-                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "220px", sm: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
+                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
-                    <Input ref={searchInputRef} placeholder="Find assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus:border-primary" />
-                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                    <Input ref={searchInputRef} placeholder="Find assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs" />
+                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setIsLogicFilterOpen(true)} 
-                        className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary relative"
-                      >
-                        <Filter className="h-4 w-4" />
-                        {activeFilterCount > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background shadow-lg">
-                            {activeFilterCount}
-                          </span>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Logic Engine</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                {showList && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
-                          <Settings2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary">
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Sort Pulse</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
+                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Main Registry Content */}
+      {/* Main Workspace Surface */}
       <div className="flex-1 min-h-0 relative">
-        {/* Focus Backdrop Overlay */}
         <AnimatePresence>
           {expandedAssetId && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setExpandedAssetId(null)}
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-md cursor-zoom-out"
-            />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExpandedAssetId(null)} className="fixed inset-0 z-40 bg-background/60 backdrop-blur-md" />
           )}
         </AnimatePresence>
 
-        <ScrollArea className={cn(
-          "flex-1 px-1 h-full transition-all duration-500",
-          expandedAssetId && "blur-[2px] grayscale-[0.2] pointer-events-none select-none scale-[0.995]"
-        )}>
+        <ScrollArea className={cn("flex-1 px-1 h-full transition-all duration-500", expandedAssetId && "blur-sm grayscale-[0.2] pointer-events-none")}>
           {!showList ? (
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
               {categories.map(cat => (
                 <Card 
                   key={cat} 
-                  onClick={() => handleToggleCategorySelection(cat)}
+                  onClick={() => handleExploreFolder(cat)}
                   className={cn(
-                    "bg-card border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-xl flex flex-col p-6 relative cursor-pointer", 
+                    "bg-card border-2 rounded-3xl group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer", 
                     selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border"
                   )}
                 >
-                  <div className="absolute top-4 left-4 z-20">
-                    <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => handleToggleCategorySelection(cat)} className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
+                  <div className="flex justify-between items-start mb-8">
+                    <div className="p-2.5 bg-primary/10 rounded-xl"><Layers className="h-5 w-5 text-primary" /></div>
+                    <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat])} className="h-5 w-5 rounded-lg border-border" />
                   </div>
-                  <div className="flex justify-between items-start mb-8 pl-8">
-                    <h3 className="text-sm font-black uppercase text-foreground tracking-tight leading-none truncate pr-4">{cat}</h3>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-muted-foreground/40 hover:text-foreground" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-card border-border text-foreground p-1">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename</span></DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10"><ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Open</span></DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setCategoriesToPurge([cat]); setIsPurgeDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-destructive/10 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Delete</span></DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div className="space-y-1 mb-8 pl-8">
-                    <p className="text-4xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
-                    <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
-                  </div>
-                  <Button 
-                    onClick={(e) => { e.stopPropagation(); handleExploreFolder(cat); }} 
-                    variant="outline" 
-                    className="w-full h-12 mt-auto rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-muted transition-all"
-                  >
-                    Explore <ChevronRight className="h-3 w-3" />
-                  </Button>
+                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate mb-4">{cat}</h3>
+                  <p className="text-3xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
+                  <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
                 </Card>
               ))}
             </div>
@@ -632,203 +381,65 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   )}
                 </AnimatePresence>
               </div>
-              <div className="mt-auto pt-8 border-t border-border">
-                <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={itemsPerPage} setItemsPerPage={setItemsPerPage} totalItems={processedAssets.length} />
-              </div>
+              <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={itemsPerPage} setItemsPerPage={setItemsPerPage} totalItems={processedAssets.length} />
             </div>
           )}
         </ScrollArea>
 
-        {/* 3. Focused Overlay Expansion */}
+        {/* Focused Overlay */}
         <AnimatePresence>
           {expandedAssetId && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-[15vh] left-[5vw] right-[5vw] bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col"
-            >
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[15vh] left-[5vw] right-[5vw] bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
               <div className="p-6 border-b border-border bg-muted/10 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-primary/10 rounded-xl"><Database className="h-5 w-5 text-primary" /></div>
-                  <div className="space-y-0.5">
-                    <h3 className="text-xl font-black uppercase text-foreground leading-none">Record Focus</h3>
-                    <p className="text-[9px] font-black text-primary uppercase tracking-widest">DETAILED DOSSIER PULSE</p>
-                  </div>
+                  <h3 className="text-xl font-black uppercase text-foreground leading-none">Record Focus</h3>
                 </div>
-                <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all">
-                  <X className="h-5 w-5" />
-                </button>
+                <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10"><X className="h-5 w-5" /></button>
               </div>
-              
               <ScrollArea className="flex-1 custom-scrollbar">
                 <div className="p-8">
                   {processedAssets.find(a => a.id === expandedAssetId) && (
-                    <AssetDossier 
-                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} 
-                      onEdit={handleEditAsset}
-                    />
+                    <AssetDossier record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} onEdit={handleEditAsset} />
                   )}
                 </div>
               </ScrollArea>
-
-              <div className="p-6 bg-muted/5 border-t border-border flex justify-center">
-                <Button variant="ghost" onClick={() => setExpandedAssetId(null)} className="font-black uppercase text-[10px] tracking-widest opacity-40 hover:opacity-100 transition-all">Dismiss Dossier</Button>
-              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* 4. Batch Pulse Floating Action Bar - Adaptive & Deployment Optimized */}
+      {/* Floating Batch Bar - Adaptive Stream */}
       <AnimatePresence>
         {(selectedAssetIds.size > 0 || selectedCategories.length > 0) && (
-          <motion.div 
-            initial={{ opacity: 0, y: 40, x: "-50%" }} 
-            animate={{ opacity: 1, y: 0, x: "-50%" }} 
-            exit={{ opacity: 0, y: 40, x: "-50%" }} 
-            className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-[1.5rem] sm:rounded-2xl p-2.5 sm:p-3 flex items-center shadow-3xl backdrop-blur-3xl"
-          >
-            {/* Counter Section */}
-            <div className="flex items-center gap-2.5 sm:gap-3 pl-2 sm:pl-3 pr-4 sm:pr-6 border-r border-white/10 shrink-0">
-              <div className="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px] sm:text-[10px] shadow-lg">
-                {showList ? selectedAssetIds.size : selectedCategories.length}
-              </div>
-              <span className="text-[9px] font-black uppercase text-white tracking-widest hidden xs:block">
-                {isMobile ? 'PULSE' : 'SELECTED'}
-              </span>
+          <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
+            <div className="flex items-center gap-3 pl-3 pr-6 border-r border-white/10 shrink-0">
+              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px]">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
+              <span className="text-[9px] font-black uppercase text-white tracking-widest hidden xs:block">Selected</span>
             </div>
-            
-            {/* Action Stream - Scrollable on Mobile */}
-            <ScrollArea className="flex-1 overflow-hidden" scrollHideDelay={500}>
-              <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1">
+            <ScrollArea className="flex-1 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-1">
                 {showList && selectedAssetIds.size === 1 ? (
-                  <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} size="sm" className="h-9 sm:h-11 px-4 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 shadow-xl shrink-0">
-                    <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Edit Record
-                  </Button>
+                  <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit Record</Button>
                 ) : (
-                  <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} size="sm" className="h-9 sm:h-11 px-4 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 shadow-xl shrink-0">
-                    <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Batch Edit
-                  </Button>
+                  <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
                 )}
-                
-                <Button variant="outline" onClick={showList ? handleExportAssets : handleExportCategories} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5 shrink-0">
-                  <FileDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Export
-                </Button>
-                
-                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 border-white/10 text-white/60 hover:bg-white/5 shrink-0">
-                  <GitMerge className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Merge
-                </Button>
-                
-                <Button variant="outline" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)} size="sm" className="h-9 sm:h-11 px-3 sm:px-6 rounded-xl font-black uppercase text-[9px] sm:text-[10px] gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 shrink-0">
-                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Delete
-                </Button>
+                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
+                <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
               </div>
-              <ScrollBar orientation="horizontal" className="h-1 invisible" />
+              <ScrollBar orientation="horizontal" className="invisible" />
             </ScrollArea>
-            
-            {/* Close Pulse */}
-            <div className="pl-2 border-l border-white/10 shrink-0">
-              <button 
-                onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} 
-                className="p-2 sm:p-2.5 text-white/20 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-              >
-                <X className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
-            </div>
+            <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-white/20 hover:text-white rounded-xl"><X className="h-5 w-5" /></button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 5. Modals & Sheets */}
-      <AssetForm 
-        isOpen={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
-        asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} 
-        isReadOnly={false} 
-        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
-      />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
-      
       <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
       <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={handleSaveAssetBatch} />
-      
       <FilterDrawer isOpen={isLogicFilterOpen} onOpenChange={setIsLogicFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
-
-      {/* Merge Confirmation */}
-      <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase text-white">Merge Selection?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select the target folder for this migration pulse.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-6">
-            <Select value={targetMergeCategory} onValueChange={setTargetMergeCategory}>
-              <SelectTrigger className="h-14 rounded-2xl bg-white/5 border-2 border-white/10 font-black text-[10px] uppercase">
-                <SelectValue placeholder="Target Category..." />
-              </SelectTrigger>
-              <SelectContent className="bg-black border-white/10 rounded-2xl">
-                {categories.map(c => <SelectItem key={c} value={c} className="text-[10px] font-black uppercase">{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={showList ? handleMergeAssets : handleMergeCategories} disabled={isProcessing || !targetMergeCategory} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] bg-primary text-black m-0">
-              Confirm Merge Pulse
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Asset Purge Confirmation */}
-      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive">Purge Records?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">You are about to destroy {selectedAssetIds.size} records. This action is immutable.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePurgeAssets} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] bg-destructive text-white m-0">
-              Execute Purge
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Rename Dialog */}
-      <AlertDialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase text-white">Rename Folder</AlertDialogTitle>
-          </AlertDialogHeader>
-          <div className="py-6">
-            <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-14 bg-white/5 border-2 border-white/10 rounded-2xl font-black uppercase text-sm text-white" />
-          </div>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRenameCommit} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] bg-primary text-black m-0">Commit Name</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Category Purge Confirmation */}
-      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-3xl bg-black text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive">Destroy Folder(s)?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Permanently removing {selectedCategories.length || 1} asset folder(s).</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] bg-destructive text-white m-0">
-              Execute Purge
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
