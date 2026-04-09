@@ -3,11 +3,13 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to clear business naming and context-aware selection.
- * Phase 1200: Finalized production hardening and permission gating.
+ * Phase 1350: Fixed isFilterOpen reference error and standardized naming.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { 
   Database,
   Grid,
@@ -36,8 +38,6 @@ import {
   GitMerge,
   ArrowUpRight
 } from 'lucide-react';
-import { useAppState } from '@/contexts/app-state-context';
-import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -203,7 +203,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const showList = isExplored || viewAll;
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
+    if (checked) setSelectedAssetIds(new Set(paginatedAssets.map(a => a.id)));
     else setSelectedAssetIds(new Set());
   };
 

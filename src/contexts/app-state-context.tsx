@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Hardened for high-volume data handling and deterministic normalization.
+ * Phase 1300: Integrated Deterministic Normalization Engine for Filters.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -115,7 +116,6 @@ function ViewParamSync({ activeView, setActiveViewStatus }: { activeView: Workst
 }
 
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
-  const router = useRouter();
   const [isHydrated, setIsHydrated] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
@@ -171,7 +171,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
     } catch (e) { 
-      console.error("Registry State Update Error:", e); 
+      console.error("Registry Refresh Error:", e); 
     }
   }, []);
 
@@ -253,26 +253,35 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return results;
   }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories]);
 
+  // Deterministic Option Generators with Fuzzy Consolidation
   const locationOptions = useMemo(() => {
-    const counts = new Map<string, number>();
+    const map = new Map<string, { label: string, count: number }>();
     assets.forEach(a => { 
-      const display = LocationEngine.normalize(a.location).normalized;
-      counts.set(display, (counts.get(display) || 0) + 1); 
+      const norm = LocationEngine.normalize(a.location);
+      const fuzzy = getFuzzySignature(norm.normalized);
+      const existing = map.get(fuzzy);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(fuzzy, { label: norm.normalized, count: 1 });
+      }
     });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+    return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const assigneeOptions = useMemo(() => {
-    const counts = new Map<string, number>();
+    const map = new Map<string, { label: string, count: number }>();
     assets.forEach(a => { 
       const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
       const fuzzy = getFuzzySignature(display);
-      // Group by fuzzy but use the most formatted display name
-      const existing = Array.from(counts.keys()).find(k => getFuzzySignature(k) === fuzzy);
-      const key = existing || display;
-      counts.set(key, (counts.get(key) || 0) + 1); 
+      const existing = map.get(fuzzy);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(fuzzy, { label: display, count: 1 });
+      }
     });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+    return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
   const categoryOptions = useMemo(() => {
@@ -325,7 +334,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Update Latency Detected", variant: "destructive" });
+      addNotification({ title: "Update Error", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -336,7 +345,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       await processSyncQueue();
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Upload Latency Detected", variant: "destructive" });
+      addNotification({ title: "Upload Error", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -344,7 +353,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantId, activeView, setActiveView: (v) => { setActiveViewStatus(v); if (typeof window !== 'undefined') { const p = new URLSearchParams(window.location.search); p.set('v', v.toLowerCase()); router.push(`/?${p.toString()}`, { scroll: false }); } },
+      activeGrantId, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload,
       setActiveGrantId: async (id) => { if (!appSettings) return; const next = { ...appSettings, activeGrantId: id }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id }); setAppSettings(next); await refreshRegistry(); },
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },

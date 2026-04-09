@@ -6,14 +6,6 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  swcMinify: true,
-  workboxOptions: {
-    clientsClaim: true,
-    skipWaiting: true,
-  }
 });
 
 const nextConfig = {
@@ -23,9 +15,6 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  experimental: {
-    optimizePackageImports: ['lucide-react', 'recharts'],
   },
 };
 
