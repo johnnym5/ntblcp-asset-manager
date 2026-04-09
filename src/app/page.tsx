@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Implements seamless workstation transitions and multi-function navigation.
  * Normalized naming to professional Asset Manager standards.
+ * Phase 1410: Integrated transient 5-second Notification Toasts.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -83,19 +84,19 @@ function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, y: -5 }}
+      initial={{ opacity: 0, y: 20, scale: 0.9, x: "-50%" }}
+      animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+      exit={{ opacity: 0, scale: 0.9, y: 10, x: "-50%" }}
       className={cn(
-        "absolute top-full right-0 mt-2 w-64 p-3 rounded-xl border shadow-3xl z-[100] flex items-center gap-3 backdrop-blur-3xl",
+        "fixed bottom-24 left-1/2 z-[200] w-[320px] p-4 rounded-2xl border shadow-3xl flex items-center gap-4 backdrop-blur-3xl",
         notification.variant === 'destructive' ? "bg-destructive border-destructive text-destructive-foreground" :
         "bg-card/90 border-border text-foreground"
       )}
     >
-      <div className="p-1.5 bg-white/10 rounded-lg shrink-0"><Icon className="h-4 w-4" /></div>
+      <div className="p-2 bg-white/10 rounded-xl shrink-0"><Icon className="h-5 w-5" /></div>
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
-        <p className="text-[8px] font-medium opacity-80 line-clamp-1 mt-1">{notification.description}</p>
+        <p className="text-[11px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
+        <p className="text-[9px] font-medium opacity-80 line-clamp-2 mt-1.5 italic">{notification.description}</p>
       </div>
     </motion.div>
   );
@@ -157,7 +158,7 @@ export default function SPAHub() {
       const latest = notifications.find(n => n.id === lastAddedId);
       if (latest) {
         setActiveToast(latest);
-        const timer = setTimeout(() => setActiveToast(null), 4000);
+        const timer = setTimeout(() => setActiveToast(null), 5000);
         return () => clearTimeout(timer);
       }
     }
@@ -294,7 +295,6 @@ export default function SPAHub() {
                 <Bell className="h-4.5 w-4.5" />
                 {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
               </button>
-              <AnimatePresence>{activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}</AnimatePresence>
             </div>
           </TactileMenu>
 
@@ -342,6 +342,10 @@ export default function SPAHub() {
           </ErrorBoundary>
         </div>
       </div>
+
+      <AnimatePresence>
+        {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
+      </AnimatePresence>
     </div>
   );
 }

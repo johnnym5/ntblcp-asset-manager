@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
- * Phase 206: Resolved button overlap by switching to horizontal flex actions.
- * Phase 207: Fixed drill-down pulse navigation.
+ * Phase 1410: Integrated TactileMenu for forensic breakdown and navigation arrows.
  */
 
 import React from 'react';
@@ -30,14 +29,14 @@ import {
   ArrowRight,
   User,
   Zap,
-  ArrowRightLeft
+  Tag
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 import { useAppState } from '@/contexts/app-state-context';
-import { useAuth } from '@/contexts/auth-context';
 import { useNotifications, removeNotification, clearAll, markAllAsRead } from '@/hooks/use-notifications';
+import { TactileMenu } from '@/components/TactileMenu';
 
 interface NotificationsCenterProps {
   isOpen: boolean;
@@ -53,8 +52,10 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
     if (n.assetId) {
       const shortId = n.assetId.split('-')[0];
       setSearchTerm(shortId); 
+      setActiveView('REGISTRY');
+    } else if (n.targetView) {
+      setActiveView(n.targetView as any);
     }
-    setActiveView('REGISTRY');
     onOpenChange(false);
   };
 
@@ -86,56 +87,58 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
           <div className="p-6 space-y-4 pb-32">
             {notifications.length > 0 ? (
               notifications.map((n) => (
-                <div 
-                  key={n.id} 
-                  onClick={() => handleNotificationClick(n)}
-                  className={cn(
-                    "p-5 rounded-2xl border transition-all group relative cursor-pointer",
-                    n.read ? "bg-transparent border-white/5 opacity-60" : "bg-white/[0.03] border-white/10 shadow-lg hover:border-primary/40"
-                  )}
+                <TactileMenu
+                  key={n.id}
+                  title="Indepth Pulse Breakdown"
+                  options={[
+                    { label: `ID Code: ${n.assetId || 'SYSTEM'}`, icon: Tag, onClick: () => {} },
+                    { label: n.date.toLocaleString(), icon: Clock, onClick: () => {} },
+                    { label: 'View Source Record', icon: ArrowRight, onClick: () => handleNotificationClick(n) },
+                    { label: 'Clear Notification', icon: Trash2, onClick: () => removeNotification(n.id), destructive: true }
+                  ]}
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Icon Pulse */}
-                    <div className={cn(
-                      "p-2 rounded-lg shrink-0",
-                      n.variant === 'destructive' ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
-                    )}>
-                      {n.variant === 'destructive' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                    </div>
+                  <div 
+                    onClick={() => handleNotificationClick(n)}
+                    className={cn(
+                      "p-5 rounded-2xl border transition-all group relative cursor-pointer",
+                      n.read ? "bg-transparent border-white/5 opacity-60" : "bg-white/[0.03] border-white/10 shadow-lg hover:border-primary/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "p-2 rounded-lg shrink-0",
+                        n.variant === 'destructive' ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
+                      )}>
+                        {n.variant === 'destructive' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                      </div>
 
-                    {/* Content Pulse */}
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <h4 className="text-sm font-black uppercase tracking-tight leading-tight truncate">{n.title}</h4>
-                      
-                      {n.description && (
-                        <p className="text-[11px] font-medium text-white/60 leading-relaxed italic line-clamp-2">
-                          {n.description}
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
-                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/20 uppercase tracking-widest">
-                          <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(n.date, { addSuffix: true })}
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <h4 className="text-sm font-black uppercase tracking-tight leading-tight truncate">{n.title}</h4>
+                        {n.description && (
+                          <p className="text-[11px] font-medium text-white/60 leading-relaxed italic line-clamp-2">
+                            {n.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-3 pt-1">
+                          <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                            <Clock className="h-3 w-3" />
+                            {formatDistanceToNow(n.date, { addSuffix: true })}
+                          </div>
                         </div>
-                        <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black border-white/10 text-white/40">
-                          ID: {n.assetId?.split('-')[0] || 'SYS'}
-                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-9 w-9 rounded-xl bg-white/5 text-white/40 group-hover:bg-primary/10 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-
-                    {/* Action Column - Prevents Overlap */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}
-                        className="p-2 rounded-lg text-white/10 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
                   </div>
-                </div>
+                </TactileMenu>
               ))
             ) : (
               <div className="py-40 text-center opacity-20 flex flex-col items-center gap-6">
