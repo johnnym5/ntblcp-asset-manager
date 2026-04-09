@@ -2,6 +2,7 @@
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
  * Phase 808: Added normalization for prices and synthetic additions headers.
+ * Phase 809: Added Chassis and Engine number support for vehicles.
  */
 
 import type { Asset } from "@/types/domain";
@@ -24,6 +25,8 @@ export function normalizeHeaderName(name: string): string {
   if (n === "s/n" || n === "sn") return "sn";
   if (n === "serial number" || n === "serial numbers") return "serial_number";
   if (n === "model number" || n === "model numbers" || n === "model no") return "model_number";
+  if (n.includes("chasis no") || n.includes("chassis no")) return "chassis_no";
+  if (n.includes("engine no")) return "engine_no";
   if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "date_purchased_received";
   if (n.includes("useful life")) return "useful_life_years";
 
@@ -58,6 +61,10 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { rawName: "Asset ID Code", displayName: "Asset ID Code", normalizedName: "asset_id_code", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
   { rawName: "Serial Number", displayName: "Serial Number", normalizedName: "serial_number", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
   
+  // Vehicle Specific
+  { rawName: "Chassis No", displayName: "Chassis No", normalizedName: "chassis_no", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
+  { rawName: "Engine No", displayName: "Engine No", normalizedName: "engine_no", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
+
   // Location
   { rawName: "Location", displayName: "Location", normalizedName: "location", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
   { rawName: "Assignee (Location)", displayName: "Assignee (Location)", normalizedName: "assignee_location", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
@@ -95,6 +102,8 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "asset_description": rawValue = asset.description || asset.name; break;
       case "asset_id_code": rawValue = asset.assetIdCode; break;
       case "serial_number": rawValue = asset.serialNumber; break;
+      case "chassis_no": rawValue = asset.chassisNo; break;
+      case "engine_no": rawValue = asset.engineNo; break;
       case "asset_class": rawValue = asset.category; break;
       case "condition": rawValue = asset.condition; break;
       case "manufacturer": rawValue = asset.manufacturer; break;

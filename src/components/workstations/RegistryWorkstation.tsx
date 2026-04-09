@@ -4,6 +4,7 @@
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Phase 1500: Optimized folder card typography for full name visibility.
  * Phase 1501: Enhanced high-density grid for professional desktop viewing.
+ * Phase 1502: Selection bar now strictly visibility-gated based on selection counts.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -360,7 +361,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
-  const isSelectionBarVisible = selectedAssetIds.size > 0 || selectedCategories.length > 0;
+  const isSelectionBarVisible = (showList && selectedAssetIds.size > 0) || (!showList && selectedCategories.length > 0);
 
   const totalVerified = useMemo(() => filteredAssets.filter(a => a.status === 'VERIFIED').length, [filteredAssets]);
   const totalCoverage = useMemo(() => filteredAssets.length > 0 ? Math.round((totalVerified / filteredAssets.length) * 100) : 0, [totalVerified, filteredAssets]);

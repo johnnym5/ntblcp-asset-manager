@@ -4,6 +4,7 @@
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
  * Phase 1004: Added support for 20-column synthetic templates (Additional Assets).
+ * Phase 1005: Added mapping for Chassis and Engine numbers.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -134,6 +135,8 @@ export class ParserEngine {
         case 'asset_description': asset.description = strVal; break;
         case 'asset_id_code': asset.assetIdCode = strVal; break;
         case 'serial_number': asset.serialNumber = strVal; break;
+        case 'chassis_no': asset.chassisNo = strVal; break;
+        case 'engine_no': asset.engineNo = strVal; break;
         case 'location': asset.location = strVal; break;
         case 'assignee_location': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
@@ -160,7 +163,7 @@ export class ParserEngine {
       asset.custodian = asset.custodian.trim().replace(/\b\w/g, (l: string) => l.toUpperCase());
     }
 
-    const hasIdentification = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber;
+    const hasIdentification = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
 
     if (!hasIdentification) {
       asset.validation.isRejected = true;
