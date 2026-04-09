@@ -4,9 +4,10 @@
  * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
  * Phase 1600: Transformed grid into a dynamic carousel.
  * Phase 1601: Added individual pulses for all technical headers, condition groups, and remarks.
+ * Phase 1602: Resolved ReferenceError for missing icons (Info, Trash2, ClipboardCheck).
  */
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
     Zap, 
     Boxes, 
@@ -28,13 +29,16 @@ import {
     Tag,
     Truck,
     Box,
-    FileText
+    FileText,
+    Info,
+    Trash2,
+    ClipboardCheck,
+    ArrowRight
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -55,8 +59,7 @@ export function AssetSummaryDashboard() {
         filteredAssets,
         setActiveView,
         appSettings,
-        setSearchTerm,
-        setSelectedStatuses
+        setSearchTerm
     } = useAppState();
 
     const [scrollIndex, setScrollIndex] = useState(0);
@@ -64,7 +67,6 @@ export function AssetSummaryDashboard() {
 
     const pulses = useMemo((): PulseData[] => {
         const assets = filteredAssets;
-        const total = assets.length;
 
         const isVehicle = (a: any) => {
             const cat = (a.category || '').toLowerCase();
@@ -77,7 +79,7 @@ export function AssetSummaryDashboard() {
                 id: 'missing-id',
                 label: 'Missing Asset ID',
                 description: 'Assets lacking a unique system tag or barcode ID.',
-                count: assets.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A').length,
+                count: assets.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '').length,
                 icon: Fingerprint,
                 color: 'bg-orange-600',
                 token: 'MISSING_ID',
@@ -87,7 +89,7 @@ export function AssetSummaryDashboard() {
                 id: 'missing-sn',
                 label: 'Missing S/N',
                 description: 'Assets without a primary short serial number.',
-                count: assets.filter(a => !a.sn || a.sn === 'N/A').length,
+                count: assets.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '').length,
                 icon: Tag,
                 color: 'bg-orange-500',
                 token: 'MISSING_SN',
@@ -97,7 +99,7 @@ export function AssetSummaryDashboard() {
                 id: 'missing-serial',
                 label: 'Missing Serial No',
                 description: 'Non-vehicle items missing manufacturer serials.',
-                count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A')).length,
+                count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '')).length,
                 icon: SearchCode,
                 color: 'bg-orange-400',
                 token: 'MISSING_SERIAL',
@@ -107,7 +109,7 @@ export function AssetSummaryDashboard() {
                 id: 'missing-model',
                 label: 'Missing Model No',
                 description: 'Assets missing specific model identification.',
-                count: assets.filter(a => !a.modelNumber || a.modelNumber === 'N/A').length,
+                count: assets.filter(a => !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '').length,
                 icon: Info,
                 color: 'bg-amber-500',
                 token: 'MISSING_MODEL',
@@ -149,7 +151,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-bad',
                 label: 'Critical Condition',
                 description: 'Assets in poor condition requiring repair or replacement.',
-                count: assets.filter(a => a.conditionGroup === 'Bad').length,
+                count: assets.filter(a => a.conditionGroup === 'Bad' || ['Bad condition', 'Poor', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
                 icon: Wrench,
                 color: 'bg-orange-600',
                 token: 'CONDITION_BAD',
@@ -159,7 +161,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-stolen',
                 label: 'Stolen Pulses',
                 description: 'Confirmed physical losses from regional sites.',
-                count: assets.filter(a => a.conditionGroup === 'Stolen').length,
+                count: assets.filter(a => a.conditionGroup === 'Stolen' || a.condition === 'Stolen').length,
                 icon: AlertCircle,
                 color: 'bg-red-700',
                 token: 'CONDITION_STOLEN',
@@ -169,7 +171,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-obsolete',
                 label: 'Obsolete Registry',
                 description: 'Assets that have reached the end of operational life.',
-                count: assets.filter(a => a.conditionGroup === 'Obsolete').length,
+                count: assets.filter(a => a.conditionGroup === 'Obsolete' || a.condition === 'Obsolete').length,
                 icon: Box,
                 color: 'bg-muted-foreground',
                 token: 'CONDITION_OBSOLETE',
@@ -179,7 +181,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-unsalvageable',
                 label: 'Unsalvageable',
                 description: 'Burnt or destroyed items ready for write-off.',
-                count: assets.filter(a => a.conditionGroup === 'Unsalvageable').length,
+                count: assets.filter(a => a.conditionGroup === 'Unsalvageable' || ['Unsalvageable', 'Burnt', 'Writeoff'].includes(a.condition || '')).length,
                 icon: Trash2,
                 color: 'bg-red-900',
                 token: 'CONDITION_UNSALVAGEABLE',
@@ -202,7 +204,7 @@ export function AssetSummaryDashboard() {
                 description: 'Assets awaiting field verification pulse.',
                 count: assets.filter(a => a.status === 'UNVERIFIED').length,
                 icon: ClipboardCheck,
-                color: 'bg-blue-500',
+                color: 'bg-blue-50',
                 token: 'STATUS_UNVERIFIED',
                 variant: 'blue',
                 visible: mode === 'verification'
@@ -233,11 +235,11 @@ export function AssetSummaryDashboard() {
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Sliding Diagnostic Cascade</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={prevPulse} disabled={scrollIndex === 0} className="h-10 w-10 rounded-full border border-border shadow-sm"><ChevronLeft className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" onClick={prevPulse} disabled={scrollIndex === 0} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronLeft className="h-5 w-5" /></Button>
                     <div className="px-4 py-1.5 rounded-full bg-muted/50 border border-border shadow-inner">
                         <span className="text-[10px] font-mono font-black">{scrollIndex + 1} / {pulses.length || 1}</span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={nextPulse} disabled={scrollIndex === pulses.length - 1} className="h-10 w-10 rounded-full border border-border shadow-sm"><ChevronRight className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" onClick={nextPulse} disabled={scrollIndex === pulses.length - 1} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronRight className="h-5 w-5" /></Button>
                 </div>
             </div>
 
