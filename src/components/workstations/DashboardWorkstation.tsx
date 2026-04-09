@@ -31,7 +31,8 @@ import {
   Info,
   Maximize2,
   SearchCode,
-  FileWarning
+  FileWarning,
+  LayoutGrid
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
