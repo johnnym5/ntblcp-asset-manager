@@ -6,6 +6,7 @@
  * Normalized naming to professional Asset Manager standards.
  * Phase 1410: Integrated transient 5-second Notification Toasts.
  * Phase 1414: Removed redundant VERIFY view and consolidated navigation.
+ * Phase 1415: Integrated high-fidelity Sync Status Dialog via long-press triggers.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -80,6 +81,8 @@ import { HelpCenter } from '@/components/HelpCenter';
 import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
 import { InboxSheet } from '@/components/inbox-sheet';
+import { SyncStatusDialog } from '@/components/SyncStatusDialog';
+import { useLongPress } from '@/hooks/use-long-press';
 
 function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
@@ -128,6 +131,7 @@ export default function SPAHub() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isSyncStatusOpen, setIsSyncStatusOpen] = useState(false);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -164,6 +168,9 @@ export default function SPAHub() {
     }
   }, [lastAddedId, notifications]);
 
+  // High-Fidelity Sync Dialog Trigger Pulse
+  const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
@@ -173,6 +180,7 @@ export default function SPAHub() {
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
+      <SyncStatusDialog isOpen={isSyncStatusOpen} onOpenChange={setIsSyncStatusOpen} />
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
       <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
@@ -253,19 +261,15 @@ export default function SPAHub() {
             </TooltipProvider>
           )}
 
-          <TactileMenu
-            title="Registry Parity"
-            options={[
-              { label: 'Download Updates', icon: Download, onClick: manualDownload },
-              { label: 'Upload Changes', icon: Upload, onClick: manualUpload },
-              { label: 'Synchronize All', icon: RefreshCw, onClick: refreshRegistry }
-            ]}
+          {/* Sync Controller Pulse Area */}
+          <div 
+            {...syncLongPress}
+            onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
+            className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
           >
-            <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent></Tooltip></TooltipProvider>
-              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>
-            </div>
-          </TactileMenu>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>
+          </div>
 
           <TactileMenu
             title="Network Status"
