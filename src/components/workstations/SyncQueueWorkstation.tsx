@@ -1,40 +1,27 @@
 'use client';
 
 /**
- * @fileOverview Pending Changes - Synchronizing Cloud Updates.
+ * @fileOverview Waiting Updates - Cloud Synchronization.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { 
   RefreshCw, 
-  AlertTriangle, 
-  CheckCircle2, 
   Database, 
-  Cloud, 
   Clock, 
-  Tag,
-  Trash2,
-  RotateCcw,
-  Activity,
-  Zap,
-  Box,
-  ArrowRight,
-  Upload,
-  Download,
-  Check,
-  X,
-  Layers,
-  ShieldCheck,
-  Monitor,
-  ToggleRight,
-  Wifi,
-  WifiOff,
-  ChevronDown,
-  Loader2,
-  ChevronRight,
+  Trash2, 
+  RotateCcw, 
+  Activity, 
+  Upload, 
+  Download, 
+  Check, 
+  X, 
+  Wifi, 
+  WifiOff, 
+  Loader2, 
+  ChevronRight, 
   Info,
-  ArrowDownCircle,
-  ArrowUpCircle
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,18 +50,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
-  const { isSyncing, refreshRegistry, manualDownload, isOnline, setIsOnline, appSettings } = useAppState();
+  const { isSyncing, refreshRegistry, manualDownload, isOnline, setIsOnline } = useAppState();
   const { toast } = useToast();
   
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
   const [isRetryingId, setIsRetryingId] = useState<string | null>(null);
-
-  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const loadQueue = async () => { 
     const items = await storage.getQueue(); 
@@ -107,16 +91,13 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(new Set(queue.map(q => q.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
+    if (checked) setSelectedIds(new Set(queue.map(q => q.id)));
+    else setSelectedIds(new Set());
   };
 
   const handlePushSelected = async () => {
     if (!isOnline) {
-      toast({ variant: "destructive", title: "Offline", description: "Internet required to sync changes." });
+      toast({ variant: "destructive", title: "Offline", description: "Internet required to sync." });
       return;
     }
     const idsToPush = Array.from(selectedIds);
@@ -144,10 +125,9 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
   const handleRetry = async (entry: OfflineQueueEntry) => {
     if (!isOnline) {
-      toast({ variant: "destructive", title: "Offline", description: "Cannot retry while disconnected." });
+      toast({ variant: "destructive", title: "Offline", description: "Cannot sync while disconnected." });
       return;
     }
-    
     setIsRetryingId(entry.id);
     try {
       const resetEntry: OfflineQueueEntry = { ...entry, status: 'PENDING', error: undefined };
@@ -155,9 +135,9 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
       await processSelectedSyncQueue([entry.id]);
       await refreshRegistry();
       await loadQueue();
-      toast({ title: "Retry Applied" });
+      toast({ title: "Sync Successful" });
     } catch (e) {
-      toast({ variant: "destructive", title: "Retry Failed" });
+      toast({ variant: "destructive", title: "Sync Failed" });
     } finally {
       setIsRetryingId(null);
     }
@@ -169,260 +149,92 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   const SyncItemCard = ({ entry }: { entry: OfflineQueueEntry }) => (
     <Card className={cn(
       "bg-[#050505] border-2 rounded-[1.5rem] overflow-hidden transition-all group",
-      selectedIds.has(entry.id) ? "border-primary/40 bg-primary/[0.02] shadow-xl" : "border-white/5 hover:border-white/10"
+      selectedIds.has(entry.id) ? "border-primary/40 bg-primary/[0.02]" : "border-white/5"
     )}>
       <div className="flex items-center p-4 gap-6">
-        <Checkbox 
-          checked={selectedIds.has(entry.id)} 
-          onCheckedChange={() => handleToggleSelect(entry.id)}
-          className="h-5 w-5 rounded-full border-2 border-white/10 data-[state=checked]:bg-primary"
-        />
-        
+        <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => handleToggleSelect(entry.id)} className="h-5 w-5 rounded-full" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h5 className="text-[13px] font-black uppercase tracking-tight text-white truncate leading-none">
-              {(entry.payload as any).description || 'Update record'}
-            </h5>
-            <Badge variant="outline" className={cn(
-              "h-4 px-1.5 text-[7px] font-black uppercase tracking-[0.2em] rounded-md",
-              entry.status === 'FAILED' ? "text-red-500 border-red-500/20 bg-red-500/5" :
-              entry.operation === 'CREATE' ? "text-green-500 border-green-500/20 bg-green-500/5" : "text-primary border-primary/20"
-            )}>{entry.status === 'FAILED' ? 'FAILED' : entry.operation}</Badge>
+            <h5 className="text-[13px] font-black uppercase text-white truncate leading-none">{(entry.payload as any).description || 'Update record'}</h5>
+            <Badge variant="outline" className={cn("h-4 px-1.5 text-[7px] font-black uppercase", entry.status === 'FAILED' ? "text-red-500 border-red-500/20" : "text-primary border-primary/20")}>{entry.status === 'FAILED' ? 'ERROR' : entry.operation}</Badge>
           </div>
           <div className="flex items-center gap-4 mt-2 text-[8px] font-bold text-white/20 uppercase">
             <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
-            {entry.error && <span className="text-red-500 italic truncate max-w-[200px]">{entry.error}</span>}
           </div>
         </div>
-
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {(entry.status === 'FAILED' || entry.status === 'PENDING') && (
-            <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} disabled={isRetryingId === entry.id} className="h-8 w-8 rounded-lg bg-white/5 hover:bg-primary/10 text-primary">
-              {isRetryingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" onClick={() => storage.dequeue(entry.id).then(loadQueue)} className="h-8 w-8 rounded-lg bg-white/5 text-destructive/40 hover:text-destructive hover:bg-destructive/10">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} disabled={isRetryingId === entry.id} className="h-8 w-8 text-primary"><RotateCcw className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => storage.dequeue(entry.id).then(loadQueue)} className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
     </Card>
   );
 
   return (
-    <div className={cn("space-y-8 h-full flex flex-col", !isEmbedded && "max-w-5xl mx-auto pb-40 animate-in fade-in duration-700")}>
-      
-      {/* Summary View */}
-      <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl shrink-0">
-        <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5 bg-white/[0.01]">
+    <div className={cn("space-y-8 h-full flex flex-col", !isEmbedded && "max-w-5xl mx-auto pb-40")}>
+      <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5">
           <div className="flex items-center gap-5">
-            <div className={cn("p-4 rounded-2xl shadow-inner", isOnline ? "bg-green-500/10" : "bg-red-500/10")}>
+            <div className={cn("p-4 rounded-2xl", isOnline ? "bg-green-500/10" : "bg-red-500/10")}>
               {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Pending Changes' : 'Waiting Updates'}</h3>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                {isOnline ? 'Online Status: Active' : 'Working Offline'}
-              </p>
+              <h3 className="text-xl font-black uppercase text-white">Pending Changes</h3>
+              <p className="text-[10px] font-bold text-white/40 uppercase">{isOnline ? 'Online' : 'Offline'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10 shadow-inner">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Connect</span>
+          <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10">
+            <span className="text-[10px] font-black uppercase text-white/60">Connect</span>
             <Switch checked={isOnline} onCheckedChange={setIsOnline} className="data-[state=checked]:bg-green-500" />
           </div>
         </div>
 
-        <CardContent className="p-0">
-          <div className="p-6 md:p-8 space-y-6">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-6">
-                {/* Select All */}
-                <div className="flex items-center gap-3 pr-6 border-r border-white/10">
-                  <Checkbox 
-                    id="dash-select-all" 
-                    checked={selectedIds.size === queue.length && queue.length > 0} 
-                    onCheckedChange={(c) => handleSelectAll(!!c)}
-                    className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary"
-                  />
-                  <label htmlFor="dash-select-all" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">All</label>
-                </div>
-
-                <div className="flex items-center gap-8">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Pending</span>
-                    <span className="text-3xl font-black tabular-nums text-white">{pendingCount}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Errors</span>
-                    <span className="text-3xl font-black tabular-nums text-red-600">{failedCount}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
-                  <Download className="h-4 w-4 mr-2" /> Sync Down
-                </Button>
-                
-                {selectedIds.size > 0 && (
-                  <Button onClick={handlePushSelected} disabled={isSyncing || !isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-105">
-                    {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
-                    Sync {selectedIds.size}
-                  </Button>
-                )}
-              </div>
+        <CardContent className="p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-8">
+              <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Waiting</span><span className="text-3xl font-black text-white">{pendingCount}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Errors</span><span className="text-3xl font-black text-red-600">{failedCount}</span></div>
             </div>
-
-            <div className="space-y-2 max-h-[400px] overflow-y-auto no-scrollbar">
-              {recentQueue.length > 0 ? (
-                recentQueue.map(entry => <SyncItemCard key={entry.id} entry={entry} />)
-              ) : (
-                <div className="py-12 text-center opacity-20 flex flex-col items-center gap-4">
-                  <ShieldCheck className="h-12 w-12 text-white" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">All changes synchronized</p>
-                </div>
-              )}
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase"><Download className="h-4 w-4 mr-2" /> Download</Button>
+              <Button onClick={() => setIsFullViewOpen(true)} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Review Changes</Button>
             </div>
           </div>
-
-          {queue.length > 0 && (
-            <div className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-end">
-              <Button 
-                variant="ghost" 
-                onClick={() => setIsFullViewOpen(true)}
-                className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-primary hover:bg-primary/10 transition-all"
-              >
-                Review all {queue.length} <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <div className="space-y-2">
+            {recentQueue.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Full Sync Log Dialog */}
       <Dialog open={isFullViewOpen} onOpenChange={setIsFullViewOpen}>
-        <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black border-white/10 rounded-[2.5rem] shadow-3xl text-white">
+        <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black text-white rounded-[2.5rem]">
           <div className="flex flex-col h-full">
-            <div className="p-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between shrink-0">
+            <div className="p-8 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-2xl">
-                  <Activity className="h-8 w-8 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Sync History</DialogTitle>
-                  <DialogDescription className="text-[10px] font-bold uppercase text-white/40 tracking-[0.3em]">
-                    Review the chronological order of local changes.
-                  </DialogDescription>
-                </div>
+                <Activity className="h-8 w-8 text-primary" />
+                <DialogTitle className="text-3xl font-black uppercase">Change List</DialogTitle>
               </div>
-              <button onClick={() => setIsFullViewOpen(false)} className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white transition-all"><X className="h-6 w-6" /></button>
+              <button onClick={() => setIsFullViewOpen(false)} className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl"><X className="h-6 w-6" /></button>
             </div>
 
-            <div className="px-8 py-4 bg-primary/5 border-b border-primary/10 flex items-center justify-between shrink-0">
+            <div className="px-8 py-4 bg-primary/5 border-b border-primary/10 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Checkbox 
-                  id="pop-select-all" 
-                  checked={selectedIds.size === queue.length && queue.length > 0} 
-                  onCheckedChange={(c) => handleSelectAll(!!c)}
-                  className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
-                />
-                <label htmlFor="pop-select-all" className="text-[11px] font-black uppercase tracking-widest text-primary/80 cursor-pointer">
-                  {selectedIds.size > 0 ? `${selectedIds.size} Changes Selected` : 'Select all pending updates'}
-                </label>
+                <Checkbox id="pop-select-all" checked={selectedIds.size === queue.length && queue.length > 0} onCheckedChange={(c) => handleSelectAll(!!c)} />
+                <label htmlFor="pop-select-all" className="text-[11px] font-black uppercase text-primary/80">Select All</label>
               </div>
-              
               {selectedIds.size > 0 && (
-                <div className="flex items-center gap-3">
-                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Discard Selection</Button>
-                  <Button onClick={handlePushSelected} disabled={!isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
-                    Broadcast Updates
-                  </Button>
+                <div className="flex gap-3">
+                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 text-[10px] font-black uppercase text-red-500">Discard</Button>
+                  <Button onClick={handlePushSelected} className="h-10 text-[10px] font-black uppercase bg-primary text-black">Upload Changes</Button>
                 </div>
               )}
             </div>
 
-            <ScrollArea className="flex-1 bg-black">
-              <div className="p-8 space-y-6 pb-20">
-                <Accordion type="multiple" defaultValue={["outgoing"]} className="space-y-4">
-                  
-                  {/* INCOMING UPDATES */}
-                  <AccordionItem value="incoming" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
-                    <AccordionTrigger className="hover:no-underline py-6">
-                      <div className="flex items-center justify-between w-full pr-6">
-                        <div className="flex items-center gap-4">
-                          <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-500"><ArrowDownCircle className="h-5 w-5" /></div>
-                          <h4 className="text-sm font-black uppercase text-white leading-none">Incoming Updates (From Cloud)</h4>
-                        </div>
-                        <Badge variant="outline" className="text-[8px] font-black uppercase opacity-40">Ready to Scan</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-8 text-center py-12 opacity-40">
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-4">Click "Sync Down" to check for cloud changes.</p>
-                      <Button variant="outline" onClick={manualDownload} size="sm" className="h-10 px-6 rounded-xl border-white/10 font-black uppercase text-[9px] tracking-widest">
-                        Check for Updates
-                      </Button>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  {/* OUTGOING UPDATES */}
-                  <AccordionItem value="outgoing" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
-                    <AccordionTrigger className="hover:no-underline py-6">
-                      <div className="flex items-center justify-between w-full pr-6">
-                        <div className="flex items-center gap-4">
-                          <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><ArrowUpCircle className="h-5 w-5" /></div>
-                          <h4 className="text-sm font-black uppercase text-white leading-none">Outgoing Updates ({queue.length})</h4>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-8 space-y-6">
-                      <Accordion type="multiple" defaultValue={["create", "update", "delete"]} className="space-y-3">
-                        {opGroups.CREATE.length > 0 && (
-                          <AccordionItem value="create" className="border-none">
-                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
-                              <span className="text-[10px] font-black uppercase tracking-widest">New Records ({opGroups.CREATE.length})</span>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 space-y-2">
-                              {opGroups.CREATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                            </AccordionContent>
-                          </AccordionItem>
-                        )}
-                        {opGroups.UPDATE.length > 0 && (
-                          <AccordionItem value="update" className="border-none">
-                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
-                              <span className="text-[10px] font-black uppercase tracking-widest">Record Edits ({opGroups.UPDATE.length})</span>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 space-y-2">
-                              {opGroups.UPDATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                            </AccordionContent>
-                          </AccordionItem>
-                        )}
-                        {opGroups.DELETE.length > 0 && (
-                          <AccordionItem value="delete" className="border-none">
-                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Deletions ({opGroups.DELETE.length})</span>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 space-y-2">
-                              {opGroups.DELETE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                            </AccordionContent>
-                          </AccordionItem>
-                        )}
-                      </Accordion>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                </Accordion>
+            <ScrollArea className="flex-1 p-8">
+              <div className="space-y-4 pb-20">
+                {queue.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
               </div>
             </ScrollArea>
-
-            <div className="p-8 bg-white/[0.02] border-t border-white/5 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-4 text-[10px] font-bold text-white/40 uppercase italic max-w-sm">
-                <Info className="h-4 w-4 text-primary shrink-0" />
-                <p>All updates are broadcast in the order they were made to ensure data integrity.</p>
-              </div>
-              <Button variant="ghost" onClick={() => setIsFullViewOpen(false)} className="h-14 px-12 rounded-2xl font-black uppercase text-[11px] tracking-[0.25em] bg-white/5 hover:bg-white/10 text-white">
-                Dismiss
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>

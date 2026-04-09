@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * @fileOverview High-Fidelity Filter Engine - Centered Pop-up UI.
- * Phase 232: Replaced Radix ScrollArea with native custom-scrollbar to fix CSS leak.
- * Phase 233: Implemented high-visibility scrollbars for long lists.
+ * @fileOverview Registry Filter Engine.
+ * Supports multi-select criteria across all registry dimensions.
  */
 
 import React from 'react';
@@ -15,10 +14,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Label } from './ui/label';
-import { Separator } from './ui/separator';
 import type { OptionType } from '@/contexts/app-state-context';
 
 interface AssetFilterSheetProps {
@@ -48,10 +46,11 @@ interface AssetFilterSheetProps {
 
 const MISSING_FIELD_OPTS = [
   { label: 'None', value: '' },
+  { label: 'Asset Description', value: 'description' },
+  { label: 'Asset Class', value: 'category' },
   { label: 'S/N', value: 'sn' },
   { label: 'Serial Number', value: 'serialNumber' },
   { label: 'Asset ID Code', value: 'assetIdCode' },
-  { label: 'Description', value: 'description' },
 ];
 
 const FilterSection = ({ title, options, selected, onChange }: {
@@ -72,7 +71,6 @@ const FilterSection = ({ title, options, selected, onChange }: {
     <div className="space-y-3">
       <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">{title}</Label>
       <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] overflow-hidden">
-        {/* Native overflow-y-auto with custom-scrollbar class to ensure visible scroll wheel */}
         <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
           <div className="p-2 space-y-1">
             {options.length > 0 ? (
@@ -160,29 +158,28 @@ export function AssetFilterSheet({
       <DialogContent className="max-w-3xl flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         <div className="p-10 pb-6 border-b border-white/5 bg-white/[0.02] shrink-0">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Engine</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Assets</DialogTitle>
             <DialogDescription className="text-[10px] font-black uppercase text-white/40 tracking-widest mt-1">
-              Deterministic asset selection pulse
+              Select criteria to refine the list
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        {/* Main scrollable content pane with high-visibility scrollbar */}
         <div className="flex-1 bg-black max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-10">
               {isAdmin && (
-                <FilterSection title="Regional Scope" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+                <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
               )}
               <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
             </div>
             
             <div className="space-y-10">
-              <FilterSection title="Asset Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
-              <FilterSection title="Pulse Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
+              <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+              <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
               <div className="space-y-4">
-                <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Gaps</Label>
+                <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Missing Data</Label>
                 <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2 flex flex-wrap gap-2">
                   {MISSING_FIELD_OPTS.map((opt) => {
                     const isSelected = missingFieldFilter === opt.value;
@@ -211,13 +208,13 @@ export function AssetFilterSheet({
             onClick={handleClearAll}
             className="h-14 px-8 rounded-2xl text-white/40 font-black uppercase text-[10px] tracking-[0.2em] hover:text-white"
           >
-            Purge Filters
+            Clear Filters
           </Button>
           <Button 
             onClick={() => onOpenChange(false)}
             className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform active:scale-95"
           >
-            Apply Logic Pulse
+            Apply Filters
           </Button>
         </div>
       </DialogContent>
