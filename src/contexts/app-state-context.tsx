@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Hardened for high-volume data handling and deterministic normalization.
  * Phase 1301: Integrated Diagnostic Search Tokens for Dashboard Navigation.
+ * Phase 1302: Added groupsViewMode for operational folder/condition shortcuts.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -99,6 +100,9 @@ interface AppStateContextType {
   setItemsPerPage: (val: number | 'all') => void;
   goBack: () => void;
   activeFilterCount: number;
+
+  groupsViewMode: 'category' | 'condition';
+  setGroupsViewMode: Dispatch<SetStateAction<'category' | 'condition'>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -126,6 +130,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
+  const [groupsViewMode, setGroupsViewMode] = useState<'category' | 'condition'>('category');
   
   const [headers, setHeaders] = useState<RegistryHeader[]>(
     DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[]
@@ -262,7 +267,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return results;
   }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories]);
 
-  // Deterministic Option Generators with Fuzzy Consolidation
   const locationOptions = useMemo(() => {
     const map = new Map<string, { label: string, count: number }>();
     assets.forEach(a => { 
@@ -379,7 +383,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveViewStatus('REGISTRY'); },
       isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
-      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0)
+      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0),
+      groupsViewMode, setGroupsViewMode
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}

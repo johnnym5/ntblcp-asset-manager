@@ -43,7 +43,8 @@ import {
   SearchCode,
   Monitor,
   FileUp,
-  Inbox
+  Inbox,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,6 @@ import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstati
 import { AssetGroupsWorkstation } from '@/components/workstations/AssetGroupsWorkstation';
 import { DiscrepancyWorkstation } from '@/components/workstations/DiscrepancyWorkstation';
 import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
-import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
@@ -141,7 +141,6 @@ export default function SPAHub() {
       case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return <VerifyWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
@@ -185,8 +184,7 @@ export default function SPAHub() {
                   options={[
                     { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
                     { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    ...(isAdmin ? [{ label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') }] : []),
-                    { label: 'Field Verification', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') },
+                    { label: 'Asset Folders', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
                     { label: 'Executive Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
                     { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
                     { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
@@ -209,7 +207,6 @@ export default function SPAHub() {
             options={[
               { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              ...(isAdmin ? [{ label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') }] : []),
               { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >

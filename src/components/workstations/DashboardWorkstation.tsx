@@ -3,6 +3,7 @@
 /**
  * @fileOverview Intelligence Hub - Executive Overview.
  * Phase 1412: Integrated Issue Scanner and At-a-Glance random asset carousels.
+ * Phase 1413: Added Mode Header and expanded Operational Tools.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -57,13 +58,14 @@ export function DashboardWorkstation() {
     isOnline,
     refreshRegistry,
     assets,
-    headers
+    headers,
+    setGroupsViewMode
   } = useAppState();
   
   const { userProfile } = useAuth();
   
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
-  const isVerificationMode = appSettings?.appMode === 'verification';
+  const mode = appSettings?.appMode || 'management';
 
   // --- Carousel State & Logic ---
   const [issueIndex, setIssueIndex] = useState(0);
@@ -104,6 +106,16 @@ export function DashboardWorkstation() {
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
+  const getModeInfo = () => {
+    switch(mode) {
+      case 'verification': return { icon: ClipboardCheck, label: 'Verification Protocol', desc: 'Optimized for high-speed field assessment and status confirmation.' };
+      case 'reporting': return { icon: FileText, label: 'Reporting Protocol', desc: 'Optimized for executive documentation and data quality compliance.' };
+      default: return { icon: ShieldCheck, label: 'Management Protocol', desc: 'Optimized for registry governance, structural updates, and user orchestration.' };
+    }
+  };
+
+  const modeInfo = getModeInfo();
+
   return (
     <div className="space-y-10 sm:space-y-12 animate-in fade-in duration-700 h-full flex flex-col">
       
@@ -119,7 +131,7 @@ export function DashboardWorkstation() {
                 Intelligence Hub
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-none">
-                {appSettings?.appMode || 'STANDARD'} WORKSTATION
+                {mode.toUpperCase()} WORKSTATION
               </p>
             </div>
           </div>
@@ -149,6 +161,25 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
+      {/* SYSTEM PROTOCOL HEADER */}
+      <div className="px-1">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10 rounded-[3rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl shadow-primary/5 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
+            <modeInfo.icon className="h-40 w-40 text-primary" />
+          </div>
+          <div className="flex items-center gap-8 relative z-10 text-center md:text-left flex-col md:flex-row">
+            <div className="p-6 bg-primary rounded-[2rem] shadow-2xl shadow-primary/30">
+              <modeInfo.icon className="h-10 w-10 text-black stroke-[2.5]" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{modeInfo.label}</h3>
+              <p className="text-xs font-medium text-muted-foreground italic leading-relaxed max-w-xl">{modeInfo.desc}</p>
+            </div>
+          </div>
+          <Badge className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-full shadow-lg relative z-10">Live Registry Protocol</Badge>
+        </motion.div>
+      </div>
+
       <div className="flex-1 min-h-0">
         <div className="space-y-16 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-32">
           
@@ -165,20 +196,23 @@ export function DashboardWorkstation() {
               </div>
               <Card className="bg-card border-border rounded-[2.5rem] overflow-hidden shadow-2xl">
                 <CardContent className="p-6 space-y-3">
-                  {isAdmin && (
-                    <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 group">
-                      <FileUp className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Import Assets
-                    </Button>
-                  )}
-                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
-                    <FolderOpen className="h-4 w-4 text-primary" /> Asset Hub
+                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 group">
+                    <FolderOpen className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Asset Hub
                   </Button>
-                  <Button onClick={() => setActiveView('GROUPS')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
-                    <LayoutGrid className="h-4 w-4 text-primary" /> Manage Folders
+                  <Button onClick={() => { setGroupsViewMode('category'); setActiveView('GROUPS'); }} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                    <LayoutGrid className="h-4 w-4 text-primary" /> Browse Folders
+                  </Button>
+                  <Button onClick={() => { setGroupsViewMode('condition'); setActiveView('GROUPS'); }} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                    <Activity className="h-4 w-4 text-primary" /> Asset Conditions
                   </Button>
                   <Button onClick={() => setActiveView('ANOMALIES')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
                     <SearchCode className="h-4 w-4 text-primary" /> Pattern Anomalies
                   </Button>
+                  {isAdmin && (
+                    <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5">
+                      <Settings className="h-4 w-4 text-primary" /> System Settings
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>

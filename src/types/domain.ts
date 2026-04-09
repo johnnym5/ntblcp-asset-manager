@@ -25,7 +25,6 @@ export type WorkstationView =
   | 'REGISTRY' 
   | 'GROUPS'
   | 'IMPORT' 
-  | 'VERIFY' 
   | 'REPORTS' 
   | 'ALERTS' 
   | 'AUDIT_LOG' 

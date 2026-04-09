@@ -6,7 +6,7 @@
  * Phase 1107: Removed redundant group re-calculation to fix rendering error.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -66,13 +66,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const ITEMS_PER_PAGE = 24;
 
 export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
-  const { assets, searchTerm, headers, refreshRegistry, appSettings } = useAppState();
+  const { assets, searchTerm, headers, refreshRegistry, appSettings, groupsViewMode, setGroupsViewMode } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  // UI State
-  const [groupMode, setGroupMode] = useState<'category' | 'condition'>('category');
+  // UI State - initialized from context view mode preference
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -157,7 +156,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
             )}
             <div className="space-y-0.5">
               <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">
-                {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Folders'}
+                {selectedGroup ? (selectedSubgroup || selectedGroup) : groupsViewMode === 'condition' ? 'Asset Conditions' : 'Browse Folders'}
               </h2>
               <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
                 {selectedGroup ? 'NAVIGATING CONTAINER' : 'STRUCTURAL HUB'}
@@ -168,16 +167,16 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
           {!selectedGroup && (
             <div className="bg-muted/30 p-1 rounded-xl border border-border shadow-inner backdrop-blur-xl flex">
               <button 
-                onClick={() => setGroupMode('category')}
-                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-muted-foreground hover:text-foreground")}
+                onClick={() => setGroupsViewMode('category')}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupsViewMode === 'category' ? "bg-primary text-black shadow-lg" : "text-muted-foreground hover:text-foreground")}
               >
-                Groups
+                Folders
               </button>
               <button 
-                onClick={() => setGroupMode('condition')}
-                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-muted-foreground hover:text-foreground")}
+                onClick={() => setGroupsViewMode('condition')}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupsViewMode === 'condition' ? "bg-primary text-black shadow-lg" : "text-muted-foreground hover:text-foreground")}
               >
-                Condition
+                Conditions
               </button>
             </div>
           )}
@@ -198,7 +197,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                     onClick={() => { setSelectedSubgroup(sg === selectedSubgroup ? null : sg); setCurrentPage(1); }}
                     className={cn(
                       "w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all",
-                      selectedSubgroup === sg ? "bg-primary border-primary text-black" : "bg-card border-border hover:border-primary/20"
+                      selectedSubgroup === sg ? "bg-primary border-primary text-black shadow-xl" : "bg-card border-border hover:border-primary/20"
                     )}
                   >
                     <span className="text-[10px] font-black uppercase tracking-tight truncate pr-2">{sg}</span>
@@ -228,14 +227,14 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
 
               {totalPages > 1 && (
                 <div className="mt-4 self-center bg-background/80 border border-border rounded-full px-4 py-1.5 flex items-center gap-4 backdrop-blur-xl">
-                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5"><ChevronLeft className="h-4 w-4" /></button>
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-4 w-4" /></button>
                   <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Page {currentPage} of {totalPages}</span>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5"><ChevronRight className="h-4 w-4" /></button>
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-4 w-4" /></button>
                 </div>
               )}
             </div>
           </div>
-        ) : groupMode === 'category' ? (
+        ) : groupsViewMode === 'category' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {Object.entries(tree).map(([name, data]) => (
               <Card 
@@ -248,7 +247,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                     <div className="p-2 bg-primary/10 rounded-xl"><Boxes className="h-5 w-5 text-primary" /></div>
                     <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate max-w-[120px]">{name}</h3>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-transform" />
                 </div>
                 <div className="px-5 pb-5">
                   <p className="text-3xl font-black tracking-tighter text-foreground">{data.count}</p>
@@ -267,7 +266,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                   if (groupAssets.length === 0 && group !== 'Good') return null;
 
                   return (
-                    <AccordionItem key={group} value={group} className={cn("border-2 rounded-[2rem] overflow-hidden bg-card/30", GROUP_BG_COLORS[group])}>
+                    <AccordionItem key={group} value={group} className={cn("border-2 rounded-[2rem] overflow-hidden bg-card/30 transition-all", GROUP_BG_COLORS[group])}>
                       <AccordionTrigger className="px-6 py-4 hover:no-underline">
                         <div className="flex items-center gap-4">
                           <div className={cn("p-2 rounded-lg", GROUP_BG_COLORS[group])}><Boxes className={cn("h-5 w-5", GROUP_COLORS[group])} /></div>
