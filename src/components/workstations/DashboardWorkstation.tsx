@@ -4,6 +4,7 @@
  * @fileOverview Intelligence Hub - Executive Overview.
  * Phase 1507: Prioritized At-a-Glance and locked Verification issues to Verification Mode.
  * Phase 1508: Corrected all missing icon references and prioritized carousels at top.
+ * Phase 1509: Integrated Operational Tools into the Protocol Badge and removed dedicated section.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -41,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { motion, AnimatePresence } from 'framer-motion';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
+import { TactileMenu } from '@/components/TactileMenu';
 
 export function DashboardWorkstation() {
   const { 
@@ -78,7 +80,7 @@ export function DashboardWorkstation() {
       const isUnverified = mode === 'verification' && a.status !== 'VERIFIED';
       
       const isBadCondition = ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '');
-      const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() !== '';
+      const hasAssetId = !!a.assetIdCode && a.assetIdCode !== 'N/A' && a.assetIdCode.trim() === '';
       
       const cat = (a.category || '').toLowerCase();
       const isVehicle = cat.includes('motor') || cat.includes('vehicle');
@@ -243,7 +245,7 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 2. MODE PROTOCOL HEADER - BELOW CAROUSELS */}
+      {/* 2. MODE PROTOCOL HEADER - TRIGGERS OPERATIONAL TOOLS */}
       <div className="px-1">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 sm:p-10 rounded-[3rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl shadow-primary/5 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -259,13 +261,29 @@ export function DashboardWorkstation() {
             </div>
           </div>
           <div className="flex items-center gap-3 relative z-10">
-            <Badge className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-full shadow-lg border-2 border-black">LIVE REGISTRY PROTOCOL</Badge>
+            <TactileMenu 
+              title="Operational Tools"
+              options={[
+                { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+                { label: 'Browse Folders', icon: LayoutGrid, onClick: () => { setGroupsViewMode('category'); setActiveView('GROUPS'); } },
+                { label: 'Asset Conditions', icon: Activity, onClick: () => { setGroupsViewMode('condition'); setActiveView('GROUPS'); } },
+                { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+                ...(isAdmin ? [{ label: 'System Settings', icon: Settings, onClick: () => setActiveView('SETTINGS') }] : [])
+              ]}
+            >
+              <Badge 
+                onClick={() => setActiveView('REGISTRY')}
+                className="cursor-pointer bg-primary text-black font-black uppercase text-[10px] tracking-widest px-6 h-10 rounded-full shadow-lg border-2 border-black hover:scale-105 transition-transform active:scale-95"
+              >
+                LIVE REGISTRY PROTOCOL
+              </Badge>
+            </TactileMenu>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={refreshRegistry} disabled={isSyncing} className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 transition-all">
+                  <button onClick={refreshRegistry} disabled={isSyncing} className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center">
                     <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                  </Button>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>Re-sync protocol rules</TooltipContent>
               </Tooltip>
@@ -274,39 +292,9 @@ export function DashboardWorkstation() {
         </motion.div>
       </div>
       
-      {/* 3. ANALYTICS & TOOLS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-8">
-          <AssetSummaryDashboard />
-        </div>
-        
-        <div className="lg:col-span-4 space-y-6">
-          <div className="flex items-center gap-2 px-1">
-            <Zap className="h-3 w-3 text-primary" />
-            <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Operational Tools</h3>
-          </div>
-          <Card className="bg-card border-border rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <CardContent className="p-6 space-y-3">
-              <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 group hover:border-primary/40 transition-all">
-                <FolderOpen className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Asset Hub
-              </Button>
-              <Button onClick={() => { setGroupsViewMode('category'); setActiveView('GROUPS'); }} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 hover:border-primary/40 transition-all">
-                <LayoutGrid className="h-4 w-4 text-primary" /> Browse Folders
-              </Button>
-              <Button onClick={() => { setGroupsViewMode('condition'); setActiveView('GROUPS'); }} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 hover:border-primary/40 transition-all">
-                <Activity className="h-4 w-4 text-primary" /> Asset Conditions
-              </Button>
-              <Button onClick={() => setActiveView('ANOMALIES')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 hover:border-primary/40 transition-all">
-                <SearchCode className="h-4 w-4 text-primary" /> Pattern Anomalies
-              </Button>
-              {isAdmin && (
-                <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-5 hover:border-primary/40 transition-all">
-                  <Settings className="h-4 w-4 text-primary" /> System Settings
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {/* 3. ANALYTICS SECTION */}
+      <div className="px-1">
+        <AssetSummaryDashboard />
       </div>
 
       {/* 4. SYSTEM GRID */}
