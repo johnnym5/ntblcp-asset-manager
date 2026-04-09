@@ -2,12 +2,11 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 1500: Optimized folder card typography for full name visibility.
- * Phase 1501: Enhanced high-density grid for professional desktop viewing.
- * Phase 1502: Selection bar now strictly visibility-gated based on selection counts.
+ * Phase 1505: Implemented independent folder template resolution.
+ * Phase 1506: Hardened selection bar visibility gating.
  */
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -43,7 +42,7 @@ import { RegistryTable } from '@/components/registry/RegistryTable';
 import AssetForm from '@/components/asset-form';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
-import { transformAssetToRecord } from '@/lib/registry-utils';
+import { transformAssetToRecord, normalizeHeaderName } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
 import { enqueueMutation } from '@/offline/queue';
 import { Input } from '@/components/ui/input';
@@ -74,15 +73,15 @@ import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-bat
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import type { Asset } from '@/types/domain';
+import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
-import { TactileMenu } from '@/components/TactileMenu';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     filteredAssets,
-    headers,
-    setHeaders,
+    headers: workstationHeaders,
+    setHeaders: setWorkstationHeaders,
     refreshRegistry,
     appSettings,
     setAppSettings,
@@ -153,6 +152,35 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
 
+  /**
+   * DYNAMIC HEADER RESOLUTION
+   * Syncs the workstation headers with the folder's template when explored.
+   */
+  useEffect(() => {
+    if (selectedCategories.length === 1 && activeGrant) {
+      const cat = selectedCategories[0];
+      const def = activeGrant.sheetDefinitions[cat];
+      if (def && def.displayFields) {
+        const folderHeaders: RegistryHeader[] = def.displayFields.map((f, i) => ({
+          id: `h-${f.key}-${i}`,
+          rawName: f.label,
+          displayName: f.label,
+          normalizedName: normalizeHeaderName(f.label),
+          visible: true,
+          table: f.table,
+          quickView: f.quickView,
+          inChecklist: !!f.inChecklist,
+          editable: true,
+          filterable: true,
+          sortEnabled: true,
+          dataType: 'text',
+          orderIndex: i
+        }));
+        setWorkstationHeaders(folderHeaders);
+      }
+    }
+  }, [selectedCategories, activeGrant, setWorkstationHeaders]);
+
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
     filteredAssets.forEach(a => {
@@ -178,7 +206,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
     
     if (sortKey) {
-      const sortHeader = headers.find(h => h.id === sortKey);
+      const sortHeader = workstationHeaders.find(h => h.id === sortKey);
       results.sort((a, b) => {
         const getVal = (item: Asset) => {
           if (!sortHeader) return "";
@@ -194,7 +222,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
     }
     return results;
-  }, [filteredAssets, sortKey, sortDir, selectedCategories, headers]);
+  }, [filteredAssets, sortKey, sortDir, selectedCategories, workstationHeaders]);
 
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / (itemsPerPage as number)), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * (itemsPerPage as number), currentPage * (itemsPerPage as number)), [processedAssets, currentPage, itemsPerPage]);
@@ -248,7 +276,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!isAdmin || !appSettings) return;
     setIsProcessing(true);
     try {
-      const updatedSettings = { ...appSettings, globalHeaders: headers };
+      const updatedSettings = { ...appSettings, globalHeaders: workstationHeaders };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
@@ -354,7 +382,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     const selectedAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
     if (selectedAssets.length === 0) return;
     try {
-      await ExcelService.exportRegistry(selectedAssets, headers);
+      await ExcelService.exportRegistry(selectedAssets, workstationHeaders);
       addNotification({ title: "Export Complete", variant: "success" });
     } catch (e) {
       addNotification({ title: "Export Failed", variant: "destructive" });
@@ -494,7 +522,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat])} className="h-5 w-5 rounded-lg border-border" />
                   </div>
                   
-                  {/* Optimized Folder Title Visibility */}
                   <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-tight mb-4 min-h-[2.5em] line-clamp-3 overflow-hidden" title={cat}>
                     {cat}
                   </h3>
@@ -526,7 +553,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   {viewMode === 'grid' ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <RegistryCard 
-                        record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                        record={transformAssetToRecord(asset, workstationHeaders, appSettings?.sourceBranding)} 
                         onInspect={handleEditAsset} 
                         selected={selectedAssetIds.has(asset.id)} 
                         onToggleSelect={handleToggleSelect} 
@@ -536,7 +563,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     </motion.div>
                   )) : (
                     <RegistryTable 
-                      records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                      records={paginatedAssets.map(a => transformAssetToRecord(a, workstationHeaders, appSettings?.sourceBranding))} 
                       onInspect={handleEditAsset} 
                       selectedIds={selectedAssetIds} 
                       onToggleSelect={handleToggleSelect} 
@@ -594,7 +621,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <div className="p-8">
                   {processedAssets.find(a => a.id === expandedAssetId) && (
                     <AssetDossier 
-                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, headers, appSettings?.sourceBranding)} 
+                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, workstationHeaders, appSettings?.sourceBranding)} 
                       onEdit={handleEditAsset}
                       onQuickUpdate={handleQuickUpdate}
                       isHeaderEditingMode={isHeaderEditingMode}
@@ -647,7 +674,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </AnimatePresence>
 
-      {/* 5. Modals & Dialogs */}
       <AssetForm 
         isOpen={isFormOpen} 
         onOpenChange={setIsFormOpen} 
@@ -697,7 +723,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <SortDrawer 
         isOpen={isSortOpen} 
         onOpenChange={setIsSortOpen} 
-        headers={headers} 
+        headers={workstationHeaders} 
         sortBy={sortKey} 
         sortDirection={sortDir} 
         onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 

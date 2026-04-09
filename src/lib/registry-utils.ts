@@ -1,12 +1,11 @@
 /**
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
- * Phase 808: Added normalization for prices and synthetic additions headers.
- * Phase 809: Added Chassis and Engine number support for vehicles.
+ * Phase 810: Hardened for independent folder templates and fuzzy property mapping.
  */
 
 import type { Asset } from "@/types/domain";
-import type { RegistryHeader, AssetRecord, RegistryFieldValue, DataType, RegistryPreset } from "@/types/registry";
+import type { RegistryHeader, AssetRecord, RegistryFieldValue, DataType } from "@/types/registry";
 import { getFuzzySignature } from "./utils";
 
 /**
@@ -52,49 +51,26 @@ export function getColorForSource(source: string, branding?: Record<string, stri
 }
 
 /**
- * Canonical Registry Headers with Grouping.
+ * Baseline Generic Headers. 
+ * Note: These are used as fallbacks only. Folder-specific templates override these.
  */
 export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">[] = [
-  // Identity
   { rawName: "S/N", displayName: "S/N", normalizedName: "sn", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", locked: true, group: "Identity" },
   { rawName: "Asset Description", displayName: "Asset Description", normalizedName: "asset_description", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
   { rawName: "Asset ID Code", displayName: "Asset ID Code", normalizedName: "asset_id_code", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Serial Number", displayName: "Serial Number", normalizedName: "serial_number", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  
-  // Vehicle Specific
-  { rawName: "Chassis No", displayName: "Chassis No", normalizedName: "chassis_no", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Engine No", displayName: "Engine No", normalizedName: "engine_no", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-
-  // Location
   { rawName: "Location", displayName: "Location", normalizedName: "location", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
-  { rawName: "Assignee (Location)", displayName: "Assignee (Location)", normalizedName: "assignee_location", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
-  
-  // Classification
-  { rawName: "Asset Class", displayName: "Asset Class", normalizedName: "asset_class", visible: true, table: false, quickView: false, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
-  { rawName: "Manufacturer", displayName: "Manufacturer", normalizedName: "manufacturer", visible: true, table: false, quickView: false, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
-  { rawName: "Model Number", displayName: "Model Number", normalizedName: "model_number", visible: true, table: false, quickView: false, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Classification" },
-  
-  // Procurement
-  { rawName: "Suppliers", displayName: "Suppliers", normalizedName: "suppliers", visible: true, table: false, quickView: false, inChecklist: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
-  { rawName: "Date Purchased or Received", displayName: "Date Received", normalizedName: "date_purchased_received", visible: true, table: false, quickView: false, inChecklist: false, editable: true, filterable: true, sortEnabled: true, dataType: "date", group: "Procurement" },
-  { rawName: "Purchase price (Naira)", displayName: "Price (NGN)", normalizedName: "purchase_price_ngn", visible: true, table: false, quickView: false, inChecklist: false, editable: true, filterable: true, sortEnabled: true, dataType: "currency", group: "Procurement" },
-  
-  // Condition
   { rawName: "Condition", displayName: "Condition", normalizedName: "condition", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition" },
-  { rawName: "Remarks", displayName: "Remarks", normalizedName: "remarks", visible: true, table: false, quickView: false, inChecklist: true, editable: true, filterable: true, sortEnabled: false, dataType: "text", group: "Condition" },
-
-  // Metadata & Hierarchy
-  { rawName: "Source Sheet", displayName: "Source Sheet", normalizedName: "source_sheet", visible: true, table: false, quickView: false, inChecklist: false, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Metadata" },
-  { rawName: "Row Number", displayName: "Row Number", normalizedName: "row_number", visible: true, table: false, quickView: false, inChecklist: false, editable: false, filterable: true, sortEnabled: true, dataType: "number", group: "Metadata" },
 ];
 
 /**
  * Transforms a Domain Asset to an AssetRecord for the high-density grid.
+ * Dynamically resolves values based on the PROVIDED headers (the folder's template).
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
-    let rawValue: any = "";
+    let rawValue: any = undefined;
     
+    // 1. Resolve from Core Domain Properties
     switch(header.normalizedName) {
       case "sn": rawValue = asset.sn; break;
       case "location": rawValue = asset.location; break;
@@ -113,16 +89,18 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "date_purchased_received": rawValue = asset.purchaseDate; break;
       case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
-      default:
-        rawValue = "";
     }
 
-    const isActuallyEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "nil" || String(rawValue).trim().toLowerCase() === "n/a";
+    // 2. Fuzzy Discovery Pulse: If core prop is empty, hunt in metadata
+    const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a";
     
-    if (isActuallyEmpty) {
+    if (isEmpty) {
       const meta = asset.metadata || {};
-      rawValue = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName] || "";
-      if (!rawValue) {
+      // Exact Match
+      rawValue = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName];
+      
+      // Fuzzy Fingerprint Match
+      if (rawValue === undefined || rawValue === null) {
         const fuzzyHeader = getFuzzySignature(header.displayName);
         const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
         if (matchedKey) rawValue = meta[matchedKey];
@@ -131,7 +109,7 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
 
     return {
       headerId: header.id,
-      rawValue,
+      rawValue: rawValue ?? "",
       displayValue: formatDisplayValue(rawValue, header.dataType)
     };
   });

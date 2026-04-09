@@ -39,7 +39,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ASSET_CONDITIONS } from '@/lib/constants';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const DetailField = ({ 
   headerId, 
@@ -228,7 +228,7 @@ export function AssetDossier({
         <ScrollArea className="flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2">
             {record.fields.map((field) => {
-              const header = headers.find(h => h.id === field.headerId);
+              const header = record.headers.find(h => h.id === field.headerId);
               if (!header) return null;
               return (
                 <DetailField 
@@ -266,6 +266,7 @@ export function AssetDossier({
               </div>
             </div>
           </div>
+          <ScrollBar />
         </ScrollArea>
       </div>
     </div>
