@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetDossier - The High-Fidelity Technical Registry Node.
- * Phase 1200: Simplified naming scheme (Asset Details) and production hardening.
+ * Phase 1201: Implemented permanent header renaming within Asset Details.
  */
 
 import React from 'react';
@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppState } from '@/contexts/app-state-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from '@/components/ui/input';
 
 const DetailField = ({ 
   headerId, 
@@ -39,7 +40,8 @@ const DetailField = ({
   icon: Icon, 
   isSyncing, 
   isEditing,
-  onToggleFlag 
+  onToggleFlag,
+  onRename
 }: { 
   headerId: string,
   label: string, 
@@ -47,7 +49,8 @@ const DetailField = ({
   icon?: any, 
   isSyncing?: boolean,
   isEditing?: boolean,
-  onToggleFlag?: (flag: 'table' | 'quickView' | 'inChecklist') => void
+  onToggleFlag?: (flag: 'table' | 'quickView' | 'inChecklist') => void,
+  onRename?: (newName: string) => void
 }) => {
   const { headers } = useAppState();
   const header = headers.find(h => h.id === headerId);
@@ -96,9 +99,17 @@ const DetailField = ({
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-40 group-hover/field:text-primary transition-colors">
-          {label}
-        </span>
+        {isEditing ? (
+          <Input 
+            value={label} 
+            onChange={(e) => onRename?.(e.target.value)}
+            className="h-6 bg-transparent border-none p-0 text-[7px] font-black uppercase tracking-[0.25em] text-primary focus-visible:ring-0 shadow-none"
+          />
+        ) : (
+          <span className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-40 group-hover/field:text-primary transition-colors">
+            {label}
+          </span>
+        )}
         {isSyncing && <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse" />}
       </div>
       <div className="flex items-center gap-2">
@@ -129,6 +140,10 @@ export function AssetDossier({
 
   const handleToggleHeaderFlag = (headerId: string, flag: 'table' | 'quickView' | 'inChecklist') => {
     setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, [flag]: !h[flag] } : h));
+  };
+
+  const handleRenameHeader = (headerId: string, newName: string) => {
+    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, displayName: newName } : h));
   };
 
   const visibleFields = isHeaderEditingMode 
@@ -180,6 +195,7 @@ export function AssetDossier({
                   isSyncing={syncStatus === 'local'}
                   isEditing={isHeaderEditingMode}
                   onToggleFlag={(flag) => handleToggleHeaderFlag(header.id, flag)}
+                  onRename={(newName) => handleRenameHeader(header.id, newName)}
                 />
               );
             })}

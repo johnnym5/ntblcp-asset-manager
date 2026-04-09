@@ -3,7 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to clear business naming and context-aware selection.
- * Phase 1350: Fixed isFilterOpen reference error and standardized naming.
+ * Phase 1351: Implemented Save Layout logic for permanent header persistence.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -36,7 +36,8 @@ import {
   Maximize2,
   Printer,
   GitMerge,
-  ArrowUpRight
+  ArrowUpRight,
+  Save
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/components/category-batch-edit-form';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { storage } from '@/offline/storage';
 import type { Asset } from '@/types/domain';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
@@ -87,6 +90,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setHeaders,
     refreshRegistry,
     appSettings,
+    setAppSettings,
     sortKey,
     setSortKey,
     sortDir,
@@ -109,22 +113,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSearchTerm,
     manualDownload,
     manualUpload,
-    isSyncing,
-    locationOptions,
-    assigneeOptions,
-    conditionOptions,
-    statusOptions,
-    categoryOptions,
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
-    selectedConditions,
-    setSelectedConditions,
-    missingFieldFilter,
-    setMissingFieldFilter
+    isSyncing
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -221,6 +210,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const handleEditAsset = (id: string) => {
     setSelectedAssetIdForEdit(id);
     setIsFormOpen(true);
+  };
+
+  const handleSaveGlobalHeaders = async () => {
+    if (!isAdmin || !appSettings) return;
+    setIsProcessing(true);
+    try {
+      const updatedSettings = { ...appSettings, globalHeaders: headers };
+      if (isOnline) await FirestoreService.updateSettings(updatedSettings);
+      await storage.saveSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      setIsHeaderEditingMode(false);
+      addNotification({ title: "Field Layout Saved", description: "The registry arrangement is now permanent.", variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Save Failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSaveAssetBatch = async (data: BatchUpdateData) => {
@@ -463,6 +469,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h3 className="text-xl font-black uppercase text-foreground leading-none">Asset Details</h3>
                 </div>
                 <div className="flex items-center gap-3">
+                  {isHeaderEditingMode && isAdmin && (
+                    <Button 
+                      onClick={handleSaveGlobalHeaders}
+                      disabled={isProcessing}
+                      className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
+                    >
+                      {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      Save Layout
+                    </Button>
+                  )}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
