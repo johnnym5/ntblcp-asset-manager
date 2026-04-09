@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Dashboard Workstation - Intelligence Hub.
- * Normalized naming scheme and business-focused shortcuts.
+ * Optimized for high-fidelity inventory monitoring.
  */
 
 import React from 'react';
@@ -142,7 +142,7 @@ export function DashboardWorkstation() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 px-1">
                   <Activity className="h-3 w-3 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Global Status</h3>
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Inventory Pulse</h3>
                 </div>
                 <AssetSummaryDashboard />
               </div>
@@ -161,14 +161,14 @@ export function DashboardWorkstation() {
                 </div>
                 <CardContent className="p-6 space-y-3">
                   <TactileMenu
-                    title="System Configuration"
+                    title="Configuration"
                     options={[
-                      { label: 'App Settings', icon: Palette, onClick: () => setActiveView('SETTINGS') },
-                      { label: 'Manage Users', icon: Users, onClick: () => setActiveView('USERS') }
+                      { label: 'Preferences', icon: Palette, onClick: () => setActiveView('SETTINGS') },
+                      { label: 'User Directory', icon: Users, onClick: () => setActiveView('USERS') }
                     ]}
                   >
                     <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group">
-                      <Settings className="h-4 w-4 text-primary group-hover:rotate-90 transition-transform" /> System Settings
+                      <Settings className="h-4 w-4 text-primary group-hover:rotate-90 transition-transform" /> Preferences
                     </Button>
                   </TactileMenu>
 
@@ -176,11 +176,11 @@ export function DashboardWorkstation() {
                     title="Registry Actions"
                     options={[
                       { label: 'Import Excel', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-                      { label: 'Browse Records', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
+                      { label: 'Browse Assets', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
                     ]}
                   >
                     <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
-                      <FolderOpen className="h-4 w-4 text-primary" /> Browse All Records
+                      <FolderOpen className="h-4 w-4 text-primary" /> Browse Assets
                     </Button>
                   </TactileMenu>
                   
@@ -234,8 +234,8 @@ export function DashboardWorkstation() {
               
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-1">
-                  <History className="h-3.5 w-3.5 text-primary" />
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Data Synchronization</h3>
+                  <Activity className="h-3.5 w-3.5 text-primary" />
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Synchronization Status</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-6">

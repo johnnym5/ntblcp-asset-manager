@@ -2,7 +2,8 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Normalized naming scheme and restricted access controls.
+ * Implements seamless workstation transitions and multi-function navigation.
+ * Phase 1400: Added long-press workstation menu to the back button.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -34,7 +35,12 @@ import {
   Trash2,
   FileJson,
   Zap,
-  RefreshCw
+  RefreshCw,
+  FolderOpen,
+  FileText,
+  ShieldAlert,
+  SearchCode,
+  Monitor
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -118,6 +124,8 @@ export default function SPAHub() {
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const isAdmin = userProfile?.isAdmin;
+
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -126,13 +134,13 @@ export default function SPAHub() {
       case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return appSettings?.appMode === 'verification' ? <VerifyWorkstation /> : <DashboardWorkstation />;
+      case 'VERIFY': return <VerifyWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
-  }, [activeView, appSettings?.appMode]);
+  }, [activeView]);
 
   useEffect(() => {
     if (profileSetupComplete && sessionStorage.getItem('assetain-fresh-login') === 'true') setIsWelcomeOpen(true);
@@ -163,18 +171,36 @@ export default function SPAHub() {
         <div className="flex items-center gap-4 sm:gap-8">
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
-              <motion.button initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse">
-                <ChevronLeft className="h-5 w-5" />
-              </motion.button>
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
+                <TactileMenu 
+                  title="Navigate To"
+                  options={[
+                    { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+                    { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+                    { label: 'Verification', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') },
+                    { label: 'Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
+                    { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
+                    { label: 'Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+                    { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') },
+                    ...(isAdmin ? [
+                      { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+                    ] : [])
+                  ]}
+                >
+                  <button onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse shadow-sm">
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                </TactileMenu>
+              </motion.div>
             )}
           </AnimatePresence>
 
           <TactileMenu 
-            title="Navigation"
+            title="Registry Quick-Jump"
             options={[
-              { label: 'Go to Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-              { label: 'Open Asset Hub', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              { label: 'View Audit Ledger', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
+              { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+              { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
+              { label: 'View History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -197,11 +223,11 @@ export default function SPAHub() {
 
         <div className="flex items-center gap-3 sm:gap-5">
           <TactileMenu
-            title="Synchronize"
+            title="Synchronize Data"
             options={[
-              { label: 'Download Data', icon: Download, onClick: manualDownload },
-              { label: 'Upload Data', icon: Upload, onClick: manualUpload },
-              { label: 'Refresh Registry', icon: RefreshCw, onClick: refreshRegistry }
+              { label: 'Download Updates', icon: Download, onClick: manualDownload },
+              { label: 'Upload Changes', icon: Upload, onClick: manualUpload },
+              { label: 'Force Parity Sync', icon: RefreshCw, onClick: refreshRegistry }
             ]}
           >
             <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
@@ -211,10 +237,10 @@ export default function SPAHub() {
           </TactileMenu>
 
           <TactileMenu
-            title="Network Status"
+            title="Network Logic"
             options={[
-              { label: 'Switch to Online', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
-              { label: 'Switch to Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
+              { label: 'Connect to Cloud', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
+              { label: 'Disconnect (Offline)', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
             ]}
           >
             <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
@@ -224,11 +250,11 @@ export default function SPAHub() {
           </TactileMenu>
           
           <TactileMenu
-            title="Notifications"
+            title="System Alerts"
             options={[
               { label: 'Open Center', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
               { label: 'Mark as Read', icon: CheckCircle2, onClick: markAllAsRead },
-              { label: 'Clear All', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'Clear Archive', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
             <div className="relative">
@@ -252,7 +278,7 @@ export default function SPAHub() {
                 <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">App Settings</span></DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Preferences</span></DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
             </DropdownMenuContent>
@@ -266,8 +292,15 @@ export default function SPAHub() {
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
                 <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
-                  <AnimatePresence mode="wait">
-                    <motion.div key={activeView} initial={{ opacity: 0, scale: 0.99, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.99, y: -10 }} transition={{ duration: 0.25 }} className="h-full w-full">
+                  <AnimatePresence>
+                    <motion.div 
+                      key={activeView} 
+                      initial={{ opacity: 0, scale: 0.99, y: 10 }} 
+                      animate={{ opacity: 1, scale: 1, y: 0 }} 
+                      exit={{ opacity: 0, scale: 0.99, y: -10 }} 
+                      transition={{ duration: 0.2, ease: "easeOut" }} 
+                      className="h-full w-full"
+                    >
                       {CurrentWorkstation}
                     </motion.div>
                   </AnimatePresence>
