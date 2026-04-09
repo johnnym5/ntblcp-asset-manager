@@ -5,6 +5,7 @@
  * Phase 1500: Relocated Issue Scanner and At-a-Glance to the top.
  * Phase 1501: Expanded Issue Scanner logic to detect ID gaps and critical conditions.
  * Phase 1502: Optimized typography for desktop folder name visibility.
+ * Phase 1503: Resolved refreshRegistry ReferenceError.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -52,7 +53,8 @@ export function DashboardWorkstation() {
     isOnline,
     assets,
     headers,
-    setGroupsViewMode
+    setGroupsViewMode,
+    refreshRegistry
   } = useAppState();
   
   const { userProfile } = useAuth();
