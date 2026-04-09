@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview RegistryTable - High-Fidelity List Workstation.
- * Phase 1407: Integrated Verification Controls into the table layout.
+ * @fileOverview RegistryTable - Ground-up Professional List Workstation.
+ * Phase 1500: Rebuilt with a 12-column grid pulse for deterministic alignment.
+ * Phase 1501: Integrated inline high-speed verification controls with color-coding.
  */
 
 import React from 'react';
@@ -10,22 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { 
-  User,
-  Clock,
-  Edit3,
-  Tag,
-  MapPin,
-  Settings2,
-  Lock,
-  ChevronDown,
-  Globe,
+  Edit3, 
+  Tag, 
+  Globe, 
   CloudOff,
-  List,
-  ShieldCheck,
-  Database,
   Maximize2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -37,10 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppState } from '@/contexts/app-state-context';
-import { useAuth } from '@/contexts/auth-context';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLongPress } from '@/hooks/use-long-press';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 
@@ -56,7 +45,6 @@ interface RegistryTableProps {
 
 export function RegistryTable({ 
   records, 
-  onInspect, 
   selectedIds, 
   onToggleSelect, 
   onSelectAll,
@@ -64,152 +52,141 @@ export function RegistryTable({
   onQuickUpdate
 }: RegistryTableProps) {
   const { appSettings, headers: globalHeaders } = useAppState();
-  const isMobile = useIsMobile();
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isVerificationMode = appSettings?.appMode === 'verification';
 
-  const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
-
-  const tableHeaders = globalHeaders
-    .filter(h => h.table)
-    .filter(h => isVerificationMode || !VERIFICATION_KEYS.includes(h.normalizedName));
+  const tableHeaders = globalHeaders.filter(h => h.table);
 
   return (
-    <div className="space-y-4 pb-40 animate-in fade-in duration-700 w-full overflow-hidden">
-      <div className="flex items-center px-4 sm:px-8 py-4 sm:py-5 bg-card rounded-2xl border border-border mb-6 sticky top-0 z-30 shadow-2xl backdrop-blur-xl">
-        <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center">
+    <div className="w-full flex flex-col gap-3 pb-40">
+      {/* 1. Ground-up Header Pulse */}
+      <div className="sticky top-0 z-30 flex items-center h-14 bg-card border border-border rounded-xl px-6 shadow-xl backdrop-blur-3xl">
+        <div className="w-10 shrink-0 flex items-center justify-center">
           <Checkbox 
             checked={allSelected} 
             onCheckedChange={(v) => onSelectAll(!!v)} 
-            className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary"
+            className="h-5 w-5 rounded-md border-2 border-border data-[state=checked]:bg-primary"
           />
         </div>
         
-        <div className="flex-1 grid grid-cols-12 gap-4 sm:gap-6 ml-4 sm:ml-6 items-center">
-          {tableHeaders.slice(0, isVerificationMode ? 3 : 4).map((header, idx) => (
-            <div 
-              key={header.id} 
-              className={cn(
-                "text-[8px] sm:text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40",
-                idx === 0 ? "col-span-1" : idx === 1 ? "col-span-4" : idx === 2 ? "col-span-3" : "col-span-2"
-              )}
-            >
-              {header.displayName}
-            </div>
-          ))}
-          {isVerificationMode && (
-            <div className="col-span-6 flex gap-10">
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Verification Pulse</span>
-            </div>
+        <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
+          <div className="col-span-1 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">S/N</div>
+          <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Identification</div>
+          <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Registry Scope</div>
+          {isVerificationMode ? (
+            <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-primary">Field Assessment Pulse</div>
+          ) : (
+            <div className="col-span-4 text-right text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 pr-10">Actions</div>
           )}
-          {!isVerificationMode && <div className="col-span-2" />}
         </div>
       </div>
 
-      <div className="space-y-3">
+      {/* 2. Structured Data Rows */}
+      <div className="space-y-2">
         {records.map((record) => {
           const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
           const syncStatus = (record.rawRow as any).syncStatus || 'local';
           const isSelected = selectedIds.has(record.id);
-
-          const longPressProps = useLongPress(() => onToggleSelect(record.id));
-          const handleContextMenu = (e: React.MouseEvent) => {
-            e.preventDefault();
-            onToggleSelect(record.id);
-          };
+          const isVerified = status === 'VERIFIED';
 
           return (
             <div 
               key={record.id} 
               className={cn(
-                "border-2 rounded-[1.5rem] sm:rounded-[2rem] transition-all duration-500 overflow-hidden flex items-center group/item px-4 sm:px-8 py-3 cursor-pointer",
-                isSelected ? "border-primary/40 bg-primary/[0.02] shadow-2xl" : "border-border bg-card hover:border-primary/20"
+                "h-16 flex items-center px-6 rounded-2xl border-2 transition-all duration-300 group cursor-pointer",
+                isSelected ? "border-primary/40 bg-primary/[0.03] shadow-lg" : "border-border/40 bg-card hover:border-primary/20",
+                isVerificationMode && isVerified && !isSelected && "bg-green-500/[0.02] border-green-500/10",
+                isVerificationMode && !isVerified && !isSelected && "bg-red-500/[0.02] border-red-500/10"
               )}
               onClick={() => onToggleExpand(record.id)}
-              {...longPressProps}
-              onContextMenu={handleContextMenu}
             >
-              <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+              <div className="w-10 shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                 <Checkbox 
                   checked={isSelected} 
                   onCheckedChange={() => onToggleSelect(record.id)}
-                  className="h-5 w-5 sm:h-6 sm:w-6 rounded-full border-2 border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  className="h-5 w-5 rounded-full border-2 border-border data-[state=checked]:bg-primary"
                 />
               </div>
 
-              <div className="flex-1 grid grid-cols-12 gap-4 sm:gap-6 ml-4 sm:ml-6 items-center">
-                {tableHeaders.slice(0, isVerificationMode ? 3 : 4).map((header, idx) => {
-                  const field = record.fields.find(f => f.headerId === header.id);
-                  return (
-                    <div 
-                      key={header.id} 
-                      className={cn(
-                        "min-w-0 pr-2",
-                        idx === 0 ? "col-span-1" : idx === 1 ? "col-span-4" : idx === 2 ? "col-span-3" : "col-span-2"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "font-black tracking-tight truncate block uppercase",
-                          idx === 0 ? "text-[10px] font-mono text-muted-foreground/40" : "text-xs sm:text-sm text-foreground"
-                        )}>
-                          {idx === 0 ? `#${field?.displayValue || '---'}` : field?.displayValue || '---'}
-                        </span>
-                        {idx === 1 && (
-                          <div className={cn(
-                            "p-1 rounded-md border shrink-0",
-                            syncStatus === 'synced' ? "bg-green-500/10 border-green-500/20 text-green-600" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
-                          )}>
-                            {syncStatus === 'synced' ? <Globe className="h-2.5 w-2.5" /> : <CloudOff className="h-2.5 w-2.5" />}
-                          </div>
+              <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
+                {/* Col 1: S/N */}
+                <div className="col-span-1">
+                  <span className="text-[10px] font-mono font-black text-muted-foreground/40">{record.sn || '---'}</span>
+                </div>
+
+                {/* Col 2: Identification */}
+                <div className="col-span-4 flex items-center gap-3 min-w-0">
+                  <div className={cn(
+                    "p-1.5 rounded-lg border shrink-0",
+                    syncStatus === 'synced' ? "bg-green-500/5 border-green-500/20 text-green-600" : "bg-blue-500/5 border-blue-500/20 text-blue-600"
+                  )}>
+                    {syncStatus === 'synced' ? <Globe className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[13px] font-black uppercase text-foreground leading-none truncate">{String(record.rawRow.description || 'Untitled Asset')}</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {record.rawRow.assetIdCode || 'UNSET'}</span>
+                  </div>
+                </div>
+
+                {/* Col 3: Scope */}
+                <div className="col-span-3 min-w-0">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black uppercase text-foreground/80 truncate leading-none">{String(record.rawRow.location || 'Global')}</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter mt-1 truncate">{String(record.rawRow.custodian || 'Unassigned')}</span>
+                  </div>
+                </div>
+
+                {/* Col 4: Assessment / Actions */}
+                <div className="col-span-4" onClick={e => e.stopPropagation()}>
+                  {isVerificationMode ? (
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        size="sm" 
+                        onClick={() => onQuickUpdate?.(record.id, { status: isVerified ? 'UNVERIFIED' : 'VERIFIED' })}
+                        className={cn(
+                          "h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md",
+                          isVerified ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
                         )}
+                      >
+                        {isVerified ? <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> : <XCircle className="h-3.5 w-3.5 mr-1.5" />}
+                        {isVerified ? 'Verified' : 'Confirm'}
+                      </Button>
+
+                      <Select 
+                        value={String(record.rawRow.condition || '')} 
+                        onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
+                      >
+                        <SelectTrigger className="h-9 w-28 bg-muted/20 border-border/40 text-[9px] font-black uppercase rounded-xl">
+                          <SelectValue placeholder="Condition" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border-border">
+                          {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex-1 relative group/remark">
+                        <Input 
+                          placeholder="Remark..." 
+                          className="h-9 text-[9px] font-medium bg-muted/20 border-border/40 pr-8 rounded-xl focus-visible:ring-primary/20"
+                          value={String(record.rawRow.remarks || '')}
+                          onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
+                        />
+                        <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 opacity-20 group-hover/remark:opacity-40 transition-opacity pointer-events-none" />
                       </div>
                     </div>
-                  );
-                })}
-
-                {isVerificationMode ? (
-                  <div className="col-span-8 flex items-center gap-4 pl-4 border-l border-border/40" onClick={e => e.stopPropagation()}>
-                    <Button 
-                      size="sm" 
-                      onClick={() => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' })}
-                      className={cn(
-                        "h-8 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all",
-                        status === 'VERIFIED' ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
-                      )}
-                    >
-                      {status === 'VERIFIED' ? <CheckCircle2 className="h-3 w-3 mr-1.5" /> : <XCircle className="h-3 w-3 mr-1.5" />}
-                      {status === 'VERIFIED' ? 'Verified' : 'Unverified'}
-                    </Button>
-
-                    <Select 
-                      value={String(record.rawRow.condition || '')} 
-                      onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
-                    >
-                      <SelectTrigger className="h-8 w-32 bg-muted/30 border-border/40 text-[9px] font-black uppercase rounded-lg">
-                        <SelectValue placeholder="Condition" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-
-                    <div className="flex-1 max-w-[200px] relative group/remark">
-                      <Input 
-                        placeholder="Remarks..." 
-                        className="h-8 text-[9px] font-medium bg-muted/20 border-border/40 pr-8"
-                        value={String(record.rawRow.remarks || '')}
-                        onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
-                      />
-                      <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 opacity-20 group-hover/remark:opacity-40 transition-opacity" />
+                  ) : (
+                    <div className="flex justify-end pr-4">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 rounded-xl bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-40 group-hover/item:opacity-100"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="col-span-2 flex justify-end">
-                    <Maximize2 className="h-4 w-4 text-muted-foreground/20 group-hover/item:text-primary transition-colors" />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           );
