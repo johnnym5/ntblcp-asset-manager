@@ -5,6 +5,7 @@
  * Phase 1303: Category-Aware Technical ID Gap filtering (Chassis/Engine for vehicles vs Serial/Model for others).
  * Phase 1304: Corrected filteredAssets logic for diagnostic tokens to prevent "0 Assets" bug.
  * Phase 1305: Expanded diagnostic tokens for high-fidelity carousel pulses.
+ * Phase 1306: Added support for MISSING_MODEL token.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';

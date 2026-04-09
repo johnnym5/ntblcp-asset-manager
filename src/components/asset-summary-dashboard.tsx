@@ -4,40 +4,33 @@
  * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
  * Phase 1600: Transformed grid into a dynamic carousel.
  * Phase 1601: Added individual pulses for all technical headers, condition groups, and remarks.
- * Phase 1602: Resolved ReferenceError for missing icons (Info, Trash2, ClipboardCheck).
+ * Phase 1602: Removed count > 0 filter to show all headers as requested.
+ * Phase 1603: Added "Fidelity Nominal" state for zero-count pulses.
  */
 
 import React, { useMemo, useState } from 'react';
 import { 
-    Zap, 
-    Boxes, 
-    SearchCode, 
-    ShieldCheck,
-    Activity,
-    ShieldAlert,
     Fingerprint,
-    MapPin,
-    AlertCircle,
-    CheckCircle2,
-    Clock,
-    MessageSquare,
+    Tag,
+    SearchCode,
+    Info,
+    Truck,
+    Activity,
+    ShieldCheck,
     Wrench,
-    TrendingUp,
-    FileWarning,
+    AlertCircle,
+    Box,
+    Trash2,
+    MessageSquare,
+    ClipboardCheck,
     ChevronLeft,
     ChevronRight,
-    Tag,
-    Truck,
-    Box,
-    FileText,
-    Info,
-    Trash2,
-    ClipboardCheck,
-    ArrowRight
+    ArrowRight,
+    CheckCircle2
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,7 +70,7 @@ export function AssetSummaryDashboard() {
             // 1. Technical ID Gaps
             {
                 id: 'missing-id',
-                label: 'Missing Asset ID',
+                label: 'Asset ID Gaps',
                 description: 'Assets lacking a unique system tag or barcode ID.',
                 count: assets.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '').length,
                 icon: Fingerprint,
@@ -87,7 +80,7 @@ export function AssetSummaryDashboard() {
             },
             {
                 id: 'missing-sn',
-                label: 'Missing S/N',
+                label: 'S/N Gaps',
                 description: 'Assets without a primary short serial number.',
                 count: assets.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '').length,
                 icon: Tag,
@@ -97,7 +90,7 @@ export function AssetSummaryDashboard() {
             },
             {
                 id: 'missing-serial',
-                label: 'Missing Serial No',
+                label: 'Serial No Gaps',
                 description: 'Non-vehicle items missing manufacturer serials.',
                 count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '')).length,
                 icon: SearchCode,
@@ -107,7 +100,7 @@ export function AssetSummaryDashboard() {
             },
             {
                 id: 'missing-model',
-                label: 'Missing Model No',
+                label: 'Model No Gaps',
                 description: 'Assets missing specific model identification.',
                 count: assets.filter(a => !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '').length,
                 icon: Info,
@@ -118,7 +111,7 @@ export function AssetSummaryDashboard() {
             // 2. Vehicle Specifics
             {
                 id: 'missing-chassis',
-                label: 'Missing Chassis No',
+                label: 'Chassis No Gaps',
                 description: 'Vehicles/Motorbikes missing structural chassis pulses.',
                 count: assets.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A')).length,
                 icon: Truck,
@@ -128,7 +121,7 @@ export function AssetSummaryDashboard() {
             },
             {
                 id: 'missing-engine',
-                label: 'Missing Engine No',
+                label: 'Engine No Gaps',
                 description: 'Vehicles/Motorbikes missing engine ID pulses.',
                 count: assets.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A')).length,
                 icon: Activity,
@@ -204,14 +197,14 @@ export function AssetSummaryDashboard() {
                 description: 'Assets awaiting field verification pulse.',
                 count: assets.filter(a => a.status === 'UNVERIFIED').length,
                 icon: ClipboardCheck,
-                color: 'bg-blue-50',
+                color: 'bg-blue-500',
                 token: 'STATUS_UNVERIFIED',
                 variant: 'blue',
                 visible: mode === 'verification'
             }
         ];
 
-        return list.filter(p => p.visible !== false && p.count > 0);
+        return list.filter(p => p.visible !== false);
     }, [filteredAssets, mode]);
 
     const navigateTo = (token: string) => {
@@ -227,6 +220,11 @@ export function AssetSummaryDashboard() {
         if (scrollIndex > 0) setScrollIndex(i => i - 1);
     };
 
+    const activePulse = pulses[scrollIndex];
+    if (!activePulse) return null;
+
+    const isNominal = activePulse.count === 0;
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between px-1">
@@ -237,7 +235,7 @@ export function AssetSummaryDashboard() {
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="icon" onClick={prevPulse} disabled={scrollIndex === 0} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronLeft className="h-5 w-5" /></Button>
                     <div className="px-4 py-1.5 rounded-full bg-muted/50 border border-border shadow-inner">
-                        <span className="text-[10px] font-mono font-black">{scrollIndex + 1} / {pulses.length || 1}</span>
+                        <span className="text-[10px] font-mono font-black">{scrollIndex + 1} / {pulses.length}</span>
                     </div>
                     <Button variant="ghost" size="icon" onClick={nextPulse} disabled={scrollIndex === pulses.length - 1} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronRight className="h-5 w-5" /></Button>
                 </div>
@@ -245,77 +243,83 @@ export function AssetSummaryDashboard() {
 
             <div className="relative h-[280px]">
                 <AnimatePresence mode="wait">
-                    {pulses.length > 0 ? (
-                        <motion.div 
-                            key={pulses[scrollIndex].id}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="h-full"
-                        >
-                            <Card className={cn(
-                                "h-full rounded-[3rem] border-2 transition-all p-10 flex flex-col justify-between relative overflow-hidden",
-                                pulses[scrollIndex].variant === 'destructive' ? "bg-red-500/[0.03] border-red-500/20" :
-                                pulses[scrollIndex].variant === 'warning' ? "bg-amber-500/[0.03] border-amber-500/20" :
-                                pulses[scrollIndex].variant === 'success' ? "bg-green-500/[0.03] border-green-500/20" :
-                                pulses[scrollIndex].variant === 'blue' ? "bg-blue-500/[0.03] border-blue-500/20" :
-                                "bg-card border-border/40"
-                            )}>
-                                <div className="absolute top-0 right-0 p-12 opacity-5">
-                                    {React.createElement(pulses[scrollIndex].icon, { className: "h-40 w-40" })}
-                                </div>
+                    <motion.div 
+                        key={activePulse.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="h-full"
+                    >
+                        <Card className={cn(
+                            "h-full rounded-[3rem] border-2 transition-all p-10 flex flex-col justify-between relative overflow-hidden",
+                            isNominal ? "bg-green-500/[0.03] border-green-500/20" :
+                            activePulse.variant === 'destructive' ? "bg-red-500/[0.03] border-red-500/20" :
+                            activePulse.variant === 'warning' ? "bg-amber-500/[0.03] border-amber-500/20" :
+                            activePulse.variant === 'success' ? "bg-green-500/[0.03] border-green-500/20" :
+                            activePulse.variant === 'blue' ? "bg-blue-500/[0.03] border-blue-500/20" :
+                            "bg-card border-border/40"
+                        )}>
+                            <div className="absolute top-0 right-0 p-12 opacity-5">
+                                {React.createElement(activePulse.icon, { className: "h-40 w-40" })}
+                            </div>
 
-                                <div className="flex items-start justify-between relative z-10">
-                                    <div className="flex items-center gap-6">
-                                        <div className={cn("p-5 rounded-[1.5rem] shadow-inner", pulses[scrollIndex].color)}>
-                                            {React.createElement(pulses[scrollIndex].icon, { className: "h-8 w-8 text-white" })}
-                                        </div>
-                                        <div className="space-y-1">
-                                            <h4 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{pulses[scrollIndex].label}</h4>
-                                            <p className="text-xs font-medium text-muted-foreground italic max-w-sm">{pulses[scrollIndex].description}</p>
-                                        </div>
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="flex items-center gap-6">
+                                    <div className={cn(
+                                        "p-5 rounded-[1.5rem] shadow-inner transition-colors", 
+                                        isNominal ? "bg-green-600" : activePulse.color
+                                    )}>
+                                        {React.createElement(isNominal ? CheckCircle2 : activePulse.icon, { className: "h-8 w-8 text-white" })}
                                     </div>
-                                    <div className="text-right">
-                                        <span className={cn(
-                                            "text-6xl font-black tracking-tighter leading-none",
-                                            pulses[scrollIndex].variant === 'destructive' ? "text-red-600" :
-                                            pulses[scrollIndex].variant === 'warning' ? "text-amber-600" :
-                                            pulses[scrollIndex].variant === 'success' ? "text-green-600" :
-                                            pulses[scrollIndex].variant === 'blue' ? "text-blue-600" :
-                                            "text-foreground"
-                                        )}>
-                                            {pulses[scrollIndex].count}
-                                        </span>
-                                        <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40 mt-2">Active Pulses</p>
+                                    <div className="space-y-1">
+                                        <h4 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{activePulse.label}</h4>
+                                        <p className="text-xs font-medium text-muted-foreground italic max-w-sm">{activePulse.description}</p>
                                     </div>
                                 </div>
+                                <div className="text-right">
+                                    <span className={cn(
+                                        "text-6xl font-black tracking-tighter leading-none transition-colors",
+                                        isNominal ? "text-green-600" :
+                                        activePulse.variant === 'destructive' ? "text-red-600" :
+                                        activePulse.variant === 'warning' ? "text-amber-600" :
+                                        activePulse.variant === 'success' ? "text-green-600" :
+                                        activePulse.variant === 'blue' ? "text-blue-600" :
+                                        "text-foreground"
+                                    )}>
+                                        {activePulse.count}
+                                    </span>
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40 mt-2">Active Pulses</p>
+                                </div>
+                            </div>
 
-                                <div className="flex items-center justify-between pt-10 border-t border-dashed border-border/40 relative z-10">
-                                    <div className="flex items-center gap-4">
-                                        <Badge variant="outline" className="h-8 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-border/40 bg-muted/20">DIAGNOSTIC PULSE: {pulses[scrollIndex].token}</Badge>
-                                    </div>
-                                    <Button 
-                                        onClick={() => navigateTo(pulses[scrollIndex].token)}
-                                        className={cn(
-                                            "h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 gap-3",
-                                            pulses[scrollIndex].variant === 'destructive' ? "bg-red-600 text-white shadow-red-600/20" :
-                                            pulses[scrollIndex].variant === 'warning' ? "bg-amber-600 text-white shadow-amber-600/20" :
-                                            pulses[scrollIndex].variant === 'success' ? "bg-green-600 text-white shadow-green-600/20" :
-                                            pulses[scrollIndex].variant === 'blue' ? "bg-blue-600 text-white shadow-blue-600/20" :
-                                            "bg-primary text-black shadow-primary/20"
-                                        )}
-                                    >
-                                        Inspect Sub-Registry <ArrowRight className="h-4 w-4" />
-                                    </Button>
+                            <div className="flex items-center justify-between pt-10 border-t border-dashed border-border/40 relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <Badge variant="outline" className={cn(
+                                        "h-8 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest",
+                                        isNominal ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-border/40 bg-muted/20"
+                                    )}>
+                                        {isNominal ? 'FIDELITY NOMINAL' : `DIAGNOSTIC PULSE: ${activePulse.token}`}
+                                    </Badge>
                                 </div>
-                            </Card>
-                        </motion.div>
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center opacity-20 border-4 border-dashed rounded-[3rem]">
-                            <ShieldCheck className="h-16 w-16 mb-4" />
-                            <p className="text-sm font-black uppercase tracking-widest">Register Fidelity Nominal</p>
-                        </div>
-                    )}
+                                <Button 
+                                    onClick={() => navigateTo(activePulse.token)}
+                                    disabled={isNominal}
+                                    className={cn(
+                                        "h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 gap-3",
+                                        isNominal ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed" :
+                                        activePulse.variant === 'destructive' ? "bg-red-600 text-white shadow-red-600/20" :
+                                        activePulse.variant === 'warning' ? "bg-amber-600 text-white shadow-amber-600/20" :
+                                        activePulse.variant === 'success' ? "bg-green-600 text-white shadow-green-600/20" :
+                                        activePulse.variant === 'blue' ? "bg-blue-600 text-white shadow-blue-600/20" :
+                                        "bg-primary text-black shadow-primary/20"
+                                    )}
+                                >
+                                    {isNominal ? 'Audit Complete' : 'Inspect Sub-Registry'} 
+                                    {!isNominal && <ArrowRight className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </Card>
+                    </motion.div>
                 </AnimatePresence>
             </div>
         </div>
