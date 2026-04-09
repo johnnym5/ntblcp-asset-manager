@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 1407: Implemented handleQuickUpdate for high-speed field assessment.
- * Phase 1408: Extended quick verification controls to the Full View dossier overlay.
+ * Phase 1500: Optimized folder card typography for full name visibility.
+ * Phase 1501: Enhanced high-density grid for professional desktop viewing.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -367,7 +367,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col relative pb-safe">
-      {/* Header */}
+      {/* 1. Header */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -379,7 +379,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   onClick={goBack}
-                  className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"
+                  className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm"
                 >
                   <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </motion.button>
@@ -390,11 +390,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               )}
             </AnimatePresence>
             <div className="space-y-0.5">
-              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[200px]">
-                {showList ? (selectedCategories[0] || 'Assets') : (activeGrant?.name || 'Asset Hub')}
+              <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[300px]">
+                {showList ? (selectedCategories[0] || 'Asset Hub') : (activeGrant?.name || 'Asset Hub')}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                {showList ? `${processedAssets.length} Records` : `${filteredAssets.length} Total Assets`}
+                {showList ? `${processedAssets.length} Records Found` : `${filteredAssets.length} Total Registered Assets`}
               </p>
             </div>
           </div>
@@ -411,33 +411,33 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">Select All</label>
               </div>
 
-              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border">
-                <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg"><LayoutGrid className="h-4 w-4" /></Button>
-                <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg"><Columns className="h-4 w-4" /></Button>
+              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
+                <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg transition-all"><LayoutGrid className="h-4 w-4" /></Button>
+                <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg transition-all"><Columns className="h-4 w-4" /></Button>
               </div>
 
               <AnimatePresence mode="wait">
                 {!isSearchExpanded ? (
-                  <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0 transition-all"><Search className="h-4 w-4" /></Button>
                 ) : (
-                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
-                    <Input ref={searchInputRef} placeholder="Search assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs" />
-                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
+                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary group-focus-within:scale-110 transition-transform" />
+                    <Input ref={searchInputRef} placeholder="Filter records..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus-visible:ring-primary/20" />
+                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
-                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative group hover:border-primary/40"><Filter className="h-4 w-4 group-hover:text-primary transition-colors" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background shadow-lg">{activeFilterCount}</span>}</Button>
+                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border group hover:border-primary/40"><ArrowUpDown className="h-4 w-4 group-hover:text-primary transition-colors" /></Button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Surface */}
+      {/* 2. Main Workstation Surface */}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence>
           {expandedAssetId && (
@@ -457,8 +457,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <ShieldCheck className="h-8 w-8 text-black" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-2xl font-black uppercase text-foreground tracking-tight">Verification Coverage</h3>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{totalVerified} of {filteredAssets.length} Records Confirmed</p>
+                    <h3 className="text-2xl font-black uppercase text-foreground tracking-tight leading-none">Global Coverage</h3>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{totalVerified} of {filteredAssets.length} Physical Assessments Complete</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-8 min-w-[200px]">
@@ -467,8 +467,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <Progress value={totalCoverage} className="h-2 bg-primary/10" />
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="text-3xl font-black text-foreground">{totalCoverage}%</span>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Aggregate</span>
+                    <span className="text-3xl font-black text-foreground tracking-tighter">{totalCoverage}%</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40">Registry Total</span>
                   </div>
                 </div>
               </div>
@@ -484,27 +484,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   key={cat} 
                   onClick={() => handleExploreFolder(cat)}
                   className={cn(
-                    "bg-card border-2 rounded-3xl group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer", 
+                    "bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer", 
                     selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border"
                   )}
                 >
-                  <div className="flex justify-between items-start mb-8">
-                    <div className="p-2.5 bg-primary/10 rounded-xl"><LayoutGrid className="h-5 w-5 text-primary" /></div>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="p-2.5 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform"><LayoutGrid className="h-5 w-5 text-primary" /></div>
                     <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat])} className="h-5 w-5 rounded-lg border-border" />
                   </div>
-                  <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate mb-4">{cat}</h3>
-                  <p className="text-3xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
-                  <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
+                  
+                  {/* Optimized Folder Title Visibility */}
+                  <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-tight mb-4 min-h-[2.5em] line-clamp-3 overflow-hidden" title={cat}>
+                    {cat}
+                  </h3>
+                  
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-black tracking-tighter text-foreground leading-none">{groupStats[cat]?.total || 0}</p>
+                    <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
+                  </div>
 
                   {isVerificationMode && (
-                    <div className="mt-6 space-y-2">
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                        <span className="text-muted-foreground opacity-60">Verified</span>
+                    <div className="mt-6 space-y-2 pt-4 border-t border-dashed border-border/40">
+                      <div className="flex justify-between items-center text-[9px] font-black uppercase">
+                        <span className="text-muted-foreground opacity-60">Audit Pulse</span>
                         <span className="text-primary font-bold">{groupStats[cat]?.verified || 0} / {groupStats[cat]?.total || 0}</span>
                       </div>
                       <Progress 
                         value={groupStats[cat]?.total > 0 ? (groupStats[cat]?.verified / groupStats[cat]?.total) * 100 : 0} 
-                        className="h-1.5 bg-muted" 
+                        className="h-1 bg-muted" 
                       />
                     </div>
                   )}
@@ -544,14 +551,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           )}
         </ScrollArea>
 
-        {/* Focused Record Overlay */}
+        {/* 3. Record Overlay (Expanded) */}
         <AnimatePresence>
           {expandedAssetId && (
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[15vh] left-[5vw] right-[5vw] bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
               <div className="p-6 border-b border-border bg-muted/10 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 bg-primary/10 rounded-xl"><Database className="h-5 w-5 text-primary" /></div>
-                  <h3 className="text-xl font-black uppercase text-foreground leading-none">Asset Details</h3>
+                  <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
+                  <h3 className="text-xl font-black uppercase text-foreground leading-none">Asset Dossier</h3>
                 </div>
                 <div className="flex items-center gap-3">
                   {isHeaderEditingMode && isAdmin && (
@@ -571,15 +578,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
-                          className={cn("h-10 w-10 rounded-xl transition-all", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
+                          className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
                         >
                           <Columns className="h-5 w-5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent className="text-[8px] font-black uppercase">Field Setup</TooltipContent>
+                      <TooltipContent className="text-[8px] font-black uppercase">Edit Field Labels</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10"><X className="h-5 w-5" /></button>
+                  <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10 transition-colors shadow-sm"><X className="h-5 w-5" /></button>
                 </div>
               </div>
               <ScrollArea className="flex-1 custom-scrollbar">
@@ -599,54 +606,47 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* Floating Selection Hub */}
+      {/* 4. Selection Hub */}
       <AnimatePresence>
         {isSelectionBarVisible && (
-          <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
-            <div className="flex items-center gap-3 pl-3 pr-6 border-r border-white/10 shrink-0">
-              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px]">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
-              <span className="text-[9px] font-black uppercase text-white tracking-widest hidden xs:block">Selected</span>
+          <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
+            <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0">
+              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
+              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Items Active</span>
             </div>
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
                 {showList && selectedAssetIds.size === 1 ? (
                   (canEdit || isVerificationMode) && (
-                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>
+                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit Record</Button>
                   )
                 ) : (
                   canEdit && (
-                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
+                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Update</Button>
                   )
                 )}
                 
-                <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><FileDown className="h-4 w-4" /> Export</Button>
+                <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button>
                 
-                <TactileMenu
-                  title="Synchronize Selection"
-                  options={[
-                    { label: 'Download Updates', icon: Download, onClick: manualDownload },
-                    { label: 'Upload Changes', icon: CloudUpload, onClick: manualUpload }
-                  ]}
-                >
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60"><Download className="h-4 w-4" /> Download</Button>
-                    <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60"><CloudUpload className="h-4 w-4" /> Upload</Button>
-                  </div>
-                </TactileMenu>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 hover:border-primary/40 transition-all"><Download className="h-4 w-4" /> Pull Cloud</Button>
+                  <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 hover:border-primary/40 transition-all"><CloudUpload className="h-4 w-4" /> Push Changes</Button>
+                </div>
 
-                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Move</Button>
+                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><GitMerge className="h-4 w-4" /> Reassign</Button>
+                
                 {isAdmin && (
-                  <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+                  <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Purge</Button>
                 )}
               </div>
               <ScrollBar orientation="horizontal" className="invisible" />
             </ScrollArea>
-            <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-white/20 hover:text-white rounded-xl"><X className="h-5 w-5" /></button>
+            <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-muted-foreground hover:text-foreground rounded-xl transition-colors"><X className="h-5 w-5" /></button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Modals & Dialogs */}
+      {/* 5. Modals & Dialogs */}
       <AssetForm 
         isOpen={isFormOpen} 
         onOpenChange={setIsFormOpen} 
@@ -702,39 +702,40 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
       />
 
+      {/* Administrative Confirmation Modals */}
       <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-primary/10 bg-black text-white shadow-3xl">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-background text-foreground">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Reassign Selection</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select the target folder for this group move.</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Mass Reassignment</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic">Select the destination folder for these {selectedAssetIds.size} records.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-6">
             <Select value={targetMergeCategory} onValueChange={setTargetMergeCategory}>
-              <SelectTrigger className="h-14 rounded-2xl bg-white/5 border-2 border-white/10 font-black text-[10px] uppercase">
+              <SelectTrigger className="h-14 rounded-2xl bg-muted/20 border-2 border-border/40 font-black text-[10px] uppercase shadow-inner">
                 <SelectValue placeholder="Target Category..." />
               </SelectTrigger>
-              <SelectContent className="bg-black border-white/10">
+              <SelectContent className="rounded-xl border-border">
                 {categories.map(c => <SelectItem key={c} value={c} className="text-[10px] font-black uppercase">{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Confirm Move</AlertDialogAction>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12 flex-1">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 flex-[2] shadow-xl shadow-primary/20">Initialize Move</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
           <AlertDialogHeader>
-            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4"><Trash2 className="h-8 w-8 text-destructive" /></div>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selection?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40 text-center">This will permanently remove {selectedAssetIds.size} records from the registry store.</AlertDialogDescription>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Irreversible Deletion?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">You are about to permanently purge {selectedAssetIds.size} records from the active registry. This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 flex gap-3">
             <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-1 bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/20">Purge Data</AlertDialogAction>
+            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Destroy Records</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
