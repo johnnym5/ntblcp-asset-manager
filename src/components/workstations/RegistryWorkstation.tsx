@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 905: Implemented Inline Header Orchestration and gesture-aware selection pulses.
- * Phase 906: Resolved ReferenceError by defining isHeaderManagerOpen state.
+ * Phase 907: Integrated Tactile Menus for header actions.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -41,7 +40,9 @@ import {
   CheckCircle2,
   Activity,
   ArrowRightLeft,
-  Maximize2
+  Maximize2,
+  FileUp,
+  Printer
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -105,6 +106,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/component
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import type { Asset } from '@/types/domain';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TactileMenu } from '@/components/TactileMenu';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -410,8 +412,25 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
-                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
+                <TactileMenu
+                  title="Filter Logic"
+                  options={[
+                    { label: 'Open Filter Engine', icon: Filter, onClick: () => setIsLogicFilterOpen(true) },
+                    { label: 'Purge all filters', icon: Trash2, onClick: () => setFilters([]), destructive: true }
+                  ]}
+                >
+                  <Button variant="outline" size="icon" onClick={() => setIsLogicFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
+                </TactileMenu>
+
+                <TactileMenu
+                  title="Sort Sequence"
+                  options={[
+                    { label: 'Modify Sequence', icon: ArrowUpDown, onClick: () => setIsSortOpen(true) },
+                    { label: 'Sort by S/N', icon: Type, onClick: () => { setSortKey('sn'); setSortDir('asc'); } }
+                  ]}
+                >
+                  <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
+                </TactileMenu>
               </div>
             </div>
           </div>
@@ -526,11 +545,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
-                {showList && selectedAssetIds.size === 1 ? (
-                  <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit Record</Button>
-                ) : (
-                  <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
-                )}
+                <TactileMenu
+                  title="Batch Actions"
+                  options={[
+                    { label: showList && selectedAssetIds.size === 1 ? 'Edit Record' : 'Batch Edit', icon: Edit3, onClick: () => showList ? (selectedAssetIds.size === 1 ? handleEditAsset(Array.from(selectedAssetIds)[0]) : setIsAssetBatchEditOpen(true)) : setIsCategoryBatchEditOpen(true) },
+                    { label: 'Merge Selection', icon: GitMerge, onClick: () => setIsMergeDialogOpen(true) },
+                    { label: 'Export Selection', icon: FileDown, onClick: () => {} },
+                    { label: 'Print Labels', icon: Printer, onClick: () => {} },
+                    { label: 'Delete Records', icon: Trash2, onClick: () => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true), destructive: true }
+                  ]}
+                >
+                  {showList && selectedAssetIds.size === 1 ? (
+                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit Record</Button>
+                  ) : (
+                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Edit</Button>
+                  )}
+                </TactileMenu>
                 <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
                 <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
               </div>

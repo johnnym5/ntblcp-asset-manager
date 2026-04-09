@@ -2,10 +2,7 @@
 
 /**
  * @fileOverview Dashboard Workstation - Unified Command Hub.
- * Phase 1200: Consolidated redundant features into logical Operational Zones.
- * Phase 1201: Grouped Exploration, Integrity, and Reporting tools.
- * Phase 1202: Gated verification triggers based on appMode.
- * Phase 1203: Wrapped Audit Log in a collapsed Accordion for high-density clarity.
+ * Phase 1204: Integrated Tactile Menus for quick start tiles.
  */
 
 import React from 'react';
@@ -21,7 +18,11 @@ import {
   ShieldCheck,
   Zap,
   Monitor,
-  ClipboardCheck
+  ClipboardCheck,
+  FileUp,
+  LineChart,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -40,6 +41,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { TactileMenu } from '@/components/TactileMenu';
 
 export function DashboardWorkstation() {
   const { 
@@ -47,7 +49,8 @@ export function DashboardWorkstation() {
     setActiveView, 
     manualDownload, 
     isSyncing, 
-    isOnline 
+    isOnline,
+    refreshRegistry
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -98,22 +101,30 @@ export function DashboardWorkstation() {
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={manualDownload} 
-                      disabled={isSyncing || !isOnline}
-                      className="rounded-xl h-10 w-10 bg-muted border border-border text-muted-foreground hover:text-primary shrink-0 transition-colors"
-                    >
-                      <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="text-[8px] font-black uppercase">Refresh Cloud Pulse</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <TactileMenu
+                title="Refresh Logic"
+                options={[
+                  { label: 'Check Cloud Updates', icon: Download, onClick: manualDownload },
+                  { label: 'Full Parity Sync', icon: RefreshCw, onClick: refreshRegistry }
+                ]}
+              >
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={manualDownload} 
+                        disabled={isSyncing || !isOnline}
+                        className="rounded-xl h-10 w-10 bg-muted border border-border text-muted-foreground hover:text-primary shrink-0 transition-colors"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Refresh Cloud Pulse</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TactileMenu>
             </div>
           </div>
         </div>
@@ -146,12 +157,29 @@ export function DashboardWorkstation() {
                   </h4>
                 </div>
                 <CardContent className="p-6 space-y-3">
-                  <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group">
-                    <Settings className="h-4 w-4 text-primary group-hover:rotate-90 transition-transform" /> App Settings
-                  </Button>
-                  <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
-                    <FolderOpen className="h-4 w-4 text-primary" /> Browse All Folders
-                  </Button>
+                  <TactileMenu
+                    title="Setting Pulses"
+                    options={[
+                      { label: 'System Theme', icon: Palette, onClick: () => setActiveView('SETTINGS') },
+                      { label: 'Infrastructure', icon: Monitor, onClick: () => setActiveView('DATABASE') }
+                    ]}
+                  >
+                    <Button onClick={() => setActiveView('SETTINGS')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group">
+                      <Settings className="h-4 w-4 text-primary group-hover:rotate-90 transition-transform" /> App Settings
+                    </Button>
+                  </TactileMenu>
+
+                  <TactileMenu
+                    title="Registry Shortcuts"
+                    options={[
+                      { label: 'Import Excel', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+                      { label: 'View Folders', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') }
+                    ]}
+                  >
+                    <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
+                      <FolderOpen className="h-4 w-4 text-primary" /> Browse All Folders
+                    </Button>
+                  </TactileMenu>
                   
                   {isVerificationMode && (
                     <Button onClick={() => setActiveView('VERIFY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 text-green-600 border-green-500/20">

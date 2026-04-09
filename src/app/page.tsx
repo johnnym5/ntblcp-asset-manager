@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1305: Production hardening - adaptive headers and bottom-safe action bars.
+ * Phase 1306: Implemented global Tactile Menus for header actions.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  HelpCircle,
   ChevronLeft,
   Activity,
   History,
@@ -28,11 +27,14 @@ import {
   ClipboardCheck,
   User as UserIcon,
   ChevronDown,
-  Command,
   Download,
   Upload,
   Wifi,
-  WifiOff
+  WifiOff,
+  Trash2,
+  FileJson,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -49,7 +51,7 @@ import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useNotifications, type Notification } from '@/hooks/use-notifications';
+import { useNotifications, type Notification, markAllAsRead, clearAll } from '@/hooks/use-notifications';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -65,8 +67,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useIsMobile } from '@/hooks/use-mobile';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
-import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { storage } from '@/offline/storage';
+import { TactileMenu } from '@/components/TactileMenu';
 
 function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
@@ -78,7 +80,6 @@ function NotificationToast({ notification }: { notification: Notification }) {
       className={cn(
         "absolute top-full right-0 mt-2 w-64 p-3 rounded-xl border shadow-3xl z-[100] flex items-center gap-3 backdrop-blur-3xl",
         notification.variant === 'destructive' ? "bg-destructive border-destructive text-destructive-foreground" :
-        notification.variant === 'success' ? "bg-green-600 border-green-500 text-white" :
         "bg-card/90 border-border text-foreground"
       )}
     >
@@ -105,7 +106,8 @@ export default function SPAHub() {
     setAppSettings,
     goBack,
     selectedCategories,
-    setIsCommandPaletteOpen
+    setIsCommandPaletteOpen,
+    refreshRegistry
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -167,45 +169,80 @@ export default function SPAHub() {
             )}
           </AnimatePresence>
 
-          <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
-            <Boxes className="h-5 w-5" />
-            <div className="hidden xs:flex flex-col text-left">
-              <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-              <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'MANAGER'}</span>
-            </div>
-          </button>
+          <TactileMenu 
+            title="Registry Navigation"
+            options={[
+              { label: 'Go to Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+              { label: 'Open Asset Hub', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
+              { label: 'View Audit Ledger', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
+            ]}
+          >
+            <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
+              <Boxes className="h-5 w-5" />
+              <div className="hidden xs:flex flex-col text-left">
+                <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
+                <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'MANAGER'}</span>
+              </div>
+            </button>
+          </TactileMenu>
         </div>
 
         <div className="flex-1 flex items-center justify-center mx-4 sm:mx-12">
-          <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full">
+          <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
             <Search className="h-4 w-4" />
             <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">{isMobile ? 'Search...' : 'Universal Registry Search...'}</span>
-            <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2">⌘K</kbd>
+            <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
           </button>
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
-          <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Down</TooltipContent></Tooltip></TooltipProvider>
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Up</TooltipContent></Tooltip></TooltipProvider>
-          </div>
+          <TactileMenu
+            title="Sync Control"
+            options={[
+              { label: 'Fetch Cloud Data', icon: Download, onClick: manualDownload },
+              { label: 'Broadcast Changes', icon: Upload, onClick: manualUpload },
+              { label: 'Force Parity Refresh', icon: RefreshCw, onClick: refreshRegistry }
+            ]}
+          >
+            <div className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Down</TooltipContent></Tooltip></TooltipProvider>
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Sync Up</TooltipContent></Tooltip></TooltipProvider>
+            </div>
+          </TactileMenu>
 
-          <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
-            <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]")} />
-            <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-          </button>
-          
-          <div className="relative">
-            <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative">
-              <Bell className="h-4.5 w-4.5" />
-              {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
+          <TactileMenu
+            title="Connection Node"
+            options={[
+              { label: 'Go Online', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
+              { label: 'Work Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
+            ]}
+          >
+            <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
+              <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]")} />
+              <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </button>
-            <AnimatePresence>{activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}</AnimatePresence>
-          </div>
+          </TactileMenu>
+          
+          <TactileMenu
+            title="Alert Options"
+            options={[
+              { label: 'Open Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Mark all as Read', icon: CheckCircle2, onClick: markAllAsRead },
+              { label: 'Clear Archive', icon: Trash2, onClick: clearAll, destructive: true }
+            ]}
+          >
+            <div className="relative">
+              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative">
+                <Bell className="h-4.5 w-4.5" />
+                {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
+              </button>
+              <AnimatePresence>{activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}</AnimatePresence>
+            </div>
+          </TactileMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-9 w-9 rounded-full border-2 border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[11px] hover:border-primary/40 transition-all shrink-0 shadow-lg">
+              <button className="h-9 w-9 rounded-full border-2 border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[11px] hover:border-primary/40 transition-all shrink-0 shadow-lg tactile-pulse">
                 {userProfile?.displayName?.[0] || 'U'}
               </button>
             </DropdownMenuTrigger>
@@ -228,7 +265,7 @@ export default function SPAHub() {
           <ErrorBoundary module={activeView}>
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
-                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb- safe">
+                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
                   <AnimatePresence mode="wait">
                     <motion.div key={activeView} initial={{ opacity: 0, scale: 0.99, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.99, y: -10 }} transition={{ duration: 0.25 }} className="h-full w-full">
                       {CurrentWorkstation}
