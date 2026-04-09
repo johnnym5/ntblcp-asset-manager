@@ -4,6 +4,7 @@
  * @fileOverview AssetDossier - Professional Technical Registry Hub.
  * Phase 1500: Overhauled hierarchy to prioritize clear Headers and stacked Details.
  * Phase 1501: Integrated inline verification sidebar for high-speed audits.
+ * Phase 1502: Fixed missing ScrollArea import.
  */
 
 import React from 'react';
@@ -38,6 +39,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ASSET_CONDITIONS } from '@/lib/constants';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DetailField = ({ 
   headerId, 
