@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1303: Category-Aware Technical ID Gap filtering (Chassis/Engine for vehicles vs Serial/Model for others).
  * Phase 1304: Corrected filteredAssets logic for diagnostic tokens to prevent "0 Assets" bug.
+ * Phase 1305: Expanded diagnostic tokens for high-fidelity carousel pulses.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -248,22 +249,31 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
+      const isVehicle = (a: any) => {
+        const cat = (a.category || '').toLowerCase();
+        return cat.includes('motor') || cat.includes('vehicle');
+      };
+
       // Diagnostic Token Resolution
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
+      } else if (searchTerm === 'MISSING_SN') {
+        results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
+      } else if (searchTerm === 'MISSING_MODEL') {
+        results = results.filter(a => !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '');
+      } else if (searchTerm === 'MISSING_CHASSIS') {
+        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A'));
+      } else if (searchTerm === 'MISSING_ENGINE') {
+        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A'));
+      } else if (searchTerm === 'WITH_REMARKS') {
+        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
+      } else if (searchTerm === 'STATUS_UNVERIFIED') {
+        results = results.filter(a => a.status === 'UNVERIFIED');
+      } else if (searchTerm.startsWith('CONDITION_')) {
+        const group = searchTerm.replace('CONDITION_', '').replace(/^\w/, c => c.toUpperCase());
+        results = results.filter(a => a.conditionGroup === group);
       } else if (searchTerm === 'MISSING_SERIAL') {
-        // Category-Aware Technical ID filter
-        results = results.filter(a => {
-          const cat = (a.category || '').toLowerCase();
-          const isVehicle = cat.includes('motor') || cat.includes('vehicle');
-          if (isVehicle) {
-            return !a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === '' || 
-                   !a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === '';
-          } else {
-            return !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '' || 
-                   !a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '';
-          }
-        });
+        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
       } else {
