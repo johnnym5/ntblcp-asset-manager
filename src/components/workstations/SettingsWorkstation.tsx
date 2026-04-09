@@ -290,46 +290,50 @@ export function SettingsWorkstation() {
             </div>
           </SettingSection>
 
-          <SettingSection title="App Mode" description="Workstation Logic" icon={Smartphone}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button 
-                onClick={() => handleSettingChange('appMode', 'management')}
-                className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20")}
-              >
-                <ShieldIcon className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'management' ? "text-primary" : "text-muted-foreground")} />
-                <h4 className="text-sm font-black uppercase text-foreground mb-1">Management</h4>
-                <p className="text-[10px] font-medium text-muted-foreground italic">Full Registry Control.</p>
-              </button>
+          {isAdmin && (
+            <SettingSection title="App Mode" description="Workstation Logic" icon={Smartphone}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'management')}
+                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20")}
+                >
+                  <ShieldIcon className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'management' ? "text-primary" : "text-muted-foreground")} />
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Management</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic">Full Registry Control.</p>
+                </button>
 
-              <button 
-                onClick={() => handleSettingChange('appMode', 'verification')}
-                className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20")}
-              >
-                <ClipboardCheck className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'verification' ? "text-green-500" : "text-muted-foreground")} />
-                <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification</h4>
-                <p className="text-[10px] font-medium text-muted-foreground italic">Field Audit Mode.</p>
-              </button>
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'verification')}
+                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20")}
+                >
+                  <ClipboardCheck className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'verification' ? "text-green-500" : "text-muted-foreground")} />
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic">Field Audit Mode.</p>
+                </button>
 
-              <button 
-                onClick={() => handleSettingChange('appMode', 'reporting')}
-                className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'reporting' ? "border-blue-500 bg-blue-500/5 shadow-lg" : "border-border bg-muted/20")}
-              >
-                <FileText className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'reporting' ? "text-blue-500" : "text-muted-foreground")} />
-                <h4 className="text-sm font-black uppercase text-foreground mb-1">Reporting</h4>
-                <p className="text-[10px] font-medium text-muted-foreground italic">Document Extraction.</p>
-              </button>
-            </div>
-          </SettingSection>
-
-          <SettingSection title="Registry Rules" description="Access Restrictions" icon={Lock}>
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
-              <div className="space-y-0.5">
-                <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent unauthorized additions/deletions.</p>
+                <button 
+                  onClick={() => handleSettingChange('appMode', 'reporting')}
+                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'reporting' ? "border-blue-500 bg-blue-500/5 shadow-lg" : "border-border bg-muted/20")}
+                >
+                  <FileText className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'reporting' ? "text-blue-500" : "text-muted-foreground")} />
+                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Reporting</h4>
+                  <p className="text-[10px] font-medium text-muted-foreground italic">Document Extraction.</p>
+                </button>
               </div>
-              <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
-            </div>
-          </SettingSection>
+            </SettingSection>
+          )}
+
+          {isAdmin && (
+            <SettingSection title="Registry Rules" description="Access Restrictions" icon={Lock}>
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent unauthorized additions/deletions.</p>
+                </div>
+                <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+              </div>
+            </SettingSection>
+          )}
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none pb-20">
@@ -341,39 +345,42 @@ export function SettingsWorkstation() {
               </div>
 
               <div className="space-y-3">
-                {draftSettings.grants.map((grant) => (
-                  <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", activeGrantId === grant.id ? "border-primary bg-primary/[0.02]" : "border-border bg-muted/10")}>
-                    <div className="p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <FolderOpen className={cn("h-5 w-5", activeGrantId === grant.id ? "text-primary" : "text-muted")} />
-                        <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
+                {draftSettings.grants.map((grant) => {
+                  const isActive = activeGrantId === grant.id;
+                  return (
+                    <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", isActive ? "border-primary bg-primary/[0.02]" : "border-border bg-muted/10")}>
+                      <div className="p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <FolderOpen className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted")} />
+                          <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
+                        </div>
+                        {!isActive && (
+                          <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2">Set Active</Button>
+                        )}
                       </div>
-                      {activeGrantId !== grant.id && (
-                        <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2">Set Active</Button>
+                      {isActive && (
+                        <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
+                              <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl">
+                                <span className="text-[9px] font-black uppercase text-muted-foreground">{name}</span>
+                                <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
+                              <FileUp className="h-3.5 w-3.5" /> Import Template
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
+                              <ScanSearch className="h-3.5 w-3.5" /> Import Assets
+                            </Button>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    {activeGrantId === grant.id && (
-                      <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                            <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl">
-                              <span className="text-[9px] font-black uppercase text-muted-foreground">{name}</span>
-                              <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
-                            <FileUp className="h-3.5 w-3.5" /> Import Template
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
-                            <ScanSearch className="h-3.5 w-3.5" /> Import Assets
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           </SettingSection>

@@ -186,6 +186,7 @@ export interface Asset {
     loginName: string;
     state: string;
   };
+  adminComment?: string;
   yearBucket?: number;
 }
 

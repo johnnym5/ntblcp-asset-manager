@@ -117,6 +117,32 @@ export const FirestoreService = {
     }
   },
 
+  async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT'): Promise<void> {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', assetId);
+    const snap = await getDoc(assetRef);
+    if (!snap.exists()) return;
+
+    const asset = snap.data() as Asset;
+    if (action === 'APPROVE' && asset.pendingChanges) {
+      const updatedAsset = {
+        ...asset,
+        ...asset.pendingChanges,
+        approvalStatus: undefined,
+        pendingChanges: undefined,
+        changeSubmittedBy: undefined,
+        lastModified: new Date().toISOString()
+      };
+      await setDoc(assetRef, sanitizeForFirestore(updatedAsset));
+    } else {
+      await updateDoc(assetRef, {
+        approvalStatus: undefined,
+        pendingChanges: undefined,
+        changeSubmittedBy: undefined
+      });
+    }
+  },
+
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
     const snap = await getDocs(collection(db, 'assets'));

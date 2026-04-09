@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -13,6 +12,8 @@ export type Notification = {
   read: boolean
   variant?: NotificationVariant
   action?: React.ReactNode
+  assetId?: string; // Metadata for forensic jumps
+  targetView?: string; // Target workstation for navigation
 }
 
 const actionTypes = {

@@ -161,14 +161,15 @@ export function DashboardWorkstation() {
                   </h4>
                 </div>
                 <CardContent className="p-6 space-y-3">
-                  <Button 
-                    onClick={() => setActiveView('IMPORT')} 
-                    variant="outline" 
-                    disabled={!canEdit && !isAdmin}
-                    className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group"
-                  >
-                    <FileUp className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Import Assets
-                  </Button>
+                  {isAdmin && (
+                    <Button 
+                      onClick={() => setActiveView('IMPORT')} 
+                      variant="outline" 
+                      className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5 group"
+                    >
+                      <FileUp className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" /> Import Assets
+                    </Button>
+                  )}
 
                   <Button onClick={() => setActiveView('REGISTRY')} variant="outline" className="w-full h-12 rounded-xl border-border text-foreground font-black uppercase text-[10px] tracking-widest gap-4 hover:bg-muted transition-all justify-start px-5">
                     <FolderOpen className="h-4 w-4 text-primary" /> Browse Assets

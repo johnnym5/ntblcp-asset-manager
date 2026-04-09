@@ -41,7 +41,8 @@ import {
   ShieldAlert,
   SearchCode,
   Monitor,
-  FileUp
+  FileUp,
+  Inbox
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -76,6 +77,7 @@ import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
 import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
+import { InboxSheet } from '@/components/inbox-sheet';
 
 function NotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
@@ -114,7 +116,8 @@ export default function SPAHub() {
     goBack,
     selectedCategories,
     setIsCommandPaletteOpen,
-    refreshRegistry
+    refreshRegistry,
+    assets
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -122,10 +125,12 @@ export default function SPAHub() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
+  const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
@@ -165,6 +170,7 @@ export default function SPAHub() {
     <div className="app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden">
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
+      <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
@@ -178,7 +184,7 @@ export default function SPAHub() {
                   options={[
                     { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
                     { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+                    ...(isAdmin ? [{ label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') }] : []),
                     { label: 'Field Verification', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') },
                     { label: 'Executive Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
                     { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
@@ -202,7 +208,7 @@ export default function SPAHub() {
             options={[
               { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+              ...(isAdmin ? [{ label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') }] : []),
               { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >
@@ -225,6 +231,29 @@ export default function SPAHub() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
+          {isAdmin && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsInboxOpen(true)} 
+                    className="h-10 w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                  >
+                    <Inbox className="h-4.5 w-4.5" />
+                    {pendingApprovalsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Approval Inbox</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           <TactileMenu
             title="Registry Parity"
             options={[

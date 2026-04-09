@@ -39,7 +39,8 @@ import {
   Activity,
   Tag,
   Info,
-  Lock
+  Lock,
+  GitPullRequest
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -53,6 +54,7 @@ import { getCanonicalGroup } from "@/lib/condition-logic";
 import type { Asset, ConditionAuditEntry } from "@/types/domain";
 import { ClassificationEngine } from "@/lib/classification-engine";
 import { VALIDATION_GROUPS } from "@/lib/validation-rules";
+import { addNotification } from "@/hooks/use-notifications";
 
 interface AssetFormProps {
   isOpen: boolean;
@@ -78,7 +80,7 @@ export default function AssetForm({
     mode: 'onChange',
   });
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
   const canUserEditFull = !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
@@ -115,13 +117,44 @@ export default function AssetForm({
     setIsSaving(true);
     try {
         const nextGroup = getCanonicalGroup(data.condition);
-        const nextAsset = {
+        let nextAsset: Asset = {
             ...data,
             conditionGroup: nextGroup,
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName || 'System User',
             updateCount: (asset?.updateCount || 0) + 1
         };
+
+        // Approval Logic Pulse
+        if (!isAdmin && !canUserEditFull && asset) {
+          // Identify changes for the approval diff
+          const changes: Partial<Asset> = {};
+          (Object.keys(data) as Array<keyof Asset>).forEach(key => {
+            if (JSON.stringify(data[key]) !== JSON.stringify((asset as any)[key])) {
+              (changes as any)[key] = data[key];
+            }
+          });
+
+          if (Object.keys(changes).length > 0) {
+            nextAsset = {
+              ...asset,
+              approvalStatus: 'PENDING',
+              pendingChanges: changes,
+              changeSubmittedBy: {
+                displayName: userProfile?.displayName || 'Unknown',
+                loginName: userProfile?.loginName || 'unknown',
+                state: userProfile?.state || 'Unknown'
+              },
+              lastModified: new Date().toISOString()
+            };
+            addNotification({
+              title: "Changes Submitted",
+              description: "Sent to Admin for review.",
+              variant: "default",
+              assetId: asset.id
+            });
+          }
+        }
 
         if (asset && asset.condition !== data.condition) {
           const audit: ConditionAuditEntry = {
@@ -181,8 +214,8 @@ export default function AssetForm({
               </div>
             </div>
             {!isAdmin && !canUserEditFull && (
-              <Badge variant="outline" className="h-8 px-4 border-destructive/20 text-destructive bg-destructive/5 font-black uppercase text-[10px] tracking-widest gap-2">
-                <Lock className="h-3 w-3" /> Field Assessment Only
+              <Badge variant="outline" className="h-8 px-4 border-primary/20 text-primary bg-primary/5 font-black uppercase text-[10px] tracking-widest gap-2">
+                <GitPullRequest className="h-3 w-3" /> Approval Workflow Active
               </Badge>
             )}
           </div>
@@ -278,7 +311,7 @@ export default function AssetForm({
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 font-black uppercase text-[9px] text-white/40 hover:text-white px-10">Discard</Button>
             <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-              Save Record
+              {isAdmin || canUserEditFull ? 'Save Record' : 'Submit for Review'}
             </Button>
           </div>
         </div>
