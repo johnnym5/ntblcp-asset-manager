@@ -3,7 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to professional naming and context-aware selection.
- * Phase 1405: Hardened responsiveness and selection bar visibility.
+ * Phase 1406: Integrated Verification Mode progress bars for folders and overall scope.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -34,6 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import AssetForm from '@/components/asset-form';
@@ -337,6 +338,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const isSelectionBarVisible = selectedAssetIds.size > 0 || selectedCategories.length > 0;
 
+  const totalVerified = useMemo(() => filteredAssets.filter(a => a.status === 'VERIFIED').length, [filteredAssets]);
+  const totalCoverage = useMemo(() => filteredAssets.length > 0 ? Math.round((totalVerified / filteredAssets.length) * 100) : 0, [totalVerified, filteredAssets]);
+
   return (
     <div className="space-y-4 h-full flex flex-col relative pb-safe">
       {/* Header */}
@@ -404,6 +408,44 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
+      {/* Overall Progress - Only in Verification Mode & Not showing list */}
+      {isVerificationMode && !showList && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="px-1 mb-6"
+        >
+          <Card className="bg-primary/5 border-2 border-primary/20 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+              <ShieldCheck className="h-32 w-32 text-primary" />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Registry Verification Coverage</h3>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Aggregate progress across all project folders</p>
+              </div>
+              <div className="flex-1 max-w-md w-full space-y-4">
+                <div className="flex justify-between items-end">
+                  <span className="text-5xl font-black tracking-tighter text-primary">
+                    {totalCoverage}%
+                  </span>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Status Pulse</p>
+                    <p className="text-sm font-black uppercase text-foreground">
+                      {totalVerified} / {filteredAssets.length}
+                    </p>
+                  </div>
+                </div>
+                <Progress 
+                  value={totalCoverage} 
+                  className="h-3 shadow-inner bg-muted" 
+                />
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Surface */}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence>
@@ -431,6 +473,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate mb-4">{cat}</h3>
                   <p className="text-3xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
                   <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
+
+                  {isVerificationMode && (
+                    <div className="mt-6 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                        <span className="text-muted-foreground opacity-60">Verified</span>
+                        <span className="text-primary font-bold">{groupStats[cat]?.verified || 0} / {groupStats[cat]?.total || 0}</span>
+                      </div>
+                      <Progress 
+                        value={groupStats[cat]?.total > 0 ? (groupStats[cat]?.verified / groupStats[cat]?.total) * 100 : 0} 
+                        className="h-1.5 bg-muted" 
+                      />
+                    </div>
+                  )}
                 </Card>
               ))}
             </div>
