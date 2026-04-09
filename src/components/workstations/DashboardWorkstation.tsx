@@ -22,7 +22,9 @@ import {
   FileUp,
   LineChart,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Palette
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
