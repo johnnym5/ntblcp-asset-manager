@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Normalized to clear business naming and context-aware selection.
+ * Phase 1200: Finalized production hardening and permission gating.
  */
 
 import React, { useMemo, useState, useRef } from 'react';
@@ -32,7 +33,8 @@ import {
   Activity,
   Maximize2,
   Printer,
-  GitMerge
+  GitMerge,
+  ArrowUpRight
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -43,9 +45,7 @@ import { Card } from '@/components/ui/card';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import AssetForm from '@/components/asset-form';
-import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
-import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -78,6 +78,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-bat
 import type { Asset } from '@/types/domain';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
+import { TactileMenu } from '@/components/TactileMenu';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -96,8 +97,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsExplored,
     isOnline,
     activeGrantId,
-    filters,
-    setFilters,
     isFilterOpen,
     setIsFilterOpen,
     isSortOpen,
@@ -111,7 +110,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     manualDownload,
     manualUpload,
     isSyncing,
-    optionsMap = {},
     locationOptions,
     assigneeOptions,
     conditionOptions,
@@ -136,7 +134,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHeaderEditingMode, setIsHeaderEditingMode] = useState(false);
-  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [selectedAssetIdForEdit, setSelectedAssetIdForEdit] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -265,7 +262,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedCategories([]);
-      addNotification({ title: "Folder Update Successful", variant: "success" });
+      addNotification({ title: "Folders Updated", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsCategoryBatchEditOpen(false);
@@ -357,7 +354,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 {showList ? (selectedCategories[0] || 'Assets') : (activeGrant?.name || 'Asset Hub')}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                {showList ? `${processedAssets.length} Records` : `${filteredAssets.length} Total`}
+                {showList ? `${processedAssets.length} Records` : `${filteredAssets.length} Total Assets`}
               </p>
             </div>
           </div>
@@ -387,7 +384,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </AnimatePresence>
               
               <div className="flex items-center gap-1.5 shrink-0">
-                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
+                <TactileMenu
+                  title="Filter Logic"
+                  options={[
+                    { label: 'Clear All Filters', icon: X, onClick: () => { setSelectedLocations([]); setSelectedAssignees([]); setSelectedStatuses([]); setSelectedConditions([]); setMissingFieldFilter(''); setSearchTerm(''); } }
+                  ]}
+                >
+                  <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative"><Filter className="h-4 w-4" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background">{activeFilterCount}</span>}</Button>
+                </TactileMenu>
                 <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border"><ArrowUpDown className="h-4 w-4" /></Button>
               </div>
             </div>
@@ -421,7 +425,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </div>
                   <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate mb-4">{cat}</h3>
                   <p className="text-3xl font-black tracking-tighter text-foreground">{groupStats[cat]?.total || 0}</p>
-                  <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">ITEMS</p>
+                  <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
                 </Card>
               ))}
             </div>
@@ -449,7 +453,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           )}
         </ScrollArea>
 
-        {/* Focused Record */}
+        {/* Focused Record Overlay */}
         <AnimatePresence>
           {expandedAssetId && (
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[15vh] left-[5vw] right-[5vw] bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
@@ -493,7 +497,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* Floating Toolbar */}
+      {/* Floating Selection Hub */}
       <AnimatePresence>
         {isSelectionBarVisible && (
           <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
@@ -514,9 +518,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 )}
                 
                 <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><FileDown className="h-4 w-4" /> Export</Button>
-                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><Download className="h-4 w-4" /> Download</Button>
-                <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><CloudUpload className="h-4 w-4" /> Upload</Button>
-                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Merge</Button>
+                
+                <TactileMenu
+                  title="Synchronize Selection"
+                  options={[
+                    { label: 'Download from Cloud', icon: Download, onClick: manualDownload },
+                    { label: 'Upload to Cloud', icon: CloudUpload, onClick: manualUpload }
+                  ]}
+                >
+                  <div className="flex gap-2 shrink-0">
+                    <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60"><Download className="h-4 w-4" /> Download</Button>
+                    <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60"><CloudUpload className="h-4 w-4" /> Upload</Button>
+                  </div>
+                </TactileMenu>
+
+                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-white/10 text-white/60 shrink-0"><GitMerge className="h-4 w-4" /> Move</Button>
                 {isAdmin && (
                   <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
                 )}
@@ -528,10 +544,29 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </AnimatePresence>
 
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
-      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
-      <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
-      <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={handleSaveAssetBatch} />
+      {/* Modals & Dialogs */}
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} 
+        isReadOnly={false} 
+        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
+      />
+      
+      <CategoryBatchEditForm 
+        isOpen={isCategoryBatchEditOpen} 
+        onOpenChange={setIsCategoryBatchEditOpen} 
+        selectedCategoryCount={selectedCategories.length} 
+        onSave={handleSaveCategoryBatchEdit} 
+      />
+      
+      <AssetBatchEditForm 
+        isOpen={isAssetBatchEditOpen} 
+        onOpenChange={setIsAssetBatchEditOpen} 
+        selectedAssetCount={selectedAssetIds.size} 
+        onSave={handleSaveAssetBatch} 
+      />
+      
       <AssetFilterSheet 
         isOpen={isFilterOpen} 
         onOpenChange={setIsFilterOpen} 
@@ -555,14 +590,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         searchTerm={searchTerm} 
         setSearchTerm={setSearchTerm} 
       />
-      <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
+      
+      <SortDrawer 
+        isOpen={isSortOpen} 
+        onOpenChange={setIsSortOpen} 
+        headers={headers} 
+        sortBy={sortKey} 
+        sortDirection={sortDir} 
+        onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
+      />
 
-      {/* Dialogs */}
       <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
         <AlertDialogContent className="rounded-[2rem] border-primary/10 bg-black text-white shadow-3xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Merge Selection</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select target folder for move.</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Reassign Selection</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40">Select the target folder for this group move.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-6">
             <Select value={targetMergeCategory} onValueChange={setTargetMergeCategory}>
@@ -576,7 +618,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Move Assets</AlertDialogAction>
+            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Confirm Move</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -584,12 +626,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
         <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight">Delete Selection?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/40">This will remove {selectedAssetIds.size} records from the registry.</AlertDialogDescription>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4"><Trash2 className="h-8 w-8 text-destructive" /></div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40 text-center">This will permanently remove {selectedAssetIds.size} records from the registry store.</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12">Delete Records</AlertDialogAction>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-1 bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/20">Purge Data</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

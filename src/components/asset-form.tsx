@@ -2,7 +2,8 @@
 
 /**
  * @fileOverview AssetForm - Record Detail Workstation.
- * Restricts full editing based on Admin status or user permission.
+ * Hardened: restricted editing based on Admin status or user permission.
+ * Phase 1205: Integrated Verification mode overrides for assessment fields.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -37,7 +38,8 @@ import {
   ShieldCheck,
   Activity,
   Tag,
-  Info
+  Info,
+  Lock
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -127,7 +129,7 @@ export default function AssetForm({
             newCondition: data.condition,
             changedBy: userProfile?.displayName || 'System User',
             timestamp: new Date().toISOString(),
-            reason: data.remarks || 'Status Update',
+            reason: data.remarks || 'Assessment Update',
             isBulkAction: false
           };
           nextAsset.conditionHistory = [audit, ...(asset.conditionHistory || [])];
@@ -144,42 +146,45 @@ export default function AssetForm({
     return formValues.classification || (asset ? ClassificationEngine.classify(asset) : null);
   }, [formValues.classification, asset]);
 
+  /**
+   * Hardened Field Logic:
+   * 1. Admins bypass all locks.
+   * 2. Verification Mode allows non-admins to update Status, Condition, and Remarks.
+   * 3. Full Editing is ONLY available if explicitly enabled in user profile.
+   */
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
     
-    const verificationFields = ['status', 'condition', 'remarks'];
+    const assessmentFields = ['status', 'condition', 'remarks'];
     
-    // If verification mode is active, allow those fields even if canEditAssets is false
-    if (isVerificationMode && verificationFields.includes(fieldName)) return false;
-    
-    // Otherwise, require specific edit permission
-    if (!canUserEditFull) return true;
+    // Permission Override Pulse
+    if (isVerificationMode && assessmentFields.includes(fieldName)) return false;
+    if (canUserEditFull) return false;
 
-    // Check specific validation group rules
-    if (activeClassification) {
-      const rules = VALIDATION_GROUPS[activeClassification.validationGroup] || VALIDATION_GROUPS.unknown;
-      if ((rules as any)[fieldName] === 'forbidden') return true;
-    }
-
-    return false;
+    return true;
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1100px] w-full h-[100dvh] sm:h-[85vh] sm:w-[95vw] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 sm:rounded-[2.5rem] shadow-3xl">
         <div className="flex flex-col h-full">
-          <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
+          <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between">
             <div className="space-y-1">
               <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
-                {asset ? 'Asset Record' : 'New Record'}
+                {asset ? 'Asset Record' : 'New Entry'}
               </DialogTitle>
               <div className="flex items-center gap-2 mt-1.5">
                 <DialogDescription className="text-[9px] sm:text-xs font-bold text-white/40 uppercase tracking-widest truncate">
-                  {asset ? `ID: ${asset.id.split('-')[0]}` : 'Manual Entry'}
+                  {asset ? `ID: ${asset.id.split('-')[0]}` : 'Registry Pulse: Manual'}
                 </DialogDescription>
               </div>
             </div>
+            {!isAdmin && !canUserEditFull && (
+              <Badge variant="outline" className="h-8 px-4 border-destructive/20 text-destructive bg-destructive/5 font-black uppercase text-[10px] tracking-widest gap-2">
+                <Lock className="h-3 w-3" /> Field Assessment Only
+              </Badge>
+            )}
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
@@ -189,25 +194,25 @@ export default function AssetForm({
                   <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 sm:space-y-12">
                     <div className="space-y-6">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                        <Tag className="h-3 w-3" /> Basic Information
+                        <Tag className="h-3 w-3" /> Technical Core
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="description" render={({ field }) => (
                           <FormItem className="sm:col-span-2">
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Description</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 sm:h-14 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase" /></FormControl>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Identification</FormLabel>
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 sm:h-14 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase placeholder:opacity-20" placeholder="e.g. Toyota Hilux 2024" /></FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Manufacturer Serial</FormLabel>
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="SN-XXXX-XXXX" /></FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset ID / Tag</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" /></FormControl>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Tag ID</FormLabel>
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="TAG-XXX" /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
@@ -215,7 +220,7 @@ export default function AssetForm({
 
                     <div className="p-6 sm:p-8 rounded-[1.5rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                        <Activity className="h-3 w-3" /> Status & Condition
+                        <Activity className="h-3 w-3" /> Audit Assessment
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="condition" render={({ field }) => (
@@ -231,7 +236,7 @@ export default function AssetForm({
                         )}/>
                         <FormField control={form.control} name="status" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Verification Status</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Registry Status</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
                               <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
@@ -244,8 +249,8 @@ export default function AssetForm({
                         )}/>
                         <FormField control={form.control} name="remarks" render={({ field }) => (
                           <FormItem className="sm:col-span-2">
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Comments</FormLabel>
-                            <FormControl><Textarea {...field} readOnly={isFieldDisabled('remarks')} className="min-h-[100px] bg-black border-2 border-white/10 rounded-2xl p-4 text-xs italic" placeholder="Add any findings or notes..." /></FormControl>
+                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Field Observations</FormLabel>
+                            <FormControl><Textarea {...field} readOnly={isFieldDisabled('remarks')} className="min-h-[100px] bg-black border-2 border-white/10 rounded-2xl p-4 text-xs italic" placeholder="Document any discrepancies or site findings..." /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
@@ -259,10 +264,10 @@ export default function AssetForm({
               <div className="space-y-10">
                 <AssetChecklist values={formValues as any} />
                 <div className="p-6 rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10 space-y-4">
-                  <div className="flex items-center gap-2 opacity-40 text-[9px] font-black uppercase tracking-widest"><Info className="h-3 w-3" /> Analytics</div>
+                  <div className="flex items-center gap-2 opacity-40 text-[9px] font-black uppercase tracking-widest"><Info className="h-3 w-3" /> Data Intelligence</div>
                   <div className="space-y-2 text-[8px] uppercase">
-                    <div className="flex justify-between"><span className="text-white/20">Class</span><span className="text-white/60 font-bold">{activeClassification?.group || 'Other'}</span></div>
-                    <div className="flex justify-between"><span className="text-white/20">Quality</span><span className="text-primary font-black">{formValues.overallFidelityScore}%</span></div>
+                    <div className="flex justify-between"><span className="text-white/20">Class</span><span className="text-white/60 font-bold">{activeClassification?.group || 'Unclassified'}</span></div>
+                    <div className="flex justify-between"><span className="text-white/20">Quality</span><span className="text-primary font-black">{formValues.overallFidelityScore}% Fidelity</span></div>
                   </div>
                 </div>
               </div>

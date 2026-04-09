@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, Search, Filter } from 'lucide-react';
+import { Check, Search, Filter, LayoutGrid, FileText } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Label } from './ui/label';
 import type { OptionType } from '@/contexts/app-state-context';
@@ -55,17 +55,18 @@ interface AssetFilterSheetProps {
 const MISSING_FIELD_OPTS = [
   { label: 'None', value: '' },
   { label: 'Description', value: 'description' },
-  { label: 'Asset Class', value: 'category' },
+  { label: 'Category', value: 'category' },
   { label: 'S/N', value: 'sn' },
   { label: 'Serial Number', value: 'serialNumber' },
-  { label: 'Asset ID Code', value: 'assetIdCode' },
+  { label: 'Asset Tag', value: 'assetIdCode' },
 ];
 
-const FilterSection = ({ title, options, selected, onChange }: {
+const FilterSection = ({ title, options, selected, onChange, icon: Icon }: {
   title: string;
   options: OptionType[];
   selected: string[];
   onChange: (value: string[]) => void;
+  icon?: any;
 }) => {
   const handleSelect = (value: string) => {
     if (selected.includes(value)) {
@@ -77,7 +78,9 @@ const FilterSection = ({ title, options, selected, onChange }: {
 
   return (
     <div className="space-y-3">
-      <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">{title}</Label>
+      <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1 flex items-center gap-2">
+        {Icon && <Icon className="h-3 w-3" />} {title}
+      </Label>
       <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] overflow-hidden">
         <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
           <div className="p-2 space-y-1">
@@ -177,16 +180,18 @@ export function AssetFilterSheet({
               <Filter className="text-primary h-6 w-6" /> Filter Registry
             </DialogTitle>
             <DialogDescription className="text-[10px] font-black uppercase text-white/40 tracking-widest mt-1">
-              Refine your asset list by selecting criteria
+              Refine your asset list by selecting criteria.
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="flex-1 bg-black max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="p-10 space-y-10">
-            {/* Unified Search in Filter Sheet */}
+            {/* Unified Description Search */}
             <div className="space-y-3">
-              <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Description Search</Label>
+              <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1 flex items-center gap-2">
+                <FileText className="h-3 w-3" /> Asset Description Search
+              </Label>
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-colors" />
                 <Input 
@@ -200,16 +205,16 @@ export function AssetFilterSheet({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="space-y-10">
-                <FilterSection title="Asset Category" options={categoryOptions} selected={selectedCategories} onChange={setSelectedCategories} />
+                <FilterSection title="Asset Category" icon={LayoutGrid} options={categoryOptions} selected={selectedCategories} onChange={setSelectedCategories} />
                 {isAdmin && (
-                  <FilterSection title="Location / Region" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+                  <FilterSection title="Region" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
                 )}
-                <FilterSection title="Assignee / User" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
+                <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
               </div>
               
               <div className="space-y-10">
-                <FilterSection title="Physical Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
-                <FilterSection title="Verification Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
+                <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+                <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
                 <div className="space-y-4">
                   <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Identify Missing Data</Label>
@@ -248,7 +253,7 @@ export function AssetFilterSheet({
             onClick={() => onOpenChange(false)}
             className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform active:scale-95"
           >
-            Update Results
+            Update Registry
           </Button>
         </div>
       </DialogContent>
