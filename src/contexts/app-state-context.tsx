@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Hardened for high-volume data handling and adaptive workstation logic.
+ * Phase 1500: Production hardening - fixed missing metric definitions and improved sync resilience.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -188,8 +189,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     if (!isHydrated) return;
-    const handleOnline = () => { if (!isOnline) setIsOnline(true); };
-    const handleOffline = () => { if (isOnline) setIsOnline(false); };
+    const handleOnline = () => { if (!isOnline) setIsOnlineStatus(true); };
+    const handleOffline = () => { if (isOnline) setIsOnlineStatus(false); };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -309,6 +310,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
       await refreshRegistry();
+    } catch (e) {
+      addNotification({ title: "Sync Latency Detected", variant: "destructive" });
+    } finally { setIsSyncing(false); }
+  }, [isOnline, refreshRegistry]);
+
+  const manualUpload = useCallback(async () => {
+    if (!isOnline) return;
+    setIsSyncing(true);
+    try {
+      await processSyncQueue();
+      await refreshRegistry();
+    } catch (e) {
+      addNotification({ title: "Upload Pulse Latent", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -317,7 +331,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantId, activeView, setActiveView: (v) => { setActiveViewStatus(v); if (typeof window !== 'undefined') { const p = new URLSearchParams(window.location.search); p.set('v', v.toLowerCase()); router.push(`/?${p.toString()}`, { scroll: false }); } },
-      refreshRegistry, manualDownload, manualUpload: async () => { if (!isOnline) return; await processSyncQueue(); await refreshRegistry(); },
+      refreshRegistry, manualDownload, manualUpload,
       setActiveGrantId: async (id) => { if (!appSettings) return; const next = { ...appSettings, activeGrantId: id }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id }); setAppSettings(next); await refreshRegistry(); },
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       globalStateFilter, setGlobalStateFilter,

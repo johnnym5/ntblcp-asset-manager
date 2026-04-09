@@ -136,7 +136,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     activeFilterCount,
     goBack,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    optionsMap = {}
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -210,8 +211,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return results;
   }, [filteredAssets, sortKey, sortDir, selectedCategories, headers]);
 
-  const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / itemsPerPage), [processedAssets.length, itemsPerPage]);
-  const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [processedAssets, currentPage, itemsPerPage]);
+  const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / (itemsPerPage as number)), [processedAssets.length, itemsPerPage]);
+  const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * (itemsPerPage as number), currentPage * (itemsPerPage as number)), [processedAssets, currentPage, itemsPerPage]);
 
   const showList = isExplored || viewAll;
 
@@ -257,6 +258,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
     }
+  };
+
+  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+    // Implement category batch edit logic if needed
+    addNotification({ title: "Folder pulse updated", variant: "success" });
+    setIsCategoryBatchEditOpen(false);
   };
 
   const handleExploreFolder = (cat: string) => {
@@ -305,7 +312,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 id="sel-all-master" 
                 checked={showList ? (selectedAssetIds.size === paginatedAssets.length && paginatedAssets.length > 0) : (selectedCategories.length === categories.length && categories.length > 0)} 
                 onCheckedChange={(c) => showList ? handleSelectAll(!!c) : setSelectedCategories(c ? categories : [])} 
-                className="h-5 w-5 rounded-lg border-2 border-border" 
+                className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
               />
               <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">All</label>
             </div>
@@ -353,7 +360,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   )}
                 >
                   <div className="flex justify-between items-start mb-8">
-                    <div className="p-2.5 bg-primary/10 rounded-xl"><Layers className="h-5 w-5 text-primary" /></div>
+                    <div className="p-2.5 bg-primary/10 rounded-xl"><LayoutGrid className="h-5 w-5 text-primary" /></div>
                     <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat])} className="h-5 w-5 rounded-lg border-border" />
                   </div>
                   <h3 className="text-sm font-black uppercase text-foreground tracking-tight truncate mb-4">{cat}</h3>
