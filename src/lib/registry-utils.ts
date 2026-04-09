@@ -2,6 +2,7 @@
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
  * Phase 810: Hardened for independent folder templates and fuzzy property mapping.
+ * Phase 811: Optimized transformAssetToRecord to handle Chassis/Engine for vehicles.
  */
 
 import type { Asset } from "@/types/domain";

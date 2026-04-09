@@ -3,6 +3,7 @@
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
  * Hardened for deployment: Sign out now performs a deterministic wipe of local asset data.
+ * Phase 400: Synchronizes user permissions with cloud authorized list on every load.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -67,11 +68,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         const authorizedUsersList = appSettings?.authorizedUsers || [];
         const allUsers = [...authorizedUsersList, superAdmin];
+        
+        // Use the profile from cloud settings if it exists, to ensure updated permissions
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
           const mergedProfile: LocalUserProfile = {
             ...profile,
+            displayName: authorizedUser.displayName, // Update if renamed in settings
             states: authorizedUser.states,
             isZonalAdmin: authorizedUser.isZonalAdmin,
             assignedZone: authorizedUser.assignedZone,
@@ -84,6 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProfileSetupComplete(true);
           FirebaseAuthService.ensureSession();
         } else {
+          // User was removed from authorized list
           localStorage.removeItem('assetain-user-session');
           setUserProfile(null);
           setProfileSetupComplete(false);
@@ -127,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      // Automated Initial Download
+      // Automated Initial Download pulse for new session
       await manualDownload();
       
     } catch (e) {
@@ -151,7 +156,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       window.location.href = '/';
     } catch (e) {
       console.error("Auth: Logout failure", e);
-      // Fallback redirect even if database wipe fails
       window.location.href = '/';
     } finally {
       setLoading(false);

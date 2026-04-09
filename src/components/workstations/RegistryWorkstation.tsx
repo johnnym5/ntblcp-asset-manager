@@ -729,7 +729,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
       />
 
-      {/* Administrative Confirmation Modals */}
       <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-background text-foreground">
           <AlertDialogHeader>
