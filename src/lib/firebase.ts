@@ -16,6 +16,7 @@ import { firebaseConfig as staticConfig } from "@/firebase/config";
  * 
  * Authoritative source for Firebase SDK instances.
  * Hardened for high-latency resilience and idempotent multi-tab stability.
+ * Phase 1102: Refined Firestore initialization to resolve lease contestation warnings.
  */
 
 const firebaseConfig = {
@@ -39,14 +40,19 @@ let rtdb: Database | undefined;
 if (typeof window !== 'undefined') {
   if (isConfigValid) {
     try {
+      // 1. Initialize or Retrieve Firebase App
       if (!getApps().length) {
         app = initializeApp(firebaseConfig);
       } else {
         app = getApp();
       }
       
-      // Idempotent Firestore Protocol: Prevents lease contestation and backfill errors.
+      // 2. Deterministic Firestore Initialization
+      // We attempt to retrieve the existing instance first to avoid lease contestation.
       try {
+        db = getFirestore(app);
+      } catch (e) {
+        // If not already initialized, perform structural initialization with persistence.
         db = initializeFirestore(app, {
           localCache: persistentLocalCache({
             tabManager: persistentMultipleTabManager()
@@ -54,10 +60,9 @@ if (typeof window !== 'undefined') {
           experimentalForceLongPolling: true,
           ignoreUndefinedProperties: true
         });
-      } catch (e) {
-        db = getFirestore(app);
       }
 
+      // 3. Initialize Auth & RTDB
       auth = getAuth(app);
       if (isRtdbConfigValid) {
         rtdb = getDatabase(app);
