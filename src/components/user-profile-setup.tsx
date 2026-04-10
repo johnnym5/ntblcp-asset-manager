@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Authentication Gateway.
- * Phase 305: Login button now initiates the "Initialize Pulse" which includes RBAC-aware download.
+ * Updated with requested terminology: "Input Username" and "Passcode".
  */
 
 import React, { useState } from 'react';
@@ -59,7 +58,7 @@ export default function UserProfileSetup() {
   const handleLoginAttempt = () => {
     setError(null);
     if (!email) {
-      setError("Please enter your email or login ID.");
+      setError("Please enter your username.");
       return;
     }
 
@@ -94,7 +93,7 @@ export default function UserProfileSetup() {
     }
     
     if (!password) {
-      setError("Please enter your password.");
+      setError("Please enter your passcode.");
       return;
     }
 
@@ -143,29 +142,29 @@ export default function UserProfileSetup() {
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Package className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle className="text-2xl font-black tracking-tight">Assetain Registry</AlertDialogTitle>
+                    <AlertDialogTitle className="text-2xl font-black tracking-tight">Assetain Login</AlertDialogTitle>
                     <AlertDialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                        Secure Authentication Gateway
+                        Secure Access Portal
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4 space-y-4">
                 {!foundUser || isMultiStateUser ? (
                     <>
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Identity (Email or ID)</Label>
+                            <Label htmlFor="username" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Input Username</Label>
                             <Input 
-                            id="email" 
+                            id="username" 
                             type="text"
-                            placeholder="username or email"
+                            placeholder="username"
                             value={email} 
                             onChange={(e) => setEmail(e.target.value)}
                             className="h-11 rounded-xl"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password" title="password" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Access Passphrase</Label>
+                            <Label htmlFor="passcode" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Passcode</Label>
                             <Input 
-                            id="password" 
+                            id="passcode" 
                             type="password"
                             placeholder="••••••••"
                             value={password} 
@@ -180,12 +179,12 @@ export default function UserProfileSetup() {
                 {isMultiStateUser && (
                     <>
                      <Separator className="opacity-50" />
-                     <p className="text-[11px] text-center font-medium text-muted-foreground leading-relaxed">Identity verified. Please select your regional authorized scope for this session.</p>
+                     <p className="text-[11px] text-center font-medium text-muted-foreground leading-relaxed">Identity verified. Please select your regional location.</p>
                      <div className="space-y-2">
                         <Label htmlFor="state" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Regional Scope</Label>
                         <Select onValueChange={setSelectedState} value={selectedState}>
                             <SelectTrigger id="state" className="h-11 rounded-xl">
-                            <SelectValue placeholder="Select a location..." />
+                            <SelectValue placeholder="Select location..." />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
                                 {foundUser.states.map((state) => (
@@ -202,7 +201,7 @@ export default function UserProfileSetup() {
                 {(error) && (
                     <Alert variant="destructive" className="rounded-2xl border-2 bg-destructive/5">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle className="font-bold">Authentication Failed</AlertTitle>
+                        <AlertTitle className="font-bold">Access Denied</AlertTitle>
                         <AlertDescription className="text-xs">{error}</AlertDescription>
                     </Alert>
                 )}
@@ -210,19 +209,19 @@ export default function UserProfileSetup() {
                 <AlertDialogFooter className="mt-2">
                     {isMultiStateUser ? (
                         <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || isSyncing || !selectedState}>
-                            {isSaving || isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Initialize Pulse'}
+                            {isSaving || isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Enter System'}
                         </Button>
                     ) : (
                         <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={handleLoginAttempt} disabled={isSaving || isSyncing}>
                             {isSaving || isSyncing ? (
                               <div className="flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Configuring Workstation...</span>
+                                <span>Verifying...</span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
                                 <Zap className="h-4 w-4 fill-current" />
-                                <span>Sign In to System</span>
+                                <span>Login</span>
                               </div>
                             )}
                         </Button>

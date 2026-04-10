@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Intelligence Hub - Executive Overview.
- * Deployment Pulse: Prioritized logic and high-density operational ledger.
+ * @fileOverview Dashboard Center - Registry Overview.
+ * Terminology update: Field Assessment, Registry Admin.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -142,8 +142,8 @@ export function DashboardWorkstation() {
 
   const modeInfo = useMemo(() => {
     switch(mode) {
-      case 'verification': return { icon: ClipboardCheck, label: 'Verification Protocol', desc: 'High-speed assessment & official reporting.' };
-      default: return { icon: ShieldCheck, label: 'Management Protocol', desc: 'Registry governance & project oversight.' };
+      case 'verification': return { icon: ClipboardCheck, label: 'Field Assessment', desc: 'Assess asset condition and report site findings.' };
+      default: return { icon: ShieldCheck, label: 'Registry Admin', desc: 'Manage global project registers and governance.' };
     }
   }, [mode]);
 
@@ -170,20 +170,20 @@ export function DashboardWorkstation() {
           </div>
           <div className="flex items-center gap-3 relative z-10">
             <TactileMenu 
-              title="Operational Tools"
+              title="Operational Controls"
               options={[
-                { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                { label: 'Browse Folders', icon: LayoutGrid, onClick: () => { setGroupsViewMode('category'); setActiveView('GROUPS'); } },
-                { label: 'Asset Conditions', icon: Activity, onClick: () => { setGroupsViewMode('condition'); setActiveView('GROUPS'); } },
-                { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
-                ...(isAdmin ? [{ label: 'System Settings', icon: Settings, onClick: () => setActiveView('SETTINGS') }] : [])
+                { label: 'Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+                { label: 'Asset Folders', icon: LayoutGrid, onClick: () => { setGroupsViewMode('category'); setActiveView('GROUPS'); } },
+                { label: 'Condition Hub', icon: Activity, onClick: () => { setGroupsViewMode('condition'); setActiveView('GROUPS'); } },
+                { label: 'Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+                ...(isAdmin ? [{ label: 'Settings', icon: Settings, onClick: () => setActiveView('SETTINGS') }] : [])
               ]}
             >
               <Badge 
                 onClick={() => setActiveView('REGISTRY')}
                 className="cursor-pointer bg-primary text-black font-black uppercase text-[9px] tracking-widest px-5 h-9 rounded-full shadow-lg border-2 border-black hover:scale-105 transition-transform"
               >
-                LIVE REGISTRY PROTOCOL
+                ACCESS REGISTRY CENTER
               </Badge>
             </TactileMenu>
           </div>
@@ -196,7 +196,7 @@ export function DashboardWorkstation() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-[9px] font-black uppercase text-foreground/40 tracking-[0.3em] flex items-center gap-2">
-              <Eye className="h-3 w-3" /> Registry Sample
+              <Eye className="h-3 w-3" /> Record Sample
             </h3>
           </div>
           <div className="relative group min-h-[200px]">
@@ -225,7 +225,7 @@ export function DashboardWorkstation() {
                       <div className="p-5 bg-muted/30 rounded-2xl border-2 border-border/40 shrink-0 shadow-inner"><LayoutGrid className="h-10 w-10 text-primary/40" /></div>
                       <div className="space-y-3 flex-1 min-w-0">
                         <div className="space-y-0.5">
-                          <span className="text-[8px] font-black uppercase text-primary tracking-widest">At a Glance</span>
+                          <span className="text-[8px] font-black uppercase text-primary tracking-widest">Registry Glance</span>
                           <h4 className="text-lg font-black uppercase text-foreground truncate">{glanceAssets[glanceIndex].description}</h4>
                         </div>
                         <div className="flex items-center gap-3">
@@ -245,7 +245,7 @@ export function DashboardWorkstation() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-[9px] font-black uppercase text-foreground/40 tracking-[0.3em] flex items-center gap-2">
-              <FileWarning className="h-3 w-3" /> Issue Scanner
+              <FileWarning className="h-3 w-3" /> Exception Scanner
             </h3>
           </div>
           <div className="relative group min-h-[200px]">
@@ -308,12 +308,12 @@ export function DashboardWorkstation() {
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-primary/10 rounded-xl"><Terminal className="h-5 w-5 text-primary" /></div>
               <div className="space-y-0.5">
-                <CardTitle className="text-lg font-black uppercase tracking-tight">System Ledger</CardTitle>
-                <CardDescription className="text-[8px] font-black uppercase tracking-widest">Real-time trace pulse</CardDescription>
+                <CardTitle className="text-lg font-black uppercase tracking-tight">Activity History</CardTitle>
+                <CardDescription className="text-[8px] font-black uppercase tracking-widest">Real-time update pulse</CardDescription>
               </div>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{pendingSync.length} WAITING</Badge>
+              <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{pendingSync.length} PENDING</Badge>
               <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{recentActivity.length} EVENTS</Badge>
             </div>
           </CardHeader>
@@ -323,19 +323,19 @@ export function DashboardWorkstation() {
                 <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-4 text-left">
                     <CloudUpload className={cn("h-4 w-4", pendingSync.length > 0 ? "text-orange-500 animate-pulse" : "text-green-500")} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Cloud Reconciliation</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">Registry Sync Queue</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-6">
                   <div className="space-y-2 mb-4">
                     {pendingSync.slice(0, 3).map(q => (
                       <div key={q.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
-                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Registry Update'}</span>
+                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Record Update'}</span>
                         <Badge variant="outline" className="text-[7px] font-mono">{q.operation}</Badge>
                       </div>
                     ))}
                   </div>
-                  <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Write-Log</Button>
+                  <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Changes</Button>
                 </AccordionContent>
               </AccordionItem>
 
@@ -343,7 +343,7 @@ export function DashboardWorkstation() {
                 <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-4 text-left">
                     <GitPullRequest className="h-4 w-4 text-blue-500" />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Adjudication Feed</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">Decision Inbox</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-6">
@@ -363,7 +363,7 @@ export function DashboardWorkstation() {
                 <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-4 text-left">
                     <History className="h-4 w-4 text-primary" />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Recent Activity</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">Recent Updates</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-6">
@@ -376,7 +376,7 @@ export function DashboardWorkstation() {
                       </div>
                     ))}
                   </div>
-                  <Button variant="outline" onClick={() => setActiveView('AUDIT_LOG')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Forensic Registry Ledger</Button>
+                  <Button variant="outline" onClick={() => setActiveView('AUDIT_LOG')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Full History Ledger</Button>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

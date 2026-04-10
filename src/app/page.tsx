@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Deployment Pulse: Optimized header for mobile (Collapsible search, visible sync).
- * Phase 1422: Refined gaps and hit-zones for high-density touch displays.
+ * Terminology update: Dashboard, Registry, Settings, History.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -22,7 +21,7 @@ import {
   Info,
   ChevronLeft,
   Activity,
-  History,
+  History as HistoryIcon,
   LayoutDashboard,
   ShieldCheck,
   ClipboardCheck,
@@ -195,17 +194,16 @@ export default function SPAHub() {
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
                 <TactileMenu 
-                  title="Navigate To"
+                  title="Registry Navigation"
                   options={[
-                    { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-                    { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    { label: 'Asset Folders', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
-                    { label: 'Executive Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
-                    { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-                    { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
-                    { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') },
+                    { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+                    { label: 'Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+                    { label: 'Folders', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
+                    { label: 'Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
+                    { label: 'Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
+                    { label: 'History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
                     ...(isAdmin ? [
-                      { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+                      { label: 'Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
                     ] : [])
                   ]}
                 >
@@ -218,11 +216,11 @@ export default function SPAHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="Registry Quick-Jump"
+            title="Quick Jumps"
             options={[
-              { label: 'Home Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-              { label: 'Browse Assets', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              { label: 'Activity History', icon: History, onClick: () => setActiveView('AUDIT_LOG') }
+              { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+              { label: 'Registry', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
+              { label: 'History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') }
             ]}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -230,7 +228,7 @@ export default function SPAHub() {
               {!isMobile && (
                 <div className="flex flex-col text-left">
                   <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'STANDARD'}</span>
+                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'ASSESSMENT' : 'GOVERNANCE'}</span>
                 </div>
               )}
             </button>
@@ -261,7 +259,7 @@ export default function SPAHub() {
                 <Search className="h-3.5 w-3.5 text-primary" />
                 <input 
                   autoFocus
-                  placeholder="Search..."
+                  placeholder="Search Registry..."
                   className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
                   onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
                 />
@@ -270,7 +268,7 @@ export default function SPAHub() {
             ) : (
               <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
                 <Search className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search Registry...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search...</span>
                 <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
               </button>
             )}
@@ -296,7 +294,7 @@ export default function SPAHub() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Approval Inbox</TooltipContent>
+                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
