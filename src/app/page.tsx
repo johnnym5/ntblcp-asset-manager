@@ -2,12 +2,8 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Implements seamless workstation transitions and multi-function navigation.
- * Normalized naming to professional Asset Manager standards.
- * Phase 1410: Integrated transient 5-second Notification Toasts.
- * Phase 1414: Removed redundant VERIFY view and consolidated navigation.
- * Phase 1415: Integrated high-fidelity Sync Status Dialog via long-press triggers.
- * Phase 1416: Anchored transient toasts directly under the notification bell.
+ * Phase 1420: Integrated Mode-Aware Accent Classes.
+ * Phase 1421: Bell long-press triggers Activity History pulse.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -180,12 +176,17 @@ export default function SPAHub() {
 
   // High-Fidelity Sync Dialog Trigger Pulse
   const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
+  
+  // Notification Bell Long Press -> Activity History
+  const bellLongPress = useLongPress(() => setActiveView('AUDIT_LOG'));
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
+  const modeClass = appSettings?.appMode === 'verification' ? 'mode-verification' : appSettings?.appMode === 'reporting' ? 'mode-reporting' : '';
+
   return (
-    <div className="app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden">
+    <div className={cn("app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden", modeClass)}>
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
@@ -203,7 +204,7 @@ export default function SPAHub() {
                   options={[
                     { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
                     { label: 'Asset Hub', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    { label: 'Asset Folders', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
+                    { label: 'Asset Folders', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
                     { label: 'Executive Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
                     { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
                     { label: 'Pattern Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
@@ -294,26 +295,22 @@ export default function SPAHub() {
             </button>
           </TactileMenu>
           
-          <TactileMenu
-            title="System Notifications"
-            options={[
-              { label: 'View All', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Mark All Read', icon: CheckCircle2, onClick: markAllAsRead },
-              { label: 'Clear History', icon: Trash2, onClick: clearAll, destructive: true }
-            ]}
-          >
-            <div className="relative">
-              <button onClick={() => setIsNotificationsOpen(true)} className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative">
-                <Bell className="h-4.5 w-4.5" />
-                {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
-              </button>
-              
-              {/* Transient Dropdown Toast Pulse */}
-              <AnimatePresence>
-                {activeToast && <BellNotificationToast notification={activeToast} />}
-              </AnimatePresence>
-            </div>
-          </TactileMenu>
+          <div className="relative">
+            <button 
+              {...bellLongPress}
+              onClick={() => setIsNotificationsOpen(true)} 
+              onContextMenu={(e) => { e.preventDefault(); setActiveView('AUDIT_LOG'); }}
+              className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
+            </button>
+            
+            {/* Transient Dropdown Toast Pulse */}
+            <AnimatePresence>
+              {activeToast && <BellNotificationToast notification={activeToast} />}
+            </AnimatePresence>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
