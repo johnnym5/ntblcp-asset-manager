@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 1510: Fully optimized for deployment stability.
- * Phase 1511: Added folder-specific column customization trigger.
+ * Phase 1610: Hardened Sorting Protocol for Asset IDs and Technical Identifiers.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -148,6 +147,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isAssetDeleteOpen, setIsAssetDeleteOpen] = useState(false);
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
@@ -215,6 +216,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             case "sn": return item.sn || "";
             case "asset_description": return item.description || "";
             case "asset_id_code": return item.assetIdCode || "";
+            case "location": return item.location || "";
+            case "condition": return item.condition || "";
             default: return String((item.metadata as any)?.[sortHeader.rawName] || "");
           }
         };
@@ -793,6 +796,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           sheetDefinition={selectedSheetDef}
           originalSheetName={originalSheetName}
           onSave={(orig, newDef, all) => {
+            if (!activeGrantId) return;
             const updatedGrants = appSettings?.grants.map(grant => {
               if (grant.id === activeGrantId) {
                 const newSheetDefs = { ...grant.sheetDefinitions };
