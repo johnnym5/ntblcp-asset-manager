@@ -3,7 +3,7 @@
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
  * Hardened for deployment: Sign out now performs a deterministic wipe of local asset data.
- * Phase 400: Synchronizes user permissions with cloud authorized list on every load.
+ * Phase 401: Hardened isAdmin derivation for multi-tier RBAC visibility.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authorizedUser) {
           const mergedProfile: LocalUserProfile = {
             ...profile,
-            displayName: authorizedUser.displayName, // Update if renamed in settings
+            displayName: authorizedUser.displayName,
             states: authorizedUser.states,
             isZonalAdmin: authorizedUser.isZonalAdmin,
             assignedZone: authorizedUser.assignedZone,

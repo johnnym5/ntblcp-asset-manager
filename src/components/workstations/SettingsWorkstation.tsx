@@ -3,7 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Control Center.
  * Deployment Pulse: Hardened RBAC logic and deterministic patch reflection.
- * Phase 1608: Fixed Admin tab visibility and patched immediate local storage reflection.
+ * Phase 1610: Fixed Admin tab visibility and implemented Global S/N Normalization.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -37,7 +37,9 @@ import {
   Info,
   HeartPulse,
   Database,
-  Truck
+  Truck,
+  Hash,
+  SortAsc
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -110,6 +112,7 @@ export function SettingsWorkstation() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // RBAC Checks - Hardened for ADMIN role
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const isZonalAdmin = !!userProfile?.isZonalAdmin;
@@ -128,6 +131,55 @@ export function SettingsWorkstation() {
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
+  };
+
+  /**
+   * RE-INDEXING PATCH
+   * Sorts assets in every folder by Asset ID Tag and assigns S/N sequentially.
+   */
+  const handleApplyGlobalSNPatch = async () => {
+    if (!assets || assets.length === 0) return;
+    setIsPatching(true);
+    try {
+      const categories = Array.from(new Set(assets.map(a => a.category)));
+      const updatedAssets = [...assets];
+      let patchCount = 0;
+
+      for (const cat of categories) {
+        // 1. Get and sort assets for this folder specifically
+        const catAssets = assets.filter(a => a.category === cat)
+          .sort((a, b) => (a.assetIdCode || '').localeCompare(b.assetIdCode || '', undefined, { numeric: true }));
+        
+        // 2. Map back to main array with new S/N
+        catAssets.forEach((asset, idx) => {
+          const mainIdx = updatedAssets.findIndex(a => a.id === asset.id);
+          if (mainIdx > -1) {
+            const updated: Asset = {
+              ...updatedAssets[mainIdx],
+              sn: String(idx + 1),
+              lastModified: new Date().toISOString(),
+              lastModifiedBy: userProfile?.displayName || 'System Normalization'
+            };
+            updatedAssets[mainIdx] = updated;
+            enqueueMutation('UPDATE', 'assets', updated);
+            patchCount++;
+          }
+        });
+      }
+
+      await storage.saveAssets(updatedAssets);
+      await refreshRegistry();
+      
+      addNotification({ 
+        title: "S/N Normalization Complete", 
+        description: `Successfully re-indexed ${patchCount} records across all folders.`,
+        variant: "success"
+      });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Normalization Failure" });
+    } finally {
+      setIsPatching(false);
+    }
   };
 
   const handleApplyMotorbikePatch = async () => {
@@ -269,9 +321,9 @@ export function SettingsWorkstation() {
           <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
               <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Environment</TabsTrigger>
-              {isAdmin && !isZonalAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Project Scope</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Project Scope</TabsTrigger>}
               {(isAdmin || isZonalAdmin) && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Personnel</TabsTrigger>}
-              {isAdmin && !isZonalAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Activity Log</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Activity Log</TabsTrigger>}
               {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Infrastructure</TabsTrigger>}
             </TabsList>
           </div>
@@ -303,22 +355,44 @@ export function SettingsWorkstation() {
 
           {isAdmin && (
             <SettingSection title="Data Governance" description="Technical Pulse Maintenance" icon={Wrench}>
-              <div className="p-6 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
-                <div className="flex items-center gap-3">
-                  <Truck className="h-5 w-5 text-primary" />
-                  <h4 className="text-sm font-black uppercase">Normalized Transport Patch</h4>
+              <div className="space-y-6">
+                {/* Global SN Patch */}
+                <div className="p-6 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <SortAsc className="h-5 w-5 text-primary" />
+                    <h4 className="text-sm font-black uppercase">Normalize Global S/N Pulse</h4>
+                  </div>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                    Re-indexes all assets sequentially based on Asset ID Tag sort order, unique to each folder.
+                  </p>
+                  <Button 
+                    onClick={handleApplyGlobalSNPatch} 
+                    disabled={isPatching}
+                    className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform active:scale-95"
+                  >
+                    {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hash className="h-4 w-4 mr-2" />}
+                    Execute S/N Normalization
+                  </Button>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                  Bulk patches all motorbikes: Sets manufacturer to Bajaj and extracts short serials from ID codes.
-                </p>
-                <Button 
-                  onClick={handleApplyMotorbikePatch} 
-                  disabled={isPatching}
-                  className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform active:scale-95"
-                >
-                  {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-                  Execute Motorbike Patch
-                </Button>
+
+                {/* Motorbike Patch */}
+                <div className="p-6 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <Truck className="h-5 w-5 text-primary" />
+                    <h4 className="text-sm font-black uppercase">Normalized Transport Patch</h4>
+                  </div>
+                  <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                    Bulk patches all motorbikes: Sets manufacturer to Bajaj and extracts short serials from ID codes.
+                  </p>
+                  <Button 
+                    onClick={handleApplyMotorbikePatch} 
+                    disabled={isPatching}
+                    className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform active:scale-95"
+                  >
+                    {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                    Execute Motorbike Patch
+                  </Button>
+                </div>
               </div>
             </SettingSection>
           )}
