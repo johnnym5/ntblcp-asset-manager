@@ -5,6 +5,7 @@
  * Phase 1605: RBAC visibility hardening. Non-SuperAdmins cannot see Health.
  * Phase 1606: Implemented Motorbike Pulse Patch for Bajaj/SN normalization.
  * Phase 1607: Consolidated to 2 App Modes (Management / Verification).
+ * Phase 1608: Fixed Admin tab visibility and patched immediate local storage reflection.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -145,27 +146,41 @@ export function SettingsWorkstation() {
         return;
       }
 
-      for (const asset of motorbikeAssets) {
-        const idMatch = (asset.assetIdCode || '').match(/\/(\d+)$/);
-        const extractedSn = idMatch ? idMatch[1] : asset.sn;
+      const updatedAssets = [...assets];
+      let patchCount = 0;
 
-        const updated: Asset = {
-          ...asset,
-          manufacturer: 'Bajaj',
-          sn: extractedSn,
-          lastModified: new Date().toISOString(),
-          lastModifiedBy: userProfile?.displayName || 'System Patch'
-        };
+      for (let i = 0; i < updatedAssets.length; i++) {
+        const asset = updatedAssets[i];
+        const cat = (asset.category || '').toUpperCase();
+        if (cat.includes('MOTORCYCLE') || cat.includes('MOTORBIKE')) {
+          const idMatch = (asset.assetIdCode || '').match(/\/(\d+)$/);
+          const extractedSn = idMatch ? idMatch[1] : asset.sn;
 
-        await enqueueMutation('UPDATE', 'assets', updated);
+          const updated: Asset = {
+            ...asset,
+            manufacturer: 'Bajaj',
+            sn: extractedSn,
+            lastModified: new Date().toISOString(),
+            lastModifiedBy: userProfile?.displayName || 'System Patch'
+          };
+
+          updatedAssets[i] = updated;
+          await enqueueMutation('UPDATE', 'assets', updated);
+          patchCount++;
+        }
       }
 
+      // Commit to local storage IMMEDIATELY so refreshRegistry reflects it
+      await storage.saveAssets(updatedAssets);
       await refreshRegistry();
+      
       addNotification({ 
         title: "Motorbike Patch Applied", 
-        description: `Successfully normalized ${motorbikeAssets.length} records to Bajaj / Trailing ID.`,
+        description: `Successfully normalized ${patchCount} records to Bajaj / Trailing ID.`,
         variant: "success"
       });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Patch Failure", description: "Failed to apply data normalization." });
     } finally {
       setIsPatching(false);
     }
@@ -276,9 +291,9 @@ export function SettingsWorkstation() {
           </div>
           <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
-              {!isZonalAdmin && <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>}
+              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>
               {isAdmin && !isZonalAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
+              {(isAdmin || isZonalAdmin) && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
               {isAdmin && !isZonalAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Audit Trail</TabsTrigger>}
               {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Infrastructure</TabsTrigger>}
             </TabsList>

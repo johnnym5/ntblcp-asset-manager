@@ -4,6 +4,7 @@
  * @fileOverview ColumnCustomizationSheet - High-Fidelity Asset Group Schema Editor.
  * Phase 400: Added In-Checklist visibility control for folder-specific fidelity pulses.
  * Phase 401: Converted to centered Dialog pop-up window.
+ * Phase 402: Optimized triple-view toggles (Table, Quick, Checklist) for independent folder headers.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -35,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { SheetDefinition, DisplayField } from '@/types/domain';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -109,8 +111,8 @@ export function ColumnCustomizationSheet({
                   <Layers className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Field Setup</DialogTitle>
-                  <DialogDescription className="font-bold uppercase text-[9px] tracking-[0.3em] text-primary mt-1.5">FOLDER SCHEMA ORCHESTRATION</DialogDescription>
+                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Folder Setup</DialogTitle>
+                  <DialogDescription className="font-bold uppercase text-[9px] tracking-[0.3em] text-primary mt-1.5">CONFIGURE INDEPENDENT SCHEMA</DialogDescription>
                 </div>
               </div>
             </div>
@@ -123,15 +125,17 @@ export function ColumnCustomizationSheet({
             <p className="text-base font-black uppercase tracking-tight">{editedName}</p>
           </div>
           <Badge variant="outline" className="h-8 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
-            <Database className="h-3.5 w-3.5 mr-2" /> Local Schema active
+            <Database className="h-3.5 w-3.5 mr-2" /> Global Template Control
           </Badge>
         </div>
 
         <div className="flex items-center px-10 py-4 bg-muted/10 border-b border-border text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
-          <div className="flex-1">Field Label (Header Map)</div>
-          <div className="w-20 text-center flex flex-col items-center gap-1"><LayoutGrid className="h-3 w-3" /> Table</div>
-          <div className="w-20 text-center flex flex-col items-center gap-1"><Eye className="h-3 w-3" /> Quick</div>
-          <div className="w-20 text-center flex flex-col items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Check</div>
+          <div className="flex-1">Registry Header Mapping</div>
+          <div className="flex gap-8 pr-4">
+            <div className="w-16 text-center flex flex-col items-center gap-1"><LayoutGrid className="h-3 w-3" /> List</div>
+            <div className="w-16 text-center flex flex-col items-center gap-1"><Eye className="h-3 w-3" /> Card</div>
+            <div className="w-16 text-center flex flex-col items-center gap-1"><ClipboardCheck className="h-3 w-3" /> Check</div>
+          </div>
         </div>
 
         <ScrollArea className="flex-1 px-10 bg-background custom-scrollbar">
@@ -150,33 +154,25 @@ export function ColumnCustomizationSheet({
                   </button>
                 </div>
 
-                <div className="flex-1 pr-6">
-                  <Input value={field.label} onChange={(e) => handleLabelChange(idx, e.target.value)} className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-border/40 focus:border-primary/40 font-black uppercase text-sm tracking-tight transition-all px-0 hover:px-4 focus:px-4 shadow-none" />
+                <div className="flex-1 pr-6 min-w-0">
+                  <Input value={field.label} onChange={(e) => handleLabelChange(idx, e.target.value)} className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-border/40 focus:border-primary/40 font-black uppercase text-sm tracking-tight transition-all px-0 hover:px-4 focus:px-4 shadow-none truncate" />
                   <div className="flex items-center gap-1.5 mt-1 opacity-20 group-hover:opacity-40 transition-opacity pl-0 group-hover:pl-4">
-                    <Hash className="h-2.5 w-2.5" /><span className="text-[8px] font-mono font-bold uppercase">{field.key}</span>
+                    <Hash className="h-2.5 w-2.5" /><span className="text-[8px] font-mono font-bold uppercase truncate">{field.key}</span>
                   </div>
                 </div>
 
-                <div className="w-20 flex justify-center">
-                  <Switch 
-                    checked={field.table} 
-                    onCheckedChange={() => handleToggle(idx, 'table')} 
-                    className="data-[state=checked]:bg-primary" 
-                  />
-                </div>
-                <div className="w-20 flex justify-center">
-                  <Switch 
-                    checked={field.quickView} 
-                    onCheckedChange={() => handleToggle(idx, 'quickView')} 
-                    className="data-[state=checked]:bg-primary" 
-                  />
-                </div>
-                <div className="w-20 flex justify-center">
-                  <Switch 
-                    checked={!!field.inChecklist} 
-                    onCheckedChange={() => handleToggle(idx, 'inChecklist')} 
-                    className="data-[state=checked]:bg-primary" 
-                  />
+                <div className="flex items-center gap-8 shrink-0">
+                  <TooltipProvider>
+                    <div className="w-16 flex justify-center">
+                      <Tooltip><TooltipTrigger asChild><Switch checked={field.table} onCheckedChange={() => handleToggle(idx, 'table')} className="data-[state=checked]:bg-primary" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Table Visibility</TooltipContent></Tooltip>
+                    </div>
+                    <div className="w-16 flex justify-center">
+                      <Tooltip><TooltipTrigger asChild><Switch checked={field.quickView} onCheckedChange={() => handleToggle(idx, 'quickView')} className="data-[state=checked]:bg-primary" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Card Visibility</TooltipContent></Tooltip>
+                    </div>
+                    <div className="w-16 flex justify-center">
+                      <Tooltip><TooltipTrigger asChild><Switch checked={!!field.inChecklist} onCheckedChange={() => handleToggle(idx, 'inChecklist')} className="data-[state=checked]:bg-primary" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Fidelity Checklist</TooltipContent></Tooltip>
+                    </div>
+                  </TooltipProvider>
                 </div>
               </div>
             ))}
@@ -187,7 +183,7 @@ export function ColumnCustomizationSheet({
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] hover:bg-muted">Cancel</Button>
           <div className="flex-[3] flex gap-4">
             <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2">Apply to All Folders</Button>
-            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-primary-foreground">Save Folder Layout</Button>
+            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-primary-foreground">Save Folder Schema</Button>
           </div>
         </DialogFooter>
       </DialogContent>

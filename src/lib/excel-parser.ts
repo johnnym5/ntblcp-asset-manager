@@ -128,11 +128,13 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
       groups.forEach(group => {
           const displayFields = group.headerSet.map(h => {
               const key = normalizeHeaderName(h);
+              const isIdentification = ['sn', 'description', 'location', 'assetIdCode', 'serialNumber'].includes(key);
               return {
                   key: key as keyof Asset,
                   label: h,
-                  table: ['sn', 'description', 'location', 'assetIdCode'].includes(key),
-                  quickView: true
+                  table: isIdentification,
+                  quickView: true,
+                  inChecklist: isIdentification // Default check pulse for core data
               };
           });
 
