@@ -1,9 +1,8 @@
-
 "use client";
 
 /**
  * @fileOverview TravelReportDialog - High-Fidelity Word Document Generator.
- * Phase 45: Removed AI Narrative Pulse.
+ * Phase 46: Consolidated modes and added automated statistical tables per category.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -74,20 +73,35 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   const stats = useMemo(() => {
     const verified = assets.filter(a => a.status === 'VERIFIED');
-    const stolen = assets.filter(a => a.condition === 'Stolen').length;
-    const bad = assets.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt'].includes(a.condition || '')).length;
-    const missingSerial = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length;
-    const missingTag = assets.filter(a => !a.assetIdCode).length;
+    const total = assets.length;
+    
+    // Group by category for the automated table
+    const categories = Array.from(new Set(assets.map(a => a.category)));
+    const breakdown = categories.map(cat => {
+      const catAssets = assets.filter(a => a.category === cat);
+      const catVerified = catAssets.filter(a => a.status === 'VERIFIED').length;
+      const conditions = {
+        good: catAssets.filter(a => a.conditionGroup === 'Good').length,
+        bad: catAssets.filter(a => a.conditionGroup === 'Bad').length,
+        stolen: catAssets.filter(a => a.conditionGroup === 'Stolen').length,
+        obsolete: catAssets.filter(a => a.conditionGroup === 'Obsolete').length,
+        unsalvageable: catAssets.filter(a => a.conditionGroup === 'Unsalvageable').length
+      };
+      return {
+        name: cat,
+        total: catAssets.length,
+        verified: catVerified,
+        unverified: catAssets.length - catVerified,
+        conditions
+      };
+    });
 
     return {
-        total: assets.length,
+        total,
         verifiedCount: verified.length,
-        unverifiedCount: assets.length - verified.length,
-        stolen,
-        bad,
-        missingSerial,
-        missingTag,
-        percentage: assets.length > 0 ? Math.round((verified.length / assets.length) * 100) : 0
+        unverifiedCount: total - verified.length,
+        percentage: total > 0 ? Math.round((verified.length / total) * 100) : 0,
+        breakdown
     };
   }, [assets]);
 
@@ -98,25 +112,27 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
       setObjectives(`To conduct mandatory physical asset verification and condition assessment for the ${activeProject} registry in ${initialState}.`);
       setActivities(defaultActivities);
-      
-      let obs = `Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`;
-      if (stats.stolen > 0) obs += `\n- CRITICAL: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
-      if (stats.bad > 0) obs += `\n- CONDITION: Identified ${stats.bad} assets in critical or unsalvageable state.`;
-      if (stats.missingSerial > 0) obs += `\n- QUALITY: ${stats.missingSerial} records are missing Manufacturer Serial numbers.`;
-      setObservations(obs);
-
+      setObservations(`Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`);
       setChallenges("Internet connectivity in remote LGAs was intermittent.\nDifficulty accessing locked storage rooms in certain facilities.");
-      setRecommendations("Immediate replacement of obsolete equipment identified.\nImprove security protocols in facility stores with reported losses.\nConduct data cleaning exercise to capture missing serial numbers.");
+      setRecommendations("Immediate replacement of obsolete equipment identified.\nImprove security protocols in facility stores with reported losses.");
     }
   }, [isOpen, userProfile, stats, activeProject]);
 
   const generateWordDocument = async () => {
     setIsGenerating(true);
     try {
-        const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
+        const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType, VerticalAlign } = await import('docx');
         const { saveAs } = await import('file-saver');
 
-        const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
+        const cellStyles = { 
+          borders: { 
+            top: { style: BorderStyle.SINGLE, size: 1 }, 
+            bottom: { style: BorderStyle.SINGLE, size: 1 }, 
+            left: { style: BorderStyle.SINGLE, size: 1 }, 
+            right: { style: BorderStyle.SINGLE, size: 1 } 
+          },
+          verticalAlign: VerticalAlign.CENTER
+        };
 
         const createBulletedParagraphs = (text: string) => {
             return text.split('\n').filter(line => line.trim() !== '').map(line => {
@@ -128,27 +144,35 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             });
         };
         
-        const tableHeader = new TableRow({
+        // 1. STATISTICAL BREAKDOWN TABLE
+        const statsHeader = new TableRow({
             children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ID / TAG", bold: true })]})], ...cellStyles }),
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPTION", bold: true })]})], ...cellStyles }),
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "OBSERVATION", bold: true })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ASSET FOLDER", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "TOTAL", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "VERIFIED", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "UNVERIFIED", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "GOOD", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CRITICAL", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "STOLEN", bold: true, size: 18 })]})], ...cellStyles }),
             ],
         });
 
-        const exceptions = assets.filter(a => 
-          (a.metadata?.remarks && String(a.metadata.remarks).trim() !== '') || 
-          a.status === 'DISCREPANCY' || 
-          ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')
-        );
-
-        const remarksRows = exceptions.map((asset) => new TableRow({
+        const statsRows = stats.breakdown.map((row) => new TableRow({
             children: [
-                new TableCell({ children: [new Paragraph(asset.assetIdCode || 'UNTAGGED')], ...cellStyles }),
-                new TableCell({ children: [new Paragraph(asset.description || asset.name || 'Untitled')], ...cellStyles }),
-                new TableCell({ children: [new Paragraph(String(asset.metadata?.remarks || asset.condition || 'Integrity Failure'))], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: row.name, style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.total), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.verified), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.unverified), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.good), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.bad + row.conditions.unsalvageable), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.stolen), style: "Normal" })], ...cellStyles }),
             ],
         }));
+
+        const summaryTable = new Table({
+            rows: [statsHeader, ...statsRows],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+        });
 
         const doc = new Document({
             styles: {
@@ -170,7 +194,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     new Paragraph({ text: `REGION VISITED:\t\t${reportState}` }),
                     new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
                     new Paragraph(" "),
-                    new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "1. EXECUTIVE SUMMARY", heading: HeadingLevel.HEADING_3 }),
                     new Paragraph({
                         children: [
                             new TextRun("Mandatory physical audit conducted for "),
@@ -179,32 +203,28 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                             new TextRun({ text: reportState, bold: true }),
                             new TextRun(". Total registry scope: "),
                             new TextRun({ text: `${stats.total} assets`, bold: true }),
-                            new TextRun(". Results: "),
+                            new TextRun(". Current coverage: "),
                             new TextRun({ text: `${stats.verifiedCount} verified (${stats.percentage}%)`, bold: true, color: "008000" }),
                             new TextRun(" and "),
                             new TextRun({ text: `${stats.unverifiedCount} pending.`, bold: true, color: "FF0000" }),
                         ],
                     }),
                     new Paragraph(" "),
-                    new Paragraph({ text: "AUDIT OBJECTIVES", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "2. FOLDER-WISE STATISTICAL BREAKDOWN", heading: HeadingLevel.HEADING_3 }),
+                    summaryTable,
+                    new Paragraph(" "),
+                    new Paragraph({ text: "3. AUDIT OBJECTIVES", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(objectives),
                     new Paragraph(" "),
-                    new Paragraph({ text: "ACTIVITIES PERFORMED", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "4. ACTIVITIES PERFORMED", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(activities),
                     new Paragraph(" "),
-                    new Paragraph({ text: "KEY FINDINGS & EXCEPTIONS", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "5. KEY FINDINGS & EXCEPTIONS", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(observations),
                     new Paragraph(" "),
-                    new Paragraph({ text: "CHALLENGES ENCOUNTERED", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "6. CHALLENGES & RECOMMENDATIONS", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(challenges),
-                    new Paragraph(" "),
-                    new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(recommendations),
-                    new Paragraph(" "),
-                    new Paragraph({ text: "ASSET EXCEPTION LOG", heading: HeadingLevel.HEADING_3 }),
-                    remarksRows.length > 0 
-                        ? new Table({ rows: [tableHeader, ...remarksRows], width: { size: 100, type: WidthType.PERCENTAGE } }) 
-                        : new Paragraph("No critical registry exceptions noted in this period."),
                     new Paragraph(" "),
                     new Paragraph(" "),
                     new Paragraph({ text: `Report Authored by: ${userProfile?.displayName}` }),
@@ -214,7 +234,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         });
 
         const blob = await Packer.toBlob(doc);
-        saveAs(blob, `Assetain-Report-${reportState.replace(/\s+/g, '_')}.docx`);
+        saveAs(blob, `Assetain-Executive-Report-${reportState.replace(/\s+/g, '_')}.docx`);
         onOpenChange(false);
     } catch (e) {
         console.error("Report generation failure", e);
@@ -230,14 +250,14 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             <DialogHeader>
                 <div className="flex items-center justify-between">
                     <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
-                        <PlaneTakeoff className="text-primary h-8 w-8" /> Executive Travel Report
+                        <PlaneTakeoff className="text-primary h-8 w-8" /> Travel Report Builder
                     </DialogTitle>
                     <Badge variant="outline" className="h-9 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
-                        Registry Coverage: {stats.percentage}%
+                        Coverage: {stats.percentage}%
                     </Badge>
                 </div>
                 <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                    Automated report engine for official verification documentation.
+                    Automated executive summary with per-folder condition analytics.
                 </DialogDescription>
             </DialogHeader>
         </div>
@@ -251,51 +271,50 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                             <Input value={userProfile?.displayName || ''} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Target Scope</Label>
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Scope</Label>
                             <Input value={reportState} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Audit Period / Date</Label>
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Audit Period</Label>
                         <Input value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className="rounded-xl font-bold text-xs border-2" />
                     </div>
                     <ReportInput label="Audit Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
                     <ReportInput label="Field Activities" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
                 </div>
                 <div className="space-y-6">
-                    <div className="p-5 rounded-2xl bg-red-500/5 border-2 border-dashed border-red-500/20 space-y-3">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2">
-                            <FileWarning className="h-3.5 w-3.5" /> Discovery Analysis
+                    <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Registry Pulse Snapshot
                         </h4>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                             <div className="flex flex-col">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Exceptions</span>
-                                <span className="text-lg font-black text-red-600">{stats.stolen + stats.bad}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Total Folders</span>
+                                <span className="text-lg font-black">{stats.breakdown.length}</span>
                             </div>
                             <div className="flex flex-col text-right">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Quality Gaps</span>
-                                <span className="text-lg font-black text-orange-600">{stats.missingSerial + stats.missingTag}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Verified Records</span>
+                                <span className="text-lg font-black text-green-600">{stats.verifiedCount}</span>
                             </div>
                         </div>
                     </div>
-                    <ReportInput label="Key Findings & Discrepancies" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
-                    <ReportInput label="Field Bottlenecks" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
-                    <ReportInput label="Proposed Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+                    <ReportInput label="Detailed Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
+                    <ReportInput label="Challenges & Recommendations" id="recommendations" value={challenges + "\n" + recommendations} onChange={(e) => setRecommendations(e.target.value)} />
                     <div className="space-y-1.5">
                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Approving Manager</Label>
-                        <Input value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Enter manager name..." className="rounded-xl border-2 font-bold text-xs" />
+                        <Input value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Manager name..." className="rounded-xl border-2 font-bold text-xs" />
                     </div>
                 </div>
             </div>
         </ScrollArea>
 
-        <DialogFooter className="p-8 bg-muted/20 border-t flex items-center justify-between">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Discard Draft</Button>
-          <Button onClick={generateWordDocument} disabled={isGenerating || stats.total === 0} className="h-12 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 min-w-[240px]">
-            {isGenerating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
-            Export Executive Report (.docx)
+        <div className="p-8 bg-muted/20 border-t flex items-center justify-between">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Cancel</Button>
+          <Button onClick={generateWordDocument} disabled={isGenerating || stats.total === 0} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 min-w-[280px]">
+            {isGenerating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+            Generate Executive Report
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

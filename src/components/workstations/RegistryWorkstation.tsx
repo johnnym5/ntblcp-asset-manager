@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Phase 1610: Hardened Sorting Protocol for Asset IDs and Technical Identifiers.
+ * Phase 1611: Fixed ReferenceError for selectedSheetDef and originalSheetName.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';

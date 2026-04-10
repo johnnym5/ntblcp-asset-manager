@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Control Center.
  * Phase 1605: RBAC visibility hardening. Non-SuperAdmins cannot see Health.
  * Phase 1606: Implemented Motorbike Pulse Patch for Bajaj/SN normalization.
+ * Phase 1607: Consolidated to 2 App Modes (Management / Verification).
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -145,7 +146,6 @@ export function SettingsWorkstation() {
       }
 
       for (const asset of motorbikeAssets) {
-        // ID Pattern Extraction: gf-ntblcp/mb/1360 -> 1360
         const idMatch = (asset.assetIdCode || '').match(/\/(\d+)$/);
         const extractedSn = idMatch ? idMatch[1] : asset.sn;
 
@@ -333,8 +333,8 @@ export function SettingsWorkstation() {
 
           {isAdmin && (
             <SettingSection title="Operational Mode" description="Workstation Logic" icon={Smartphone}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(['management', 'verification', 'reporting'] as const).map(m => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(['management', 'verification'] as const).map(m => (
                   <button 
                     key={m}
                     onClick={() => handleSettingChange('appMode', m)}
