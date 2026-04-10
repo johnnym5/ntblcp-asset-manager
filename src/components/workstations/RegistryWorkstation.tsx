@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
  * Phase 1510: Fully optimized for deployment stability.
+ * Phase 1511: Added folder-specific column customization trigger.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -29,7 +30,8 @@ import {
   Edit3,
   Trash2,
   TrendingUp,
-  Activity
+  Activity,
+  Wrench
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,9 +71,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/components/category-batch-edit-form';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
+import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
-import type { Asset } from '@/types/domain';
+import type { Asset, SheetDefinition } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
@@ -144,6 +147,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [targetMergeCategory, setTargetMergeCategory] = useState<string>('');
   const [isAssetDeleteOpen, setIsAssetDeleteOpen] = useState(false);
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
@@ -204,10 +208,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       const sortHeader = workstationHeaders.find(h => h.id === sortKey);
       results.sort((a, b) => {
         const getVal = (item: Asset) => {
+          if (sortKey === 'sn') return item.sn || "";
+          if (sortKey === 'assetIdCode') return item.assetIdCode || "";
           if (!sortHeader) return "";
           switch(sortHeader.normalizedName) {
             case "sn": return item.sn || "";
             case "asset_description": return item.description || "";
+            case "asset_id_code": return item.assetIdCode || "";
             default: return String((item.metadata as any)?.[sortHeader.rawName] || "");
           }
         };
@@ -425,6 +432,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              {showList && isAdmin && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    const cat = selectedCategories[0];
+                    if (cat && activeGrant) {
+                      setSelectedSheetDef(activeGrant.sheetDefinitions[cat]);
+                      setOriginalSheetName(cat);
+                      setIsColumnSheetOpen(true);
+                    }
+                  }}
+                  className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2"
+                >
+                  <Wrench className="h-3.5 w-3.5" /> Setup Folder
+                </Button>
+              )}
+
               <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
                 <Checkbox 
                   id="sel-all-master" 
@@ -760,6 +785,37 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={originalSheetName}
+          onSave={(orig, newDef, all) => {
+            const updatedGrants = appSettings?.grants.map(grant => {
+              if (grant.id === activeGrantId) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            if (appSettings) {
+              const nextSettings = { ...appSettings, grants: updatedGrants };
+              setAppSettings(nextSettings);
+              storage.saveSettings(nextSettings);
+              if (isOnline) FirestoreService.updateSettings(nextSettings);
+              addNotification({ title: "Folder Layout Synchronized", variant: "success" });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

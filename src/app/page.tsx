@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Phase 1420: Integrated Mode-Aware Accent Classes.
  * Phase 1421: Bell long-press triggers Activity History pulse.
+ * Phase 1422: Optimized header for mobile (Collapsible search, visible sync).
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -241,11 +242,20 @@ export default function SPAHub() {
         </div>
 
         <div className="flex-1 flex items-center justify-center mx-4 sm:mx-12">
-          <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
-            <Search className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">{isMobile ? 'Search...' : 'Search Registry...'}</span>
-            <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
-          </button>
+          {isMobile ? (
+            <button 
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="h-10 w-10 flex items-center justify-center bg-muted/30 border border-border rounded-xl text-primary hover:bg-primary/10 transition-all shadow-sm"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          ) : (
+            <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
+              <Search className="h-4 w-4" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search Registry...</span>
+              <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
@@ -272,11 +282,11 @@ export default function SPAHub() {
             </TooltipProvider>
           )}
 
-          {/* Sync Controller Pulse Area */}
+          {/* Sync Controller Pulse Area - Now always visible on mobile */}
           <div 
             {...syncLongPress}
             onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
-            className="hidden sm:flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
+            className="flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
           >
             <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent></Tooltip></TooltipProvider>
             <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>

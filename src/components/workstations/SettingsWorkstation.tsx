@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Control Center.
  * Phase 1605: RBAC visibility hardening. Non-SuperAdmins cannot see Health.
+ * Phase 1606: Implemented Motorbike Pulse Patch for Bajaj/SN normalization.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -35,7 +36,8 @@ import {
   RefreshCw,
   Info,
   HeartPulse,
-  Database
+  Database,
+  Truck
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,7 +56,8 @@ import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { addNotification } from '@/hooks/use-notifications';
-import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
+import { enqueueMutation } from '@/offline/queue';
+import type { AppSettings, Grant, SheetDefinition, Asset } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -83,6 +86,7 @@ export function SettingsWorkstation() {
     setActiveView,
     setActiveGrantId,
     activeGrantId,
+    assets,
     isSyncing 
   } = useAppState();
   
@@ -91,6 +95,7 @@ export function SettingsWorkstation() {
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isPatching, setIsPatching] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
@@ -122,7 +127,48 @@ export function SettingsWorkstation() {
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
-    setDraftSettings({ ...draftSettings, [key]: value });
+    setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
+  };
+
+  const handleApplyMotorbikePatch = async () => {
+    if (!assets || assets.length === 0) return;
+    setIsPatching(true);
+    try {
+      const motorbikeAssets = assets.filter(a => {
+        const cat = (a.category || '').toUpperCase();
+        return cat.includes('MOTORCYCLE') || cat.includes('MOTORBIKE');
+      });
+
+      if (motorbikeAssets.length === 0) {
+        toast({ title: "Patch Scope Empty", description: "No motorbike records discovered in active registry." });
+        return;
+      }
+
+      for (const asset of motorbikeAssets) {
+        // ID Pattern Extraction: gf-ntblcp/mb/1360 -> 1360
+        const idMatch = (asset.assetIdCode || '').match(/\/(\d+)$/);
+        const extractedSn = idMatch ? idMatch[1] : asset.sn;
+
+        const updated: Asset = {
+          ...asset,
+          manufacturer: 'Bajaj',
+          sn: extractedSn,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: userProfile?.displayName || 'System Patch'
+        };
+
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+
+      await refreshRegistry();
+      addNotification({ 
+        title: "Motorbike Patch Applied", 
+        description: `Successfully normalized ${motorbikeAssets.length} records to Bajaj / Trailing ID.`,
+        variant: "success"
+      });
+    } finally {
+      setIsPatching(false);
+    }
   };
 
   const handleUpdateMyPassword = async () => {
@@ -262,6 +308,28 @@ export function SettingsWorkstation() {
               <Button variant="outline" size="sm" onClick={() => setIsPasswordDialogOpen(true)} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] border-2">Change Password</Button>
             </div>
           </SettingSection>
+
+          {isAdmin && (
+            <SettingSection title="Data Engineering" description="One-tap registry fixes" icon={Wrench}>
+              <div className="p-6 rounded-2xl bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Truck className="h-5 w-5 text-primary" />
+                  <h4 className="text-sm font-black uppercase">Motorbike Pulse Patch</h4>
+                </div>
+                <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                  Bulk updates all motorcycle records: Sets Manufacturer to "Bajaj" and extracts S/N from ID Code digits (e.g. mb/1360 → 1360).
+                </p>
+                <Button 
+                  onClick={handleApplyMotorbikePatch} 
+                  disabled={isPatching}
+                  className="w-full h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+                >
+                  {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                  Apply Motorbike Patch
+                </Button>
+              </div>
+            </SettingSection>
+          )}
 
           {isAdmin && (
             <SettingSection title="Operational Mode" description="Workstation Logic" icon={Smartphone}>
