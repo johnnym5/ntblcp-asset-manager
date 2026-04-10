@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
- * Phase 1605: Category-Aware Technical ID gaps (excluding vehicles from serial/model).
- * Phase 1606: Fixed missing icon imports.
+ * Phase 1600: Integrated navigation controls & Swipe actions.
+ * Phase 1601: Implemented unlimited loop logic.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -58,14 +58,12 @@ export function AssetSummaryDashboard() {
 
     const pulses = useMemo((): PulseData[] => {
         const assets = filteredAssets;
-
         const isVehicle = (a: any) => {
             const cat = (a.category || '').toLowerCase();
             return cat.includes('motor') || cat.includes('vehicle');
         };
 
         const list: PulseData[] = [
-            // 1. Technical ID Gaps
             {
                 id: 'missing-id',
                 label: 'Asset ID Gaps',
@@ -90,7 +88,7 @@ export function AssetSummaryDashboard() {
                 id: 'missing-serial',
                 label: 'Serial No Gaps',
                 description: 'Non-vehicle items missing manufacturer serials.',
-                count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === '')).length,
+                count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A')).length,
                 icon: SearchCode,
                 color: 'bg-orange-400',
                 token: 'MISSING_SERIAL',
@@ -100,13 +98,12 @@ export function AssetSummaryDashboard() {
                 id: 'missing-model',
                 label: 'Model No Gaps',
                 description: 'Equipment items missing specific model identification.',
-                count: assets.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === '')).length,
+                count: assets.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A')).length,
                 icon: Info,
                 color: 'bg-amber-500',
                 token: 'MISSING_MODEL',
                 variant: 'warning'
             },
-            // 2. Vehicle Specifics
             {
                 id: 'missing-chassis',
                 label: 'Chassis No Gaps',
@@ -127,7 +124,6 @@ export function AssetSummaryDashboard() {
                 token: 'MISSING_ENGINE',
                 variant: 'destructive'
             },
-            // 3. Condition Groups
             {
                 id: 'cond-good',
                 label: 'Optimal Assets',
@@ -142,7 +138,7 @@ export function AssetSummaryDashboard() {
                 id: 'cond-bad',
                 label: 'Critical Condition',
                 description: 'Assets in poor condition requiring repair or replacement.',
-                count: assets.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
+                count: assets.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || '')).length,
                 icon: Wrench,
                 color: 'bg-orange-600',
                 token: 'CONDITION_BAD',
@@ -172,13 +168,12 @@ export function AssetSummaryDashboard() {
                 id: 'cond-unsalvageable',
                 label: 'Unsalvageable',
                 description: 'Burnt or destroyed items ready for write-off.',
-                count: assets.filter(a => ['Unsalvageable', 'Burnt', 'Writeoff'].includes(a.condition || '')).length,
+                count: assets.filter(a => ['Unsalvageable', 'Burnt'].includes(a.condition || '')).length,
                 icon: Trash2,
                 color: 'bg-red-900',
                 token: 'CONDITION_UNSALVAGEABLE',
                 variant: 'destructive'
             },
-            // 4. Operational Pulses
             {
                 id: 'with-remarks',
                 label: 'Field Remarks',
@@ -210,46 +205,44 @@ export function AssetSummaryDashboard() {
         setActiveView('REGISTRY');
     };
 
-    const nextPulse = () => {
-        if (scrollIndex < pulses.length - 1) setScrollIndex(i => i + 1);
-    };
-
-    const prevPulse = () => {
-        if (scrollIndex > 0) setScrollIndex(i => i - 1);
-    };
+    const nextPulse = () => setScrollIndex(i => (i + 1) % pulses.length);
+    const prevPulse = () => setScrollIndex(i => (i - 1 + pulses.length) % pulses.length);
 
     const activePulse = pulses[scrollIndex];
     if (!activePulse) return null;
 
     const isNominal = activePulse.count === 0;
+    const swipeConfidenceThreshold = 10000;
+    const swipePower = (offset: number, velocity: number) => Math.abs(offset) * velocity;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between px-1">
-                <div className="space-y-1">
-                    <h3 className="text-2xl font-black uppercase text-foreground tracking-tight leading-none">Inventory Pulse</h3>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">Sliding Diagnostic Cascade</p>
-                </div>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={prevPulse} disabled={scrollIndex === 0} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronLeft className="h-5 w-5" /></Button>
-                    <div className="px-4 py-1.5 rounded-full bg-muted/50 border border-border shadow-inner">
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground">{scrollIndex + 1} / {pulses.length}</span>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={nextPulse} disabled={scrollIndex === pulses.length - 1} className="h-10 w-10 rounded-full border border-border shadow-sm active:scale-95 transition-all"><ChevronRight className="h-5 w-5" /></Button>
+                    <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20"><Activity className="h-4 w-4 text-primary" /></div>
+                    <h3 className="text-[10px] font-black uppercase text-foreground/60 tracking-[0.2em]">Inventory Pulse</h3>
                 </div>
             </div>
 
-            <div className="relative h-[280px]">
+            <div className="relative group min-h-[280px]">
                 <AnimatePresence mode="wait">
                     <motion.div 
-                        key={activePulse.id}
+                        key={`${activePulse.id}-${pulses.length}`}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
+                        drag="x"
+                        dragConstraints={{ left: 0, right: 0 }}
+                        dragElastic={1}
+                        onDragEnd={(e, { offset, velocity }) => {
+                            const swipe = swipePower(offset.x, velocity.x);
+                            if (swipe < -swipeConfidenceThreshold) nextPulse();
+                            else if (swipe > swipeConfidenceThreshold) prevPulse();
+                        }}
                         className="h-full"
                     >
                         <Card className={cn(
-                            "h-full rounded-[3rem] border-2 transition-all p-10 flex flex-col justify-between relative overflow-hidden",
+                            "h-full rounded-[3rem] border-2 transition-all p-10 flex flex-col justify-between relative overflow-hidden shadow-3xl",
                             isNominal ? "bg-green-500/[0.03] border-green-500/20" :
                             activePulse.variant === 'destructive' ? "bg-red-500/[0.03] border-red-500/20" :
                             activePulse.variant === 'warning' ? "bg-amber-500/[0.03] border-amber-500/20" :
@@ -286,7 +279,7 @@ export function AssetSummaryDashboard() {
                                     )}>
                                         {activePulse.count}
                                     </span>
-                                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40 mt-2">Active Pulses</p>
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40 mt-2">Current Pulse</p>
                                 </div>
                             </div>
 
@@ -296,7 +289,7 @@ export function AssetSummaryDashboard() {
                                         "h-8 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest",
                                         isNominal ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-border/40 bg-muted/20"
                                     )}>
-                                        {isNominal ? 'FIDELITY NOMINAL' : `DIAGNOSTIC PULSE: ${activePulse.token}`}
+                                        {scrollIndex + 1} / {pulses.length}
                                     </Badge>
                                 </div>
                                 <Button 
@@ -305,16 +298,22 @@ export function AssetSummaryDashboard() {
                                     className={cn(
                                         "h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 gap-3",
                                         isNominal ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed" :
-                                        activePulse.variant === 'destructive' ? "bg-red-600 text-white shadow-red-600/20" :
-                                        activePulse.variant === 'warning' ? "bg-amber-600 text-white shadow-amber-600/20" :
-                                        activePulse.variant === 'success' ? "bg-green-600 text-white shadow-green-600/20" :
-                                        activePulse.variant === 'blue' ? "bg-blue-600 text-white shadow-blue-600/20" :
-                                        "bg-primary text-black shadow-primary/20"
+                                        activePulse.variant === 'destructive' ? "bg-red-600 text-white" :
+                                        activePulse.variant === 'warning' ? "bg-amber-600 text-white" :
+                                        "bg-primary text-black"
                                     )}
                                 >
-                                    {isNominal ? 'Audit Complete' : 'Inspect Sub-Registry'} 
+                                    {isNominal ? 'Fidelity Perfect' : 'Inspect Sub-Registry'} 
                                     {!isNominal && <ArrowRight className="h-4 w-4" />}
                                 </Button>
+                            </div>
+
+                            {/* Integrated Carousel Arrows */}
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="outline" size="icon" onClick={prevPulse} className="h-10 w-10 rounded-full border-2 bg-background/80 backdrop-blur-md"><ChevronLeft className="h-5 w-5" /></Button>
+                            </div>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="outline" size="icon" onClick={nextPulse} className="h-10 w-10 rounded-full border-2 bg-background/80 backdrop-blur-md"><ChevronRight className="h-5 w-5" /></Button>
                             </div>
                         </Card>
                     </motion.div>

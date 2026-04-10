@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Control Center.
- * Cleaned naming and simplified workflows.
- * Phase 158: Relocated Import button to Project & Sheet section.
+ * Phase 1605: RBAC visibility hardening. Non-SuperAdmins cannot see Health.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -34,7 +33,9 @@ import {
   FolderOpen,
   ClipboardCheck,
   RefreshCw,
-  Info
+  Info,
+  HeartPulse,
+  Database
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -106,6 +107,7 @@ export function SettingsWorkstation() {
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
+  const isZonalAdmin = !!userProfile?.isZonalAdmin;
 
   useEffect(() => {
     if (appSettings) {
@@ -123,6 +125,27 @@ export function SettingsWorkstation() {
     setDraftSettings({ ...draftSettings, [key]: value });
   };
 
+  const handleUpdateMyPassword = async () => {
+    if (!newPassword || newPassword.length < 4) {
+      toast({ variant: "destructive", title: "Security Alert", description: "Password must be at least 4 characters." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ variant: "destructive", title: "Password Mismatch", description: "Passwords do not match." });
+      return;
+    }
+    if (!draftSettings || !userProfile) return;
+    const updatedUsers = draftSettings.authorizedUsers.map(u => {
+      if (u.loginName === userProfile.loginName) return { ...u, password: newPassword };
+      return u;
+    });
+    handleSettingChange('authorizedUsers', updatedUsers);
+    setIsPasswordDialogOpen(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    addNotification({ title: "Password Staged", description: "Save changes to finalize.", variant: "success" });
+  };
+
   const handleSaveChange = async () => {
     if (!draftSettings) return;
     setIsSaving(true);
@@ -136,32 +159,6 @@ export function SettingsWorkstation() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleUpdateMyPassword = async () => {
-    if (!newPassword || newPassword.length < 4) {
-      toast({ variant: "destructive", title: "Security Alert", description: "Password must be at least 4 characters." });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast({ variant: "destructive", title: "Password Mismatch", description: "Passwords do not match." });
-      return;
-    }
-
-    if (!draftSettings || !userProfile) return;
-
-    const updatedUsers = draftSettings.authorizedUsers.map(u => {
-      if (u.loginName === userProfile.loginName) {
-        return { ...u, password: newPassword };
-      }
-      return u;
-    });
-
-    handleSettingChange('authorizedUsers', updatedUsers);
-    setIsPasswordDialogOpen(false);
-    setNewPassword('');
-    setConfirmPassword('');
-    addNotification({ title: "Password Staged", description: "Save changes to finalize.", variant: "success" });
   };
 
   const handleAddProject = () => {
@@ -182,24 +179,14 @@ export function SettingsWorkstation() {
     if (!draftSettings || !activeGrantId) return;
     const file = event.target.files?.[0];
     if (!file) return;
-
     try {
       const templates = await parseExcelForTemplate(file);
       const activeGrant = draftSettings.grants.find(g => g.id === activeGrantId);
       if (!activeGrant) return;
-
       const nextSheetDefs = { ...activeGrant.sheetDefinitions };
-      templates.forEach(t => {
-        nextSheetDefs[t.name] = t;
-      });
-
-      const updatedGrants = draftSettings.grants.map(g => 
-        g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g
-      );
-
-      const nextSettings = { ...draftSettings, grants: updatedGrants };
-      setDraftSettings(nextSettings);
-
+      templates.forEach(t => { nextSheetDefs[t.name] = t; });
+      const updatedGrants = draftSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g);
+      setDraftSettings({ ...draftSettings, grants: updatedGrants });
       addNotification({ title: 'Template Added', description: `${templates.length} categories staged.` });
     } catch (error) {
       addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
@@ -228,26 +215,26 @@ export function SettingsWorkstation() {
   );
 
   return (
-    <Tabs defaultValue="general" className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
+    <Tabs defaultValue={isZonalAdmin ? "users" : "general"} className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-6 -mx-1 shrink-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><SettingsIcon className="h-5 w-5 text-primary" /></div>
               <div className="space-y-0.5">
-                <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Settings</h2>
-                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Application Setup</p>
+                <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Control Center</h2>
+                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Governance & Config</p>
               </div>
             </div>
             <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>
-              {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">History</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">System Health</TabsTrigger>}
+              {!isZonalAdmin && <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>}
+              {isAdmin && !isZonalAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
+              {isAdmin && !isZonalAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Audit Trail</TabsTrigger>}
+              {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Infrastructure</TabsTrigger>}
             </TabsList>
           </div>
         </div>
@@ -258,92 +245,49 @@ export function SettingsWorkstation() {
           <SettingSection title="Appearance" description="Visual themes" icon={Palette}>
             <div className="grid grid-cols-2 gap-3">
               <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Sun className="h-4 w-4" /> Light Mode
+                <Sun className="h-4 w-4" /> Light
               </Button>
               <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Moon className="h-4 w-4" /> Dark Mode
+                <Moon className="h-4 w-4" /> Dark
               </Button>
             </div>
           </SettingSection>
 
           <SettingSection title="Security" description="Password Management" icon={KeyRound}>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
-                <div className="space-y-0.5">
-                  <Label className="text-xs font-black uppercase tracking-tight">Your Password</Label>
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 italic">Update your login credentials.</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setIsPasswordDialogOpen(true)} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] border-2">Change Password</Button>
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-black uppercase tracking-tight">Access Passphrase</Label>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 italic">Rotate your system credentials.</p>
               </div>
-
-              {isAdmin && (
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs font-black uppercase tracking-tight text-primary">Global User Management</Label>
-                    <p className="text-[9px] font-bold text-primary/60 uppercase italic">Manage passwords for all users.</p>
-                  </div>
-                  <TabsList className="bg-transparent h-auto p-0 border-none">
-                    <TabsTrigger value="users" className="h-10 px-6 rounded-xl font-black uppercase text-[9px] bg-primary text-black shadow-lg">Manage Users</TabsTrigger>
-                  </TabsList>
-                </div>
-              )}
+              <Button variant="outline" size="sm" onClick={() => setIsPasswordDialogOpen(true)} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] border-2">Change Password</Button>
             </div>
           </SettingSection>
 
           {isAdmin && (
-            <SettingSection title="App Mode" description="Workstation Logic" icon={Smartphone}>
+            <SettingSection title="Operational Mode" description="Workstation Logic" icon={Smartphone}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button 
-                  onClick={() => handleSettingChange('appMode', 'management')}
-                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'management' ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20")}
-                >
-                  <ShieldIcon className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'management' ? "text-primary" : "text-muted-foreground")} />
-                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Management</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground italic">Full Registry Control.</p>
-                </button>
-
-                <button 
-                  onClick={() => handleSettingChange('appMode', 'verification')}
-                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'verification' ? "border-green-500 bg-green-500/5 shadow-lg" : "border-border bg-muted/20")}
-                >
-                  <ClipboardCheck className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'verification' ? "text-green-500" : "text-muted-foreground")} />
-                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Verification</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground italic">Field Audit Mode.</p>
-                </button>
-
-                <button 
-                  onClick={() => handleSettingChange('appMode', 'reporting')}
-                  className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === 'reporting' ? "border-blue-500 bg-blue-500/5 shadow-lg" : "border-border bg-muted/20")}
-                >
-                  <FileText className={cn("h-5 w-5 mb-4", draftSettings.appMode === 'reporting' ? "text-blue-500" : "text-muted-foreground")} />
-                  <h4 className="text-sm font-black uppercase text-foreground mb-1">Reporting</h4>
-                  <p className="text-[10px] font-medium text-muted-foreground italic">Document Extraction.</p>
-                </button>
-              </div>
-            </SettingSection>
-          )}
-
-          {isAdmin && (
-            <SettingSection title="Registry Rules" description="Access Restrictions" icon={Lock}>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
-                <div className="space-y-0.5">
-                  <Label className="text-xs font-black uppercase tracking-tight">Lock Asset List</Label>
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Prevent unauthorized additions/deletions.</p>
-                </div>
-                <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+                {(['management', 'verification', 'reporting'] as const).map(m => (
+                  <button 
+                    key={m}
+                    onClick={() => handleSettingChange('appMode', m)}
+                    className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === m ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20")}
+                  >
+                    <h4 className="text-sm font-black uppercase text-foreground mb-1">{m}</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic">Switch to {m} protocol.</p>
+                  </button>
+                ))}
               </div>
             </SettingSection>
           )}
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none pb-20">
-          <SettingSection title="Projects" description="Authorized Registers" icon={LayoutGrid}>
+          <SettingSection title="Authorized Registers" description="Project Management" icon={LayoutGrid}>
             <div className="space-y-6">
               <div className="flex gap-2">
                 <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm" />
                 <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Add Project</Button>
               </div>
-
               <div className="space-y-3">
                 {draftSettings.grants.map((grant) => {
                   const isActive = activeGrantId === grant.id;
@@ -354,16 +298,14 @@ export function SettingsWorkstation() {
                           <FolderOpen className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted")} />
                           <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
                         </div>
-                        {!isActive && (
-                          <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2">Set Active</Button>
-                        )}
+                        {!isActive && <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2">Set Active</Button>}
                       </div>
                       {isActive && (
                         <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
                               <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl">
-                                <span className="text-[9px] font-black uppercase text-muted-foreground">{name}</span>
+                                <span className="text-[9px] font-black uppercase text-muted-foreground truncate pr-4">{name}</span>
                                 <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
                               </div>
                             ))}
@@ -372,7 +314,7 @@ export function SettingsWorkstation() {
                             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
                               <FileUp className="h-3.5 w-3.5" /> Import Template
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
+                            <Button variant="outline" size="sm" onClick={() => { setActiveView('IMPORT'); onOpenChange(false); }} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
                               <ScanSearch className="h-3.5 w-3.5" /> Import Assets
                             </Button>
                           </div>
@@ -387,7 +329,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="users" className="m-0 outline-none pb-20">
-          <SettingSection title="User Management" description="Auditors & Access" icon={Users}>
+          <SettingSection title="User Directory" description="Auditors & Access" icon={Users}>
             <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
           </SettingSection>
         </TabsContent>
@@ -406,7 +348,7 @@ export function SettingsWorkstation() {
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Cancel</Button>
         <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldIcon className="h-4 w-4 mr-3" />}
-          Save Changes
+          Commit Protocol
         </Button>
       </div>
 
@@ -439,23 +381,23 @@ export function SettingsWorkstation() {
         <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden bg-background">
           <div className="p-8 pb-4 bg-muted/20 border-b">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase">Change Password</DialogTitle>
-              <DialogDescription className="text-[10px] font-bold uppercase opacity-60">Update your account credentials.</DialogDescription>
+              <DialogTitle className="text-2xl font-black uppercase">Rotate Credentials</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold uppercase opacity-60">Update your access passphrase.</DialogDescription>
             </DialogHeader>
           </div>
           <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase opacity-40">New Password</Label>
+              <Label className="text-[10px] font-black uppercase opacity-40">New Passphrase</Label>
               <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase opacity-40">Confirm Password</Label>
+              <Label className="text-[10px] font-black uppercase opacity-40">Confirm Passphrase</Label>
               <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20" />
             </div>
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t flex gap-3">
-            <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)} className="flex-1 h-12 font-bold">Cancel</Button>
-            <Button onClick={handleUpdateMyPassword} className="flex-[2] h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Update Password</Button>
+            <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)} className="flex-1 h-12 font-bold">Abort</Button>
+            <Button onClick={handleUpdateMyPassword} className="flex-[2] h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Update Credentials</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

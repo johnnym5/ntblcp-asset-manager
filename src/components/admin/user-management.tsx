@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview User Management Directory.
- * Phase 1011: Renamed from Auditor Directory to User Directory.
+ * Phase 1600: Zonal Admin scoping. Filters users by zonal states.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -30,20 +30,43 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, getFuzzySignature } from '@/lib/utils';
+import { NIGERIAN_ZONES } from '@/lib/constants';
 
 interface UserManagementProps {
   users: AuthorizedUser[];
   onUsersChange: (users: AuthorizedUser[]) => void;
-  adminProfile: { loginName: string } | null;
+  adminProfile: any;
 }
 
 export function UserManagement({ users, onUsersChange, adminProfile }: UserManagementProps) {
   const { toast } = useToast();
-  
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AuthorizedUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AuthorizedUser | null>(null);
+
+  const isSuperAdmin = adminProfile?.role === 'SUPERADMIN';
+  const isZonalAdmin = !!adminProfile?.isZonalAdmin;
+  const assignedZone = adminProfile?.assignedZone;
+
+  const filteredUsers = useMemo(() => {
+    if (isSuperAdmin) return users;
+    
+    // Zonal Admin Scope Logic
+    if (isZonalAdmin && assignedZone) {
+      const zonalStates = NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES] || [];
+      const zonalStatesFuzzy = zonalStates.map(s => getFuzzySignature(s));
+      
+      return users.filter(u => {
+        // Zonal admins see themselves and users who have AT LEAST ONE state within their zone
+        if (u.loginName === adminProfile.loginName) return true;
+        return u.states.some(s => zonalStatesFuzzy.includes(getFuzzySignature(s)));
+      });
+    }
+
+    // Standard admins see everyone
+    return users;
+  }, [users, isSuperAdmin, isZonalAdmin, assignedZone, adminProfile]);
 
   const handleAddNewUser = () => {
     setUserToEdit(null);
@@ -57,49 +80,41 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
 
   const handleSaveUser = async (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => {
     let newUsers = [...(users || [])];
-    
-    const findIndex = originalLoginName 
-      ? newUsers.findIndex(u => u.loginName === originalLoginName)
-      : -1;
+    const findIndex = originalLoginName ? newUsers.findIndex(u => u.loginName === originalLoginName) : -1;
 
     if (newUsers.some(u => u.loginName === userToSave.loginName && u.loginName !== originalLoginName)) {
-      toast({ variant: "destructive", title: "Identity Conflict", description: `The login ID "${userToSave.loginName}" is already claimed.` });
+      toast({ variant: "destructive", title: "Identity Conflict", description: `Login ID "${userToSave.loginName}" is taken.` });
       return;
     }
     
-    if (findIndex > -1) {
-      newUsers[findIndex] = {
-        ...newUsers[findIndex],
-        ...userToSave,
-      };
-    } else {
-      newUsers.push(userToSave as AuthorizedUser);
-    }
+    if (findIndex > -1) newUsers[findIndex] = { ...newUsers[findIndex], ...userToSave };
+    else newUsers.push(userToSave as AuthorizedUser);
     
     onUsersChange(newUsers);
     setIsEditFormOpen(false);
-    toast({ title: "User Profile Updated" });
+    toast({ title: "User Protocol Synchronized" });
   };
 
   const handleDeleteUser = () => {
     if (!userToDelete) return;
-    const newUsers = (users || []).filter(u => u.loginName !== userToDelete.loginName);
-    onUsersChange(newUsers);
+    onUsersChange(users.filter(u => u.loginName !== userToDelete.loginName));
     setUserToDelete(null);
-    toast({ title: "User Account Revoked" });
+    toast({ title: "Identity Purged" });
   };
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center px-1">
         <div className="space-y-1">
           <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
-            <UserIcon className="h-4 w-4" /> User Directory
+            <UserIcon className="h-4 w-4" /> Personnel Directory
           </h3>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-tighter">Authorized personnel and regional scopes.</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">
+            {isZonalAdmin ? `Managing Zone: ${assignedZone}` : 'Authorized system auditors & admins.'}
+          </p>
         </div>
-        <Button onClick={handleAddNewUser} className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-primary/10">
-          <UserPlus className="h-3.5 w-3.5" /> Add New User
+        <Button onClick={handleAddNewUser} className="h-10 px-6 rounded-xl font-black uppercase text-[10px] shadow-lg">
+          <UserPlus className="h-3.5 w-3.5 mr-2" /> Add Personnel
         </Button>
       </div>
 
@@ -107,53 +122,53 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-b-2">
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 pl-6">User Identity</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Security Tier</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Scope</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 text-right pr-6">Pulse Control</TableHead>
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4 pl-6">Personnel</TableHead>
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4">Security Tier</TableHead>
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4">Authorized Scope</TableHead>
+              <TableHead className="text-right pr-6 text-[9px] font-black uppercase tracking-widest py-4">Pulse</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users && users.map(user => (
-              <TableRow key={user.loginName} className="group hover:bg-primary/[0.02] transition-colors border-b last:border-0">
+            {filteredUsers.map(user => (
+              <TableRow key={user.loginName} className="group hover:bg-primary/[0.02] border-b last:border-0 transition-colors">
                 <TableCell className="py-4 pl-6">
                   <div className="flex flex-col">
-                    <span className="font-black text-sm tracking-tight">{user.displayName}</span>
-                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-tighter opacity-60">ID: {user.loginName}</span>
+                    <span className="font-black text-xs uppercase text-foreground">{user.displayName}</span>
+                    <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">ID: {user.loginName}</span>
                   </div>
                 </TableCell>
                 <TableCell className="py-4">
                   <Badge variant="outline" className={cn(
-                    "text-[9px] font-black uppercase tracking-widest h-6 px-3 rounded-lg border-2",
-                    user.isAdmin ? "border-primary/20 bg-primary/5 text-primary" : "border-muted-foreground/20 text-muted-foreground"
+                    "text-[8px] font-black uppercase h-6 px-3 rounded-lg border-2",
+                    user.isAdmin ? "border-primary/20 bg-primary/5 text-primary" : "border-muted-foreground/20"
                   )}>
-                    {user.isAdmin ? <ShieldCheck className="mr-1.5 h-3 w-3" /> : null}
+                    {user.isAdmin && <ShieldCheck className="mr-1.5 h-2.5 w-2.5" />}
                     {user.role}
                   </Badge>
                 </TableCell>
                 <TableCell className="py-4">
                   <div className="flex flex-wrap gap-1.5 max-w-[200px]">
-                    {user.states?.slice(0, 3).map(s => (
-                      <Badge key={s} variant="secondary" className="text-[8px] font-black uppercase h-5 px-2 bg-muted/50 border border-border/40">
+                    {user.states?.slice(0, 2).map(s => (
+                      <Badge key={s} variant="secondary" className="text-[7px] font-black uppercase px-2 h-5 bg-muted/50 border border-border/40">
                         {s}
                       </Badge>
                     ))}
-                    {user.states?.length > 3 && <span className="text-[9px] font-bold text-muted-foreground">+{user.states.length - 3}</span>}
+                    {user.states?.length > 2 && <span className="text-[8px] font-bold text-muted-foreground">+{user.states.length - 2}</span>}
                   </div>
                 </TableCell>
                 <TableCell className="py-4 text-right pr-6">
-                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all" onClick={() => handleEditUser(user)}>
-                      <Edit className="h-4 w-4" />
+                   <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary" onClick={() => handleEditUser(user)}>
+                      <Edit className="h-3.5 w-3.5" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-9 w-9 rounded-xl text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-all" 
+                      className="h-8 w-8 rounded-lg text-destructive/40 hover:text-destructive hover:bg-destructive/10" 
                       onClick={() => setUserToDelete(user)} 
                       disabled={adminProfile?.loginName === user.loginName}
                     >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                    </div>
                 </TableCell>
@@ -166,17 +181,17 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       <UserEditForm isOpen={isEditFormOpen} onOpenChange={setIsEditFormOpen} user={userToEdit} onSave={handleSaveUser} />
       
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
-        <AlertDialogContent className="rounded-[2rem] border-primary/10">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Revoke Account?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">
-              This will permanently revoke all access for <strong>{userToDelete?.displayName}</strong>.
+            <AlertDialogTitle className="text-xl font-black uppercase">Purge Identity?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
+              This will permanently revoke system access for <strong>{userToDelete?.displayName}</strong>. All staged regional scope locks for this user will be destroyed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4">
-            <AlertDialogCancel className="font-bold rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
-              Confirm Revocation
+          <AlertDialogFooter className="mt-6 gap-3">
+            <AlertDialogCancel className="font-bold rounded-xl border-2 border-white/10 m-0">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-white font-black uppercase text-[10px] tracking-widest h-12 px-8 rounded-xl m-0 shadow-2xl shadow-destructive/20">
+              Execute Purge
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

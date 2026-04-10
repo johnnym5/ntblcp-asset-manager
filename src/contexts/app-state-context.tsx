@@ -2,7 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1308: Final category-aware Technical ID gap resolution.
+ * Phase 1600: Fixed Registry Sorting for ID Tags and Metadata.
+ * Phase 1601: Enhanced diagnostic filter logic.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -272,7 +273,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       } else if (searchTerm === 'MISSING_SERIAL') {
         results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A'));
       } else if (searchTerm === 'CONDITION_BAD') {
-        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable', 'F2: Major repairs required-poor condition'].includes(a.condition || ''));
+        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
       } else {
         const fuzzySearch = getFuzzySignature(searchTerm);
         results = results.filter(a => {
@@ -281,8 +282,31 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         });
       }
     }
+
+    // --- Hardened Sorting Protocol ---
+    if (sortKey) {
+      const activeHeader = headers.find(h => h.id === sortKey);
+      if (activeHeader) {
+        results.sort((a, b) => {
+          const getVal = (item: Asset) => {
+            switch(activeHeader.normalizedName) {
+              case "sn": return item.sn || "";
+              case "asset_description": return item.description || "";
+              case "asset_id_code": return item.assetIdCode || "";
+              case "location": return item.location || "";
+              case "condition": return item.condition || "";
+              default: return String((item.metadata as any)?.[activeHeader.rawName] || "");
+            }
+          };
+          const valA = String(getVal(a));
+          const valB = String(getVal(b));
+          return sortDir === 'asc' ? valA.localeCompare(valB, undefined, { numeric: true }) : valB.localeCompare(valA, undefined, { numeric: true });
+        });
+      }
+    }
+
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories]);
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers]);
 
   const locationOptions = useMemo(() => {
     const map = new Map<string, { label: string, count: number }>();
@@ -344,7 +368,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
           const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
           await storage.saveAssets([...otherAssets, ...taggedRemote]);
-          addNotification({ title: "Update Successful", variant: "success" });
+          addNotification({ title: "Protocol Synchronized", variant: "success" });
         }
       }
       await refreshRegistry();
