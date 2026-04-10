@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Hardened for deployment: Sign out now performs a deterministic wipe of local asset data.
- * Phase 401: Hardened isAdmin derivation for multi-tier RBAC visibility.
+ * Hardened for deployment with robust isAdmin derivation.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -69,7 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authorizedUsersList = appSettings?.authorizedUsers || [];
         const allUsers = [...authorizedUsersList, superAdmin];
         
-        // Use the profile from cloud settings if it exists, to ensure updated permissions
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
@@ -80,6 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isZonalAdmin: authorizedUser.isZonalAdmin,
             assignedZone: authorizedUser.assignedZone,
             role: authorizedUser.role,
+            // Hardened Admin Derivation
             isAdmin: authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
             canAddAssets: authorizedUser.canAddAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
             canEditAssets: authorizedUser.canEditAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
@@ -88,7 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setProfileSetupComplete(true);
           FirebaseAuthService.ensureSession();
         } else {
-          // User was removed from authorized list
           localStorage.removeItem('assetain-user-session');
           setUserProfile(null);
           setProfileSetupComplete(false);
@@ -132,7 +130,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      // Automated Initial Download pulse for new session
       await manualDownload();
       
     } catch (e) {
@@ -145,9 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     try {
-      // Deterministic wipe of local data on logout for security
       await storage.clearAssets(); 
-      
       localStorage.removeItem('assetain-user-session');
       sessionStorage.removeItem('assetain-fresh-login');
       setUserProfile(null);

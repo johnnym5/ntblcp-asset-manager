@@ -48,7 +48,7 @@
     --ring: 45 100% 50%;
   }
 
-  /* Mode Specific Accents */
+  /* Mode Specific Accents - Injected via SPAHub classes */
   .mode-verification {
     --primary: 142 76% 36%; /* Field Green */
     --ring: 142 76% 36%;
@@ -84,7 +84,6 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Allow text selection in inputs */
   input, textarea {
     user-select: text !important;
   }
@@ -95,7 +94,6 @@
     @apply active:scale-95 transition-transform duration-200;
   }
   
-  /* High-Fidelity Custom Scrollbar */
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.3) transparent;
@@ -111,16 +109,12 @@
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary) / 0.2);
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: content-box;
+    @apply bg-primary/20 rounded-full border-2 border-transparent bg-clip-content;
     transition: background 0.2s;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.5);
-    background-clip: content-box;
+    @apply bg-primary/50;
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -146,16 +140,5 @@
 
   .pt-safe {
     padding-top: env(safe-area-inset-top);
-  }
-
-  @keyframes field-pulse {
-    0% { border-color: rgba(220, 38, 38, 0.2); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-    50% { border-color: rgba(220, 38, 38, 1); box-shadow: 0 0 10px 1px rgba(220, 38, 38, 0.4); }
-    100% { border-color: rgba(220, 38, 38, 0.2); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-  }
-
-  .animate-field-pulse {
-    animation: field-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    border-width: 1.5px !important;
   }
 }
