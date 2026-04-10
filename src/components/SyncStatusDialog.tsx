@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SyncStatusDialog - High-Fidelity Sync Management Workstation.
- * Recreated to match the exact visual pulse from the user's screenshot.
- * Phase 1101: Resolved DialogTitle accessibility error.
+ * Finalized for deployment with Bi-directional Sync (Push/Pull).
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -20,11 +19,12 @@ import {
   WifiOff, 
   ShieldCheck, 
   Download, 
+  Upload,
   Zap, 
   Activity,
-  Circle,
   RefreshCw,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { storage } from '@/offline/storage';
@@ -37,7 +37,15 @@ interface SyncStatusDialogProps {
 }
 
 export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps) {
-  const { isOnline, setIsOnline, manualDownload, isSyncing, assets } = useAppState();
+  const { 
+    isOnline, 
+    setIsOnline, 
+    manualDownload, 
+    manualUpload,
+    isSyncing, 
+    assets 
+  } = useAppState();
+  
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
 
   useEffect(() => {
@@ -64,9 +72,14 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
         {/* Header Ribbon */}
-        <DialogHeader className="px-10 py-6 flex flex-row items-center gap-3 space-y-0 border-b border-white/5">
-          <Zap className="h-4 w-4 text-primary fill-current" />
-          <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status Hub</DialogTitle>
+        <DialogHeader className="px-10 py-6 flex flex-row items-center justify-between gap-3 space-y-0 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <Zap className="h-4 w-4 text-primary fill-current" />
+            <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status Hub</DialogTitle>
+          </div>
+          <button onClick={() => onOpenChange(false)} className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
         </DialogHeader>
 
         {/* Main Control Surface */}
@@ -81,18 +94,18 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                 {isOnline ? <Wifi className="h-10 w-10 animate-pulse" /> : <WifiOff className="h-10 w-10" />}
               </div>
               <div className="space-y-1">
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Pending Changes</h3>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Registry Pulse</h3>
                 <p className={cn(
                   "text-[10px] font-black uppercase tracking-widest",
                   isOnline ? "text-green-500/60" : "text-red-500/60"
                 )}>
-                  Network Pulse: {isOnline ? 'Active' : 'Disconnected'}
+                  Network Protocol: {isOnline ? 'Active' : 'Disconnected'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 bg-white/[0.03] p-3 px-6 rounded-2xl border border-white/10 shadow-xl">
-              <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Connect</span>
+              <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Online</span>
               <Switch 
                 checked={isOnline} 
                 onCheckedChange={setIsOnline} 
@@ -103,52 +116,58 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
 
           <div className="h-px w-full bg-white/[0.05]" />
 
-          {/* Middle Section: Metrics & Action */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-            <div className="flex items-center gap-12">
-              <div className="flex items-center gap-4 group">
-                <div className="h-6 w-6 rounded-full border-2 border-white/10 flex items-center justify-center transition-all group-hover:border-primary/40">
-                  <div className="h-2.5 w-2.5 rounded-full bg-transparent" />
+          {/* Middle Section: Metrics & Bi-directional Actions */}
+          <div className="flex flex-col gap-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-12">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Queued</span>
+                  <span className="text-5xl font-black text-white tabular-nums">{stats.pending}</span>
                 </div>
-                <span className="text-[11px] font-black uppercase text-white/40 tracking-[0.2em]">All</span>
+
+                <div className="w-px h-10 bg-white/10" />
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-black text-red-600/40 uppercase tracking-[0.3em]">Conflicts</span>
+                  <span className="text-5xl font-black text-red-600 tabular-nums">{stats.errors}</span>
+                </div>
               </div>
 
-              <div className="w-px h-10 bg-white/10" />
-
-              <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Pending</span>
-                <span className="text-5xl font-black text-white tabular-nums">{stats.pending}</span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-red-600/40 uppercase tracking-[0.3em]">Errors</span>
-                <span className="text-5xl font-black text-red-600 tabular-nums">{stats.errors}</span>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline"
+                  onClick={manualDownload}
+                  disabled={isSyncing || !isOnline}
+                  className="h-16 px-8 rounded-2xl bg-white/[0.03] border-2 border-white/10 hover:border-primary/20 text-white font-black uppercase text-[10px] tracking-widest gap-3 transition-all"
+                >
+                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
+                  Pull Cloud
+                </Button>
+                <Button 
+                  onClick={manualUpload}
+                  disabled={isSyncing || !isOnline || stats.pending === 0}
+                  className="h-16 px-10 rounded-2xl bg-primary text-black font-black uppercase text-xs tracking-widest gap-3 shadow-2xl transition-transform hover:scale-105 active:scale-95"
+                >
+                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Push Changes
+                </Button>
               </div>
             </div>
-
-            <Button 
-              onClick={manualDownload}
-              disabled={isSyncing || !isOnline}
-              className="h-16 px-10 rounded-2xl bg-white/[0.03] border-2 border-white/5 hover:border-primary/20 hover:bg-white/5 text-white font-black uppercase text-xs tracking-widest gap-4 transition-all shadow-2xl"
-            >
-              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-              Sync Down
-            </Button>
           </div>
 
           {/* Bottom Section: Fidelity Shield */}
-          <div className="pt-10 flex flex-col items-center justify-center gap-6">
+          <div className="pt-10 flex flex-col items-center justify-center gap-6 border-t border-dashed border-white/5">
             <div className={cn(
               "p-6 rounded-full transition-all duration-700",
               isFullySynced ? "bg-green-500/5 text-green-500 scale-110" : "bg-white/5 text-white/10"
             )}>
-              <ShieldCheck className={cn("h-16 w-16", isFullySynced && "animate-[bounce_2s_infinite]")} />
+              <ShieldCheck className={cn("h-16 w-16", isFullySynced && "animate-[bounce_3s_infinite]")} />
             </div>
             <p className={cn(
               "text-[11px] font-black uppercase tracking-[0.4em] transition-all",
               isFullySynced ? "text-green-500/40" : "text-white/10"
             )}>
-              {isFullySynced ? 'All Changes Synchronized' : 'Sync Pulse Pending'}
+              {isFullySynced ? 'High-Availability Parity Confirmed' : 'Sync Replay Required'}
             </p>
           </div>
         </div>

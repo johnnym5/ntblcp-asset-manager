@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Asset Hub - Main Registry Workstation.
- * Phase 1610: Hardened Sorting Protocol for Asset IDs and Technical Identifiers.
- * Phase 1611: Fixed ReferenceError for selectedSheetDef and originalSheetName.
+ * Deployment Pulse: Hardened sorting protocol and independent folder independence.
+ * Optimized: Adaptive density for mobile/desktop workstations.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -77,7 +77,6 @@ import { storage } from '@/offline/storage';
 import type { Asset, SheetDefinition } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -109,22 +108,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSearchTerm,
     manualDownload,
     manualUpload,
-    isSyncing,
-    locationOptions,
-    selectedLocations,
-    setSelectedLocations,
-    assigneeOptions,
-    selectedAssignees,
-    setSelectedAssignees,
-    categoryOptions,
-    conditionOptions,
-    selectedConditions,
-    setSelectedConditions,
-    statusOptions,
-    selectedStatuses,
-    setSelectedStatuses,
-    missingFieldFilter,
-    setMissingFieldFilter
+    isSyncing
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -147,6 +131,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [targetMergeCategory, setTargetMergeCategory] = useState<string>('');
   const [isAssetDeleteOpen, setIsAssetDeleteOpen] = useState(false);
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
+  
+  // Folder Independence States
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
@@ -287,7 +273,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       setIsHeaderEditingMode(false);
-      addNotification({ title: "Layout Saved", variant: "success" });
+      addNotification({ title: "Layout Pulse Synchronized", variant: "success" });
     } catch (e) {
       addNotification({ title: "Save Failed", variant: "destructive" });
     } finally {
@@ -312,7 +298,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      addNotification({ title: "Batch Update Successful", variant: "success" });
+      addNotification({ title: "Batch Update Applied", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
@@ -363,7 +349,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsMergeDialogOpen(false);
-      addNotification({ title: "Records Moved", variant: "success" });
+      addNotification({ title: "Records Migrated", variant: "success" });
     } finally {
       setIsProcessing(false);
     }
@@ -378,7 +364,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsAssetDeleteOpen(false);
-      addNotification({ title: "Records Deleted", variant: "destructive" });
+      addNotification({ title: "Records Purged", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -389,7 +375,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (selectedAssets.length === 0) return;
     try {
       await ExcelService.exportRegistry(selectedAssets, workstationHeaders);
-      addNotification({ title: "Export Complete", variant: "success" });
+      addNotification({ title: "Export Initialized", variant: "success" });
     } catch (e) {
       addNotification({ title: "Export Failed", variant: "destructive" });
     }
@@ -402,10 +388,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col relative pb-safe">
-      {/* 1. Header */}
+      {/* 1. Header Pulse */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
-          <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-3 self-start min-w-0">
             <AnimatePresence mode="wait">
               {showList ? (
                 <motion.button
@@ -414,22 +400,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   onClick={goBack}
-                  className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm"
+                  className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm shrink-0"
                 >
                   <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </motion.button>
               ) : (
-                <div key="logo-icon" className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
+                <div key="logo-icon" className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5 shrink-0">
                   <Database className="h-5 w-5 text-primary" />
                 </div>
               )}
             </AnimatePresence>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 min-w-0">
               <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[300px]">
                 {showList ? (selectedCategories[0] || 'Asset Hub') : (activeGrant?.name || 'Asset Hub')}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                {showList ? `${processedAssets.length} Records Found` : `${filteredAssets.length} Total Registered Assets`}
+                {showList ? `${processedAssets.length} Records Discovered` : `${filteredAssets.length} Total Registered Nodes`}
               </p>
             </div>
           </div>
@@ -448,7 +434,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       setIsColumnSheetOpen(true);
                     }
                   }}
-                  className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2"
+                  className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shrink-0 shadow-sm"
                 >
                   <Wrench className="h-3.5 w-3.5" /> Setup Folder
                 </Button>
@@ -461,10 +447,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   onCheckedChange={(c) => showList ? handleSelectAll(!!c) : setSelectedCategories(c ? categories : [])} 
                   className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
                 />
-                <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer">Select All</label>
+                <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer hidden sm:block">Select Page</label>
               </div>
 
-              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner">
+              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0">
                 <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg transition-all"><LayoutGrid className="h-4 w-4" /></Button>
                 <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg transition-all"><Columns className="h-4 w-4" /></Button>
               </div>
@@ -473,18 +459,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 {!isSearchExpanded ? (
                   <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-border bg-muted/50 text-primary shrink-0 transition-all"><Search className="h-4 w-4" /></Button>
                 ) : (
-                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary group-focus-within:scale-110 transition-transform" />
-                    <Input ref={searchInputRef} placeholder="Filter records..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus-visible:ring-primary/20" />
+                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
+                    <Input ref={searchInputRef} placeholder="Search records..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-muted/50 border-2 border-primary/20 text-foreground text-xs focus-visible:ring-primary/20" />
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
               </AnimatePresence>
-              
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 rounded-lg border-border relative group hover:border-primary/40"><Filter className="h-4 w-4 group-hover:text-primary transition-colors" />{activeFilterCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[8px] font-black text-black border-2 border-background shadow-lg">{activeFilterCount}</span>}</Button>
-                <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-border group hover:border-primary/40"><ArrowUpDown className="h-4 w-4 group-hover:text-primary transition-colors" /></Button>
-              </div>
             </div>
           </div>
         </div>
@@ -664,7 +645,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0">
               <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
-              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Items Active</span>
+              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Items Selected</span>
             </div>
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
@@ -680,11 +661,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 
                 <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button>
                 
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 hover:border-primary/40 transition-all"><Download className="h-4 w-4" /> Pull Cloud</Button>
-                  <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 hover:border-primary/40 transition-all"><CloudUpload className="h-4 w-4" /> Push Changes</Button>
-                </div>
-
                 <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><GitMerge className="h-4 w-4" /> Reassign</Button>
                 
                 {isAdmin && (
@@ -718,30 +694,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsAssetBatchEditOpen} 
         selectedAssetCount={selectedAssetIds.size} 
         onSave={handleSaveAssetBatch} 
-      />
-      
-      <AssetFilterSheet 
-        isOpen={isFilterOpen} 
-        onOpenChange={setIsFilterOpen} 
-        isAdmin={isAdmin} 
-        locationOptions={locationOptions} 
-        selectedLocations={selectedLocations} 
-        setSelectedLocations={setSelectedLocations} 
-        assigneeOptions={assigneeOptions} 
-        selectedAssignees={selectedAssignees} 
-        categoryOptions={categoryOptions} 
-        selectedCategories={selectedCategories} 
-        setSelectedCategories={setSelectedCategories} 
-        conditionOptions={conditionOptions} 
-        selectedConditions={selectedConditions} 
-        setSelectedConditions={setSelectedConditions} 
-        statusOptions={statusOptions} 
-        selectedStatuses={selectedStatuses} 
-        setSelectedStatuses={setSelectedStatuses} 
-        missingFieldFilter={missingFieldFilter} 
-        setMissingFieldFilter={setMissingFieldFilter} 
-        searchTerm={searchTerm} 
-        setSearchTerm={setSearchTerm} 
       />
       
       <SortDrawer 

@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1600: Fixed Registry Sorting for ID Tags and Metadata.
- * Phase 1601: Enhanced diagnostic filter logic.
+ * Deployment Pulse: Hardened sorting protocol and high-availability sync exposure.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -283,7 +282,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     }
 
-    // --- Hardened Sorting Protocol ---
     if (sortKey) {
       const activeHeader = headers.find(h => h.id === sortKey);
       if (activeHeader) {

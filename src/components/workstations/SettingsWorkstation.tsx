@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Control Center.
- * Phase 1605: RBAC visibility hardening. Non-SuperAdmins cannot see Health.
- * Phase 1606: Implemented Motorbike Pulse Patch for Bajaj/SN normalization.
- * Phase 1607: Consolidated to 2 App Modes (Management / Verification).
+ * Deployment Pulse: Hardened RBAC logic and deterministic patch reflection.
  * Phase 1608: Fixed Admin tab visibility and patched immediate local storage reflection.
  */
 
@@ -142,7 +140,7 @@ export function SettingsWorkstation() {
       });
 
       if (motorbikeAssets.length === 0) {
-        toast({ title: "Patch Scope Empty", description: "No motorbike records discovered in active registry." });
+        toast({ title: "Patch Scope Empty", description: "No transport records discovered in active registry." });
         return;
       }
 
@@ -170,17 +168,16 @@ export function SettingsWorkstation() {
         }
       }
 
-      // Commit to local storage IMMEDIATELY so refreshRegistry reflects it
       await storage.saveAssets(updatedAssets);
       await refreshRegistry();
       
       addNotification({ 
         title: "Motorbike Patch Applied", 
-        description: `Successfully normalized ${patchCount} records to Bajaj / Trailing ID.`,
+        description: `Successfully normalized ${patchCount} records to Bajaj identity.`,
         variant: "success"
       });
     } catch (e) {
-      toast({ variant: "destructive", title: "Patch Failure", description: "Failed to apply data normalization." });
+      toast({ variant: "destructive", title: "Patch Failure" });
     } finally {
       setIsPatching(false);
     }
@@ -192,7 +189,7 @@ export function SettingsWorkstation() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ variant: "destructive", title: "Password Mismatch", description: "Passwords do not match." });
+      toast({ variant: "destructive", title: "Password Mismatch" });
       return;
     }
     if (!draftSettings || !userProfile) return;
@@ -204,7 +201,7 @@ export function SettingsWorkstation() {
     setIsPasswordDialogOpen(false);
     setNewPassword('');
     setConfirmPassword('');
-    addNotification({ title: "Password Staged", description: "Save changes to finalize.", variant: "success" });
+    addNotification({ title: "Passphrase Staged", description: "Save protocol to commit changes.", variant: "success" });
   };
 
   const handleSaveChange = async () => {
@@ -216,7 +213,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      addNotification({ title: `Settings Saved`, variant: "success" });
+      addNotification({ title: `Control Protocol Saved`, variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -234,26 +231,6 @@ export function SettingsWorkstation() {
     setSelectedSheetDef(sheetDef);
     setOriginalSheetName(sheetDef.name);
     setIsColumnSheetOpen(true);
-  };
-
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!draftSettings || !activeGrantId) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const templates = await parseExcelForTemplate(file);
-      const activeGrant = draftSettings.grants.find(g => g.id === activeGrantId);
-      if (!activeGrant) return;
-      const nextSheetDefs = { ...activeGrant.sheetDefinitions };
-      templates.forEach(t => { nextSheetDefs[t.name] = t; });
-      const updatedGrants = draftSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g);
-      setDraftSettings({ ...draftSettings, grants: updatedGrants });
-      addNotification({ title: 'Template Added', description: `${templates.length} categories staged.` });
-    } catch (error) {
-      addNotification({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
   };
 
   if (!settingsLoaded || !draftSettings) return null;
@@ -284,17 +261,17 @@ export function SettingsWorkstation() {
               <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><SettingsIcon className="h-5 w-5 text-primary" /></div>
               <div className="space-y-0.5">
                 <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Control Center</h2>
-                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Governance & Config</p>
+                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Protocol Setup</p>
               </div>
             </div>
-            <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all"><X className="h-5 w-5 text-muted-foreground" /></button>
+            <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">General</TabsTrigger>
-              {isAdmin && !isZonalAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
-              {(isAdmin || isZonalAdmin) && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Users</TabsTrigger>}
-              {isAdmin && !isZonalAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Audit Trail</TabsTrigger>}
+              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Environment</TabsTrigger>
+              {isAdmin && !isZonalAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Project Scope</TabsTrigger>}
+              {(isAdmin || isZonalAdmin) && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Personnel</TabsTrigger>}
+              {isAdmin && !isZonalAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Activity Log</TabsTrigger>}
               {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Infrastructure</TabsTrigger>}
             </TabsList>
           </div>
@@ -303,60 +280,64 @@ export function SettingsWorkstation() {
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
         <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
-          <SettingSection title="Appearance" description="Visual themes" icon={Palette}>
+          <SettingSection title="Workstation Theme" description="Visual pulse settings" icon={Palette}>
             <div className="grid grid-cols-2 gap-3">
               <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Sun className="h-4 w-4" /> Light
+                <Sun className="h-4 w-4" /> High-Contrast
               </Button>
               <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Moon className="h-4 w-4" /> Dark
+                <Moon className="h-4 w-4" /> Dark Mode
               </Button>
             </div>
           </SettingSection>
 
-          <SettingSection title="Security" description="Password Management" icon={KeyRound}>
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border">
+          <SettingSection title="Security Protocol" description="Credential Management" icon={KeyRound}>
+            <div className="flex items-center justify-between p-5 rounded-2xl bg-muted/30 border border-border shadow-sm">
               <div className="space-y-0.5">
-                <Label className="text-xs font-black uppercase tracking-tight">Access Passphrase</Label>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60 italic">Rotate your system credentials.</p>
+                <Label className="text-xs font-black uppercase tracking-tight">System Passphrase</Label>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Authorized rotation required every 90 days.</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setIsPasswordDialogOpen(true)} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] border-2">Change Password</Button>
+              <Button variant="outline" size="sm" onClick={() => setIsPasswordDialogOpen(true)} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] border-2">Rotate Access</Button>
             </div>
           </SettingSection>
 
           {isAdmin && (
-            <SettingSection title="Data Engineering" description="One-tap registry fixes" icon={Wrench}>
-              <div className="p-6 rounded-2xl bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4">
+            <SettingSection title="Data Governance" description="Technical Pulse Maintenance" icon={Wrench}>
+              <div className="p-6 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
                 <div className="flex items-center gap-3">
                   <Truck className="h-5 w-5 text-primary" />
-                  <h4 className="text-sm font-black uppercase">Motorbike Pulse Patch</h4>
+                  <h4 className="text-sm font-black uppercase">Normalized Transport Patch</h4>
                 </div>
                 <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                  Bulk updates all motorcycle records: Sets Manufacturer to "Bajaj" and extracts S/N from ID Code digits (e.g. mb/1360 → 1360).
+                  Bulk patches all motorbikes: Sets manufacturer to Bajaj and extracts short serials from ID codes.
                 </p>
                 <Button 
                   onClick={handleApplyMotorbikePatch} 
                   disabled={isPatching}
-                  className="w-full h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+                  className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform active:scale-95"
                 >
                   {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
-                  Apply Motorbike Patch
+                  Execute Motorbike Patch
                 </Button>
               </div>
             </SettingSection>
           )}
 
           {isAdmin && (
-            <SettingSection title="Operational Mode" description="Workstation Logic" icon={Smartphone}>
+            <SettingSection title="Application Logic" description="Operational Standards" icon={Smartphone}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(['management', 'verification'] as const).map(m => (
                   <button 
                     key={m}
                     onClick={() => handleSettingChange('appMode', m)}
-                    className={cn("p-6 rounded-2xl border-2 text-left transition-all", draftSettings.appMode === m ? "border-primary bg-primary/5 shadow-lg" : "border-border bg-muted/20")}
+                    className={cn(
+                      "p-6 rounded-2xl border-2 text-left transition-all relative overflow-hidden",
+                      draftSettings.appMode === m ? "border-primary bg-primary/[0.03] shadow-lg" : "border-border bg-muted/20"
+                    )}
                   >
-                    <h4 className="text-sm font-black uppercase text-foreground mb-1">{m}</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic">Switch to {m} protocol.</p>
+                    {draftSettings.appMode === m && <div className="absolute top-2 right-2"><CheckCircle2 className="h-4 w-4 text-primary" /></div>}
+                    <h4 className="text-sm font-black uppercase text-foreground mb-1">{m} Mode</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic">Standardizes registry interaction.</p>
                   </button>
                 ))}
               </div>
@@ -365,41 +346,35 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="groups" className="m-0 outline-none pb-20">
-          <SettingSection title="Authorized Registers" description="Project Management" icon={LayoutGrid}>
+          <SettingSection title="Project Directory" description="Active Registry Scope" icon={LayoutGrid}>
             <div className="space-y-6">
               <div className="flex gap-2">
-                <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm" />
-                <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Add Project</Button>
+                <Input placeholder="Enter project identifier..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 bg-background border-border rounded-xl font-bold text-sm shadow-inner" />
+                <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Grant</Button>
               </div>
               <div className="space-y-3">
                 {draftSettings.grants.map((grant) => {
                   const isActive = activeGrantId === grant.id;
                   return (
-                    <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", isActive ? "border-primary bg-primary/[0.02]" : "border-border bg-muted/10")}>
+                    <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all shadow-md", isActive ? "border-primary bg-primary/[0.02]" : "border-border bg-muted/10")}>
                       <div className="p-5 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <FolderOpen className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted")} />
+                          <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                            <FolderOpen className="h-5 w-5" />
+                          </div>
                           <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
                         </div>
-                        {!isActive && <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2">Set Active</Button>}
+                        {!isActive && <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black uppercase text-[8px] border-2 shadow-sm">Enable Node</Button>}
                       </div>
                       {isActive && (
                         <div className="px-5 pb-5 pt-2 border-t border-dashed border-border space-y-4">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                              <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl">
+                              <div key={name} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl shadow-inner">
                                 <span className="text-[9px] font-black uppercase text-muted-foreground truncate pr-4">{name}</span>
                                 <button onClick={() => handleEditSchema(grant.id, def)} className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"><Wrench className="h-3.5 w-3.5" /></button>
                               </div>
                             ))}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
-                              <FileUp className="h-3.5 w-3.5" /> Import Template
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => { setActiveView('IMPORT'); onOpenChange(false); }} className="flex-1 h-10 rounded-xl bg-muted/50 border-border font-black uppercase text-[8px] gap-2">
-                              <ScanSearch className="h-3.5 w-3.5" /> Import Assets
-                            </Button>
                           </div>
                         </div>
                       )}
@@ -412,7 +387,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="users" className="m-0 outline-none pb-20">
-          <SettingSection title="User Directory" description="Auditors & Access" icon={Users}>
+          <SettingSection title="Personnel Registry" description="Identity & Regional Scope" icon={Users}>
             <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
           </SettingSection>
         </TabsContent>
@@ -428,59 +403,35 @@ export function SettingsWorkstation() {
       </div>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Cancel</Button>
-        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldIcon className="h-4 w-4 mr-3" />}
-          Commit Protocol
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Discard Protocol</Button>
+        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />}
+          Commit Control Changes
         </Button>
       </div>
 
-      <input type="file" ref={fileInputRef} onChange={handleFileImport} className="hidden" accept=".xlsx,.xls" />
-      
-      {selectedSheetDef && (
-        <ColumnCustomizationSheet 
-          isOpen={isColumnSheetOpen}
-          onOpenChange={setIsColumnSheetOpen}
-          sheetDefinition={selectedSheetDef}
-          originalSheetName={originalSheetName}
-          onSave={(orig, newDef, all) => {
-            if (!draftSettings) return;
-            const updatedGrants = draftSettings.grants.map(grant => {
-              if (grant.id === activeGrantIdForSchema) {
-                const newSheetDefs = { ...grant.sheetDefinitions };
-                if (all) Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
-                else { newSheetDefs[newDef.name] = newDef; if (orig && orig !== newDef.name) delete newSheetDefs[orig]; }
-                return { ...grant, sheetDefinitions: newSheetDefs };
-              }
-              return grant;
-            });
-            setDraftSettings({ ...draftSettings, grants: updatedGrants });
-          }}
-        />
-      )}
-
       {/* Password Update Dialog */}
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden bg-background">
+        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden bg-background border-primary/10 shadow-3xl">
           <div className="p-8 pb-4 bg-muted/20 border-b">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase">Rotate Credentials</DialogTitle>
-              <DialogDescription className="text-[10px] font-bold uppercase opacity-60">Update your access passphrase.</DialogDescription>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight text-foreground">Rotate Credentials</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold uppercase opacity-60 tracking-widest mt-1">Personnel Security Refresh</DialogDescription>
             </DialogHeader>
           </div>
           <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase opacity-40">New Passphrase</Label>
-              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20" />
+              <Label className="text-[10px] font-black uppercase opacity-40 tracking-widest ml-1">New Passphrase</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 shadow-inner" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase opacity-40">Confirm Passphrase</Label>
-              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20" />
+              <Label className="text-[10px] font-black uppercase opacity-40 tracking-widest ml-1">Confirm Identity</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-14 rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 shadow-inner" />
             </div>
           </div>
           <DialogFooter className="p-8 bg-muted/20 border-t flex gap-3">
-            <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)} className="flex-1 h-12 font-bold">Abort</Button>
-            <Button onClick={handleUpdateMyPassword} className="flex-[2] h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Update Credentials</Button>
+            <Button variant="ghost" onClick={() => setIsPasswordDialogOpen(false)} className="flex-1 h-12 font-bold rounded-xl">Abort</Button>
+            <Button onClick={handleUpdateMyPassword} className="flex-[2] h-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] shadow-lg">Update System Credentials</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

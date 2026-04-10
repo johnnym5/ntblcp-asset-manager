@@ -2,9 +2,8 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Phase 1420: Integrated Mode-Aware Accent Classes.
- * Phase 1421: Bell long-press triggers Activity History pulse.
- * Phase 1422: Optimized header for mobile (Collapsible search, visible sync).
+ * Deployment Pulse: Optimized header for mobile (Collapsible search, visible sync).
+ * Phase 1422: Refined gaps and hit-zones for high-density touch displays.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -45,7 +44,8 @@ import {
   FileUp,
   Inbox,
   LayoutGrid,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -61,7 +61,7 @@ import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useNotifications, type Notification, markAllAsRead, clearAll } from '@/hooks/use-notifications';
+import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -83,10 +83,6 @@ import { InboxSheet } from '@/components/inbox-sheet';
 import { SyncStatusDialog } from '@/components/SyncStatusDialog';
 import { useLongPress } from '@/hooks/use-long-press';
 
-/**
- * High-Fidelity Dropdown Toast
- * Anchored directly under the bell button.
- */
 function BellNotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
   return (
@@ -101,7 +97,7 @@ function BellNotificationToast({ notification }: { notification: Notification })
     >
       <div className={cn(
         "p-2 rounded-xl shrink-0",
-        notification.variant === 'destructive' ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+        notification.variant === 'destructive' ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary"
       )}>
         <Icon className="h-4 w-4" />
       </div>
@@ -139,6 +135,7 @@ export default function SPAHub() {
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isSyncStatusOpen, setIsSyncStatusOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -175,10 +172,7 @@ export default function SPAHub() {
     }
   }, [lastAddedId, notifications]);
 
-  // High-Fidelity Sync Dialog Trigger Pulse
   const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
-  
-  // Notification Bell Long Press -> Activity History
   const bellLongPress = useLongPress(() => setActiveView('AUDIT_LOG'));
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -196,7 +190,7 @@ export default function SPAHub() {
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
       <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
-        <div className="flex items-center gap-4 sm:gap-8">
+        <div className="flex items-center gap-2 sm:gap-8">
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
@@ -233,32 +227,57 @@ export default function SPAHub() {
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
               <Boxes className="h-5 w-5" />
-              <div className="hidden xs:flex flex-col text-left">
-                <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Asset Manager</h1>
-                <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'STANDARD'}</span>
-              </div>
+              {!isMobile && (
+                <div className="flex flex-col text-left">
+                  <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
+                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode || 'STANDARD'}</span>
+                </div>
+              )}
             </button>
           </TactileMenu>
         </div>
 
-        <div className="flex-1 flex items-center justify-center mx-4 sm:mx-12">
-          {isMobile ? (
-            <button 
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="h-10 w-10 flex items-center justify-center bg-muted/30 border border-border rounded-xl text-primary hover:bg-primary/10 transition-all shadow-sm"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          ) : (
-            <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
-              <Search className="h-4 w-4" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search Registry...</span>
-              <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
-            </button>
-          )}
+        <div className="flex-1 flex items-center justify-center mx-4">
+          <AnimatePresence mode="wait">
+            {isMobile && !isMobileSearchOpen ? (
+              <motion.button 
+                key="search-trigger"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={() => setIsMobileSearchOpen(true)}
+                className="h-10 w-10 flex items-center justify-center bg-muted/30 border border-border rounded-xl text-primary hover:bg-primary/10 transition-all"
+              >
+                <Search className="h-4 w-4" />
+              </motion.button>
+            ) : isMobile && isMobileSearchOpen ? (
+              <motion.div 
+                key="mobile-search"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "100%", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl px-3 h-10 w-full"
+              >
+                <Search className="h-3.5 w-3.5 text-primary" />
+                <input 
+                  autoFocus
+                  placeholder="Search..."
+                  className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
+                  onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
+                />
+                <button onClick={() => setIsMobileSearchOpen(false)}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+              </motion.div>
+            ) : (
+              <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
+                <Search className="h-4 w-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search Registry...</span>
+                <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
+              </button>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-5">
+        <div className="flex items-center gap-2 sm:gap-5">
           {isAdmin && (
             <TooltipProvider>
               <Tooltip>
@@ -267,11 +286,11 @@ export default function SPAHub() {
                     variant="ghost" 
                     size="icon" 
                     onClick={() => setIsInboxOpen(true)} 
-                    className="h-10 w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
                   >
-                    <Inbox className="h-4.5 w-4.5" />
+                    <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                     {pendingApprovalsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
                         {pendingApprovalsCount}
                       </span>
                     )}
@@ -282,41 +301,25 @@ export default function SPAHub() {
             </TooltipProvider>
           )}
 
-          {/* Sync Controller Pulse Area - Now always visible on mobile */}
           <div 
             {...syncLongPress}
             onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
             className="flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
           >
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download Data</TooltipContent></Tooltip></TooltipProvider>
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload Data</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Pull Cloud</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Push Changes</TooltipContent></Tooltip></TooltipProvider>
           </div>
 
-          <TactileMenu
-            title="Network Status"
-            options={[
-              { label: 'Connect to Cloud', icon: Wifi, onClick: () => setIsOnline(true), disabled: isOnline },
-              { label: 'Work Offline', icon: WifiOff, onClick: () => setIsOnline(false), disabled: !isOnline }
-            ]}
-          >
-            <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse px-2">
-              <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]")} />
-              <span className={cn("text-[8px] font-black uppercase tracking-widest hidden sm:block", isOnline ? 'ONLINE' : 'OFFLINE')}>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-            </button>
-          </TactileMenu>
-          
           <div className="relative">
             <button 
               {...bellLongPress}
               onClick={() => setIsNotificationsOpen(true)} 
               onContextMenu={(e) => { e.preventDefault(); setActiveView('AUDIT_LOG'); }}
-              className="p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
+              className="p-2 sm:p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
             >
-              <Bell className="h-4.5 w-4.5" />
+              <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
               {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
             </button>
-            
-            {/* Transient Dropdown Toast Pulse */}
             <AnimatePresence>
               {activeToast && <BellNotificationToast notification={activeToast} />}
             </AnimatePresence>
@@ -348,7 +351,7 @@ export default function SPAHub() {
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
                 <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
-                  <AnimatePresence initial={false}>
+                  <AnimatePresence mode="wait">
                     <motion.div 
                       key={activeView} 
                       initial={{ opacity: 0, scale: 0.99, y: 10 }} 
