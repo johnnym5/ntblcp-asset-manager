@@ -7,6 +7,7 @@
  * Phase 1410: Integrated transient 5-second Notification Toasts.
  * Phase 1414: Removed redundant VERIFY view and consolidated navigation.
  * Phase 1415: Integrated high-fidelity Sync Status Dialog via long-press triggers.
+ * Phase 1416: Anchored transient toasts directly under the notification bell.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -46,7 +47,8 @@ import {
   Monitor,
   FileUp,
   Inbox,
-  LayoutGrid
+  LayoutGrid,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -84,23 +86,31 @@ import { InboxSheet } from '@/components/inbox-sheet';
 import { SyncStatusDialog } from '@/components/SyncStatusDialog';
 import { useLongPress } from '@/hooks/use-long-press';
 
-function NotificationToast({ notification }: { notification: Notification }) {
+/**
+ * High-Fidelity Dropdown Toast
+ * Anchored directly under the bell button.
+ */
+function BellNotificationToast({ notification }: { notification: Notification }) {
   const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.9, x: "-50%" }}
-      animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-      exit={{ opacity: 0, scale: 0.9, y: 10, x: "-50%" }}
+      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.95 }}
       className={cn(
-        "fixed bottom-24 left-1/2 z-[200] w-[320px] p-4 rounded-2xl border shadow-3xl flex items-center gap-4 backdrop-blur-3xl",
-        notification.variant === 'destructive' ? "bg-destructive border-destructive text-destructive-foreground" :
-        "bg-card/90 border-border text-foreground"
+        "absolute top-full mt-3 right-0 z-[100] w-[280px] p-3 rounded-2xl border shadow-3xl flex items-start gap-3 backdrop-blur-3xl bg-card/95 border-border origin-top-right",
+        notification.variant === 'destructive' ? "border-destructive/30" : "border-border"
       )}
     >
-      <div className="p-2 bg-white/10 rounded-xl shrink-0"><Icon className="h-5 w-5" /></div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-black uppercase tracking-tight truncate leading-none">{notification.title}</p>
-        <p className="text-[9px] font-medium opacity-80 line-clamp-2 mt-1.5 italic">{notification.description}</p>
+      <div className={cn(
+        "p-2 rounded-xl shrink-0",
+        notification.variant === 'destructive' ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+      )}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none text-foreground">{notification.title}</p>
+        <p className="text-[9px] font-medium opacity-60 line-clamp-2 mt-1.5 italic leading-relaxed">{notification.description}</p>
       </div>
     </motion.div>
   );
@@ -297,6 +307,11 @@ export default function SPAHub() {
                 <Bell className="h-4.5 w-4.5" />
                 {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
               </button>
+              
+              {/* Transient Dropdown Toast Pulse */}
+              <AnimatePresence>
+                {activeToast && <BellNotificationToast notification={activeToast} />}
+              </AnimatePresence>
             </div>
           </TactileMenu>
 
@@ -344,10 +359,6 @@ export default function SPAHub() {
           </ErrorBoundary>
         </div>
       </div>
-
-      <AnimatePresence>
-        {activeToast && <NotificationToast key={activeToast.id} notification={activeToast} />}
-      </AnimatePresence>
     </div>
   );
 }
