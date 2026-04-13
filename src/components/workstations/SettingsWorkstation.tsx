@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Governance Control Center.
  * Standardized terminology for professional asset management.
  * Implemented Concurrent Multi-Project Selection and Integrated Ingestion.
+ * Phase 1106: Added per-sheet visibility toggles for admins.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -40,7 +41,9 @@ import {
   ChevronDown,
   ChevronRight,
   Save,
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,6 +52,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { UserManagement } from '@/components/admin/user-management';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
@@ -189,6 +193,20 @@ export function SettingsWorkstation() {
     handleSettingChange('activeGrantIds', next);
   };
 
+  const toggleSheetEnablement = (grantId: string, sheetName: string, enabled: boolean) => {
+    if (!draftSettings) return;
+    const nextGrants = draftSettings.grants.map(g => {
+      if (g.id === grantId) {
+        const nextEnabled = enabled 
+          ? Array.from(new Set([...g.enabledSheets, sheetName]))
+          : g.enabledSheets.filter(s => s !== sheetName);
+        return { ...g, enabledSheets: nextEnabled };
+      }
+      return g;
+    });
+    handleSettingChange('grants', nextGrants);
+  };
+
   const commitProjectRename = () => {
     if (!editingProjectId || !draftSettings) return;
     const nextGrants = draftSettings.grants.map(g => g.id === editingProjectId ? { ...g, name: editProjectValue } : g);
@@ -244,8 +262,12 @@ export function SettingsWorkstation() {
       const nextGrants = draftSettings.grants.map(g => {
         if (g.id === targetId) {
           const nextDefs = { ...g.sheetDefinitions };
-          templates.forEach(t => { nextDefs[t.name] = t; });
-          return { ...g, sheetDefinitions: nextDefs };
+          const nextEnabled = [...g.enabledSheets];
+          templates.forEach(t => { 
+            nextDefs[t.name] = t;
+            if (!nextEnabled.includes(t.name)) nextEnabled.push(t.name);
+          });
+          return { ...g, sheetDefinitions: nextDefs, enabledSheets: nextEnabled };
         }
         return g;
       });
@@ -400,7 +422,7 @@ export function SettingsWorkstation() {
                             </div>
 
                             <div className="flex items-center gap-3 pl-6">
-                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable Scope</span>
+                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable Project</span>
                               <Checkbox checked={isEnabled} onCheckedChange={(checked) => toggleProjectEnablement(grant.id, !!checked)} className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
                             </div>
                           </div>
@@ -408,21 +430,39 @@ export function SettingsWorkstation() {
                           {isExpanded && (
                             <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
                               <div className="flex items-center justify-between px-1">
-                                <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Registered Folder List</h4>
+                                <div className="space-y-1">
+                                  <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 leading-none">Registered Folder List</h4>
+                                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide specific asset groups</p>
+                                </div>
                                 <div className="flex items-center gap-2">
-                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Import Template</Button>
+                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Load Template</Button>
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => {
                                   const isSheetEditing = editingSheetKey?.grantId === grant.id && editingSheetKey?.name === name;
+                                  const isSheetEnabled = grant.enabledSheets?.includes(name);
+                                  
                                   return (
-                                    <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
-                                      {isSheetEditing ? (
-                                        <div className="flex items-center gap-2 flex-1 mr-4"><Input value={editSheetValue} onChange={(e) => setEditSheetValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)} className="h-8 text-[10px] font-black uppercase" /><Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
-                                      ) : (
-                                        <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
-                                      )}
+                                    <div key={name} className={cn(
+                                      "flex items-center justify-between p-4 bg-background border rounded-xl group/folder transition-all",
+                                      isSheetEnabled ? "border-primary/20 bg-primary/[0.01]" : "border-border opacity-60"
+                                    )}>
+                                      <div className="flex items-center gap-3 flex-1 mr-4 min-w-0">
+                                        <Switch 
+                                          checked={isSheetEnabled} 
+                                          onCheckedChange={(c) => toggleSheetEnablement(grant.id, name, c)}
+                                          className="data-[state=checked]:bg-primary scale-75"
+                                        />
+                                        {isSheetEditing ? (
+                                          <div className="flex items-center gap-2 flex-1"><Input value={editSheetValue} onChange={(e) => setEditSheetValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)} className="h-8 text-[10px] font-black uppercase" /><Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
+                                        ) : (
+                                          <div className="flex flex-col min-w-0">
+                                            <span className={cn("text-[11px] font-black uppercase truncate leading-none", isSheetEnabled ? "text-foreground" : "text-muted-foreground")}>{name}</span>
+                                            <span className="text-[7px] font-bold uppercase text-muted-foreground mt-1">{isSheetEnabled ? 'Active in Registry' : 'Hidden from Registry'}</span>
+                                          </div>
+                                        )}
+                                      </div>
                                       <div className="flex items-center gap-2 text-white/20 shrink-0">
                                         {!isSheetEditing && <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>}
                                         <button className="p-1.5 hover:text-primary transition-colors" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>

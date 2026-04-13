@@ -1,11 +1,12 @@
 /**
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Phase 1407: Integrated high-speed verification controls (Red/Green Toggle, Condition, Remarks).
+ * Phase 1408: Added Folder Badge for combined project context.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3 } from 'lucide-react';
+import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { ASSET_CONDITIONS } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -94,6 +96,13 @@ export function RegistryCard({
               </div>
               <Maximize2 className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
             </div>
+          </div>
+
+          <div className="mb-1">
+            <Badge variant="secondary" className="bg-muted/50 border-border/40 text-[7px] font-black uppercase tracking-tighter h-4.5 px-1.5 gap-1">
+              <FolderOpen className="h-2.5 w-2.5 text-primary opacity-60" />
+              {record.sourceSheet}
+            </Badge>
           </div>
 
           <h4 className="text-[12px] font-black uppercase text-foreground truncate leading-tight tracking-tight">

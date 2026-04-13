@@ -4,6 +4,7 @@
  * @fileOverview RegistryTable - Ground-up Professional List Workstation.
  * Phase 1500: Rebuilt with a 12-column grid pulse for deterministic alignment.
  * Phase 1501: Integrated inline high-speed verification controls with color-coding.
+ * Phase 1502: Added Folder column for combined project views.
  */
 
 import React from 'react';
@@ -18,7 +19,8 @@ import {
   Maximize2,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -56,7 +58,9 @@ export function RegistryTable({
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isVerificationMode = appSettings?.appMode === 'verification';
 
-  const tableHeaders = globalHeaders.filter(h => h.table);
+  // Determine if we should show the category column (if multiple categories exist in the view)
+  const uniqueCategories = Array.from(new Set(records.map(r => r.sourceSheet)));
+  const showCategoryCol = uniqueCategories.length > 1;
 
   return (
     <div className="w-full flex flex-col gap-3 pb-40">
@@ -72,8 +76,13 @@ export function RegistryTable({
         
         <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
           <div className="col-span-1 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">S/N</div>
-          <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Identification</div>
-          <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Registry Scope</div>
+          <div className={showCategoryCol ? "col-span-3" : "col-span-4"}>
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Identification</span>
+          </div>
+          {showCategoryCol && (
+            <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Asset Folder</div>
+          )}
+          <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Registry Scope</div>
           {isVerificationMode ? (
             <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-primary">Field Assessment Pulse</div>
           ) : (
@@ -116,7 +125,7 @@ export function RegistryTable({
                 </div>
 
                 {/* Col 2: Identification */}
-                <div className="col-span-4 flex items-center gap-3 min-w-0">
+                <div className={showCategoryCol ? "col-span-3 flex items-center gap-3 min-w-0" : "col-span-4 flex items-center gap-3 min-w-0"}>
                   <div className={cn(
                     "p-1.5 rounded-lg border shrink-0",
                     syncStatus === 'synced' ? "bg-green-500/5 border-green-500/20 text-green-600" : "bg-blue-500/5 border-blue-500/20 text-blue-600"
@@ -129,8 +138,18 @@ export function RegistryTable({
                   </div>
                 </div>
 
+                {/* Optional Folder Column */}
+                {showCategoryCol && (
+                  <div className="col-span-2 min-w-0">
+                    <Badge variant="outline" className="border-border/60 text-[8px] font-black uppercase tracking-tighter truncate max-w-full">
+                      <FolderOpen className="h-2.5 w-2.5 mr-1 text-primary opacity-60" />
+                      {record.sourceSheet}
+                    </Badge>
+                  </div>
+                )}
+
                 {/* Col 3: Scope */}
-                <div className="col-span-3 min-w-0">
+                <div className="col-span-2 min-w-0">
                   <div className="flex flex-col">
                     <span className="text-[11px] font-black uppercase text-foreground/80 truncate leading-none">{String(record.rawRow.location || 'Global')}</span>
                     <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter mt-1 truncate">{String(record.rawRow.custodian || 'Unassigned')}</span>

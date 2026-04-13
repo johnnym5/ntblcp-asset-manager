@@ -1,6 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
  * Forensic update: Captures diffs and previous state automatically for the audit trail.
+ * Phase 1105: Implemented State Scope Chunking to bypass Firestore "IN" limit of 30.
  */
 
 import { 
@@ -50,26 +51,53 @@ export const FirestoreService = {
     });
   },
 
+  /**
+   * Fetches assets for projects. 
+   * Hardened: Handles Firestore's 30-item limit for "IN" queries by chunking.
+   */
   async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
     
-    let q;
     const hasStates = stateScopes && stateScopes.length > 0 && !stateScopes.includes('All');
-
-    if (grantId === 'ALL_PROJECTS') {
-      q = hasStates 
-        ? query(assetsRef, where('location', 'in', stateScopes))
-        : query(assetsRef, orderBy('location'));
-    } else {
-      q = hasStates
-        ? query(assetsRef, where('grantId', '==', grantId), where('location', 'in', stateScopes))
-        : query(assetsRef, where('grantId', '==', grantId));
-    }
-
-    try {
+    
+    // Helper to execute query and return assets
+    const fetchChunk = async (q: any) => {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
+    };
+
+    try {
+      if (hasStates) {
+        // Firestore limits 'in' queries to 30 items. Nigeria has 37 states.
+        const CHUNK_SIZE = 30;
+        const stateChunks = [];
+        for (let i = 0; i < stateScopes!.length; i += CHUNK_SIZE) {
+          stateChunks.push(stateScopes!.slice(i, i + CHUNK_SIZE));
+        }
+
+        let allAssets: Asset[] = [];
+        for (const chunk of stateChunks) {
+          let q;
+          if (grantId === 'ALL_PROJECTS') {
+            q = query(assetsRef, where('location', 'in', chunk));
+          } else {
+            q = query(assetsRef, where('grantId', '==', grantId), where('location', 'in', chunk));
+          }
+          const chunkAssets = await fetchChunk(q);
+          allAssets = [...allAssets, ...chunkAssets];
+        }
+        return allAssets;
+      } else {
+        // No state filtering
+        let q;
+        if (grantId === 'ALL_PROJECTS') {
+          q = query(assetsRef, orderBy('location'));
+        } else {
+          q = query(assetsRef, where('grantId', '==', grantId));
+        }
+        return await fetchChunk(q);
+      }
     } catch (err: any) {
       this.handlePermissionError(assetsRef.path, 'list', err);
       throw err;
