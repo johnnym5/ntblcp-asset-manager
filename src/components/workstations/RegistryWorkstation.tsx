@@ -95,7 +95,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     isExplored,
     setIsExplored,
     isOnline,
-    activeGrantId,
+    activeGrantIds,
     isFilterOpen,
     setIsFilterOpen,
     isSortOpen,
@@ -141,12 +141,26 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
-  const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
+  // Enabled Grants Cluster
+  const enabledGrants = useMemo(() => {
+    return appSettings?.grants.filter(g => activeGrantIds.includes(g.id)) || [];
+  }, [appSettings, activeGrantIds]);
+
+  // Aggregate Sheet Definitions from all enabled projects
+  const mergedSheetDefinitions = useMemo(() => {
+    const defs: Record<string, SheetDefinition> = {};
+    enabledGrants.forEach(g => {
+      Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
+        defs[name] = def;
+      });
+    });
+    return defs;
+  }, [enabledGrants]);
 
   useEffect(() => {
-    if (selectedCategories.length === 1 && activeGrant) {
+    if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
-      const def = activeGrant.sheetDefinitions[cat];
+      const def = mergedSheetDefinitions[cat];
       if (def && def.displayFields) {
         const folderHeaders: RegistryHeader[] = def.displayFields.map((f, i) => ({
           id: `h-${f.key}-${i}`,
@@ -166,7 +180,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         setWorkstationHeaders(folderHeaders);
       }
     }
-  }, [selectedCategories, activeGrant, setWorkstationHeaders]);
+  }, [selectedCategories, mergedSheetDefinitions, setWorkstationHeaders]);
 
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
@@ -180,13 +194,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   }, [filteredAssets]);
 
   const categories = useMemo(() => {
-    if (!activeGrant) return [];
-    const allInProject = Object.keys(activeGrant.sheetDefinitions || {}).sort();
-    return allInProject.filter(cat => {
+    const allKnownFolders = Object.keys(mergedSheetDefinitions).sort();
+    return allKnownFolders.filter(cat => {
       const stats = groupStats[cat];
       return (stats && stats.total > 0) || appSettings?.enabledSheets?.includes(cat);
     });
-  }, [activeGrant, groupStats, appSettings?.enabledSheets]);
+  }, [mergedSheetDefinitions, groupStats, appSettings?.enabledSheets]);
 
   const processedAssets = useMemo(() => {
     let results = [...filteredAssets];
@@ -412,7 +425,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </AnimatePresence>
             <div className="space-y-0.5 min-w-0">
               <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[300px]">
-                {showList ? (selectedCategories[0] || 'Asset Hub') : (activeGrant?.name || 'Asset Hub')}
+                {showList ? (selectedCategories[0] || 'Asset Hub') : 'Asset Registry'}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
                 {showList ? `${processedAssets.length} Records Discovered` : `${filteredAssets.length} Total Registered Nodes`}
@@ -428,8 +441,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   size="sm" 
                   onClick={() => {
                     const cat = selectedCategories[0];
-                    if (cat && activeGrant) {
-                      setSelectedSheetDef(activeGrant.sheetDefinitions[cat]);
+                    if (cat && mergedSheetDefinitions[cat]) {
+                      setSelectedSheetDef(mergedSheetDefinitions[cat]);
                       setOriginalSheetName(cat);
                       setIsColumnSheetOpen(true);
                     }
@@ -749,20 +762,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           sheetDefinition={selectedSheetDef}
           originalSheetName={originalSheetName}
           onSave={(orig, newDef, all) => {
-            if (!activeGrantId) return;
-            const updatedGrants = appSettings?.grants.map(grant => {
-              if (grant.id === activeGrantId) {
-                const newSheetDefs = { ...grant.sheetDefinitions };
+            // Find which grant this definition belongs to
+            const grant = appSettings?.grants.find(g => g.sheetDefinitions[orig || ''] || g.sheetDefinitions[newDef.name]);
+            if (!grant) return;
+
+            const updatedGrants = appSettings?.grants.map(g => {
+              if (g.id === grant.id) {
+                const newSheetDefs = { ...g.sheetDefinitions };
                 if (all) {
                   Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
                 } else {
                   newSheetDefs[newDef.name] = newDef;
                   if (orig && orig !== newDef.name) delete newSheetDefs[orig];
                 }
-                return { ...grant, sheetDefinitions: newSheetDefs };
+                return { ...g, sheetDefinitions: newSheetDefs };
               }
-              return grant;
+              return g;
             });
+
             if (appSettings) {
               const nextSettings = { ...appSettings, grants: updatedGrants };
               setAppSettings(nextSettings);
