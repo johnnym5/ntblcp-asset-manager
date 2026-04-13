@@ -2,11 +2,12 @@
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Phase 1407: Integrated high-speed verification controls (Red/Green Toggle, Condition, Remarks).
  * Phase 1408: Added Folder Badge for combined project context.
+ * Phase 1409: Added Project Name to header for multi-grant clarity.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen } from 'lucide-react';
+import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
@@ -54,6 +55,8 @@ export function RegistryCard({
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
+  const grantId = (record.rawRow as any).grantId;
+  const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
   const longPressProps = useLongPress(() => {
     onToggleSelect?.(record.id);
@@ -98,7 +101,11 @@ export function RegistryCard({
             </div>
           </div>
 
-          <div className="mb-1">
+          <div className="mb-1 flex flex-wrap gap-1">
+            <Badge variant="secondary" className="bg-primary/10 border-primary/20 text-primary text-[7px] font-black uppercase tracking-tighter h-4.5 px-1.5 flex items-center gap-1">
+              <ShieldCheck className="h-2 w-2" />
+              {grantName}
+            </Badge>
             <Badge variant="secondary" className="bg-muted/50 border-border/40 text-[7px] font-black uppercase tracking-tighter h-4.5 px-1.5 gap-1">
               <FolderOpen className="h-2.5 w-2.5 text-primary opacity-60" />
               {record.sourceSheet}

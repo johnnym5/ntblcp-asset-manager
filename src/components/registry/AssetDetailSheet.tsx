@@ -4,6 +4,7 @@
  * @fileOverview AssetDetailSheet - Professional Audit Dossier Wrapper.
  * Preserved for non-registry pages (GIS, Alerts, Gallery) that require a pop-up context.
  * Phase 1408: Added quick verification controls to the dossier overlay.
+ * Phase 1409: Added Project Name badge for multi-grant clarity.
  */
 
 import React from 'react';
@@ -45,12 +46,14 @@ interface AssetDetailSheetProps {
 }
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
-  const { refreshRegistry, filteredAssets } = useAppState();
+  const { refreshRegistry, filteredAssets, appSettings } = useAppState();
   const { userProfile } = useAuth();
 
   if (!record) return null;
 
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
+  const grantId = (record.rawRow as any).grantId;
+  const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
   const handleQuickUpdate = async (id: string, updates: Partial<Asset>) => {
     const asset = filteredAssets.find(a => a.id === id);
@@ -88,6 +91,9 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                 Asset Dossier
               </DialogTitle>
               <div className="flex items-center gap-3">
+                <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[8px] h-5 px-2 rounded-full">
+                  {grantName}
+                </Badge>
                 <Badge className="bg-primary text-black font-black uppercase text-[8px] h-5 px-2 rounded-full">
                   {record.sourceSheet || 'REGISTRY PULSE'}
                 </Badge>

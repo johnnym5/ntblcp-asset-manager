@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetDossier - Professional Technical Registry Hub.
  * Phase 1511: Renamed Fidelity Audit to Asset Data Checklist.
+ * Phase 1512: Added Project Name badge for multi-grant clarity.
  */
 
 import React from 'react';
@@ -112,6 +113,8 @@ export function AssetDossier({
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
   const isVerified = status === 'VERIFIED';
+  const grantId = (record.rawRow as any).grantId;
+  const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
   const handleToggleHeaderFlag = (headerId: string, flag: 'table' | 'quickView' | 'inChecklist') => {
     setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, [flag]: !h[flag] } : h));
@@ -214,8 +217,15 @@ export function AssetDossier({
       {/* Main Data Core */}
       <div className="flex-1 flex flex-col bg-background min-h-0 overflow-hidden relative">
         <div className="p-8 border-b border-border/40 flex items-center justify-between">
-          <div className="space-y-1">
-            <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Registry Attributes</h4>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[8px] h-5 px-2 rounded-full">
+                {grantName}
+              </Badge>
+              <Badge className="bg-primary text-black font-black uppercase text-[8px] h-5 px-2 rounded-full">
+                {record.sourceSheet || 'REGISTRY PULSE'}
+              </Badge>
+            </div>
             <p className="text-xl font-black uppercase text-foreground leading-none">Technical Dossier</p>
           </div>
           <Badge variant="outline" className="h-7 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px]">

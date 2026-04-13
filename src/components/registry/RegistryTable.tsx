@@ -98,6 +98,8 @@ export function RegistryTable({
           const syncStatus = (record.rawRow as any).syncStatus || 'local';
           const isSelected = selectedIds.has(record.id);
           const isVerified = status === 'VERIFIED';
+          const grantId = (record.rawRow as any).grantId;
+          const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
           return (
             <div 
@@ -140,7 +142,10 @@ export function RegistryTable({
 
                 {/* Optional Folder Column */}
                 {showCategoryCol && (
-                  <div className="col-span-2 min-w-0">
+                  <div className="col-span-2 min-w-0 flex flex-col gap-1">
+                    <span className="text-[7px] font-black uppercase text-primary tracking-tighter truncate opacity-60">
+                      {grantName}
+                    </span>
                     <Badge variant="outline" className="border-border/60 text-[8px] font-black uppercase tracking-tighter truncate max-w-full">
                       <FolderOpen className="h-2.5 w-2.5 mr-1 text-primary opacity-60" />
                       {record.sourceSheet}
@@ -191,7 +196,7 @@ export function RegistryTable({
                           value={String(record.rawRow.remarks || '')}
                           onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
                         />
-                        <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 opacity-20 group-hover/remark:opacity-40 transition-opacity pointer-events-none" />
+                        <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 opacity-20 group/remark:opacity-40 transition-opacity pointer-events-none" />
                       </div>
                     </div>
                   ) : (
