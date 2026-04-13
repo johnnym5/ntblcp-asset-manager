@@ -57,6 +57,7 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export function SettingsWorkstation() {
   const { 
@@ -77,7 +78,7 @@ export function SettingsWorkstation() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectValue, setEditProjectValue] = useState('');
   
-  // Sheet (Group) Management State
+  // Group Management State
   const [editingSheetKey, setEditingSheetKey] = useState<{grantId: string, name: string} | null>(null);
   const [editSheetValue, setEditSheetValue] = useState('');
 
@@ -252,7 +253,7 @@ export function SettingsWorkstation() {
       });
       
       handleSettingChange('grants', nextGrants);
-      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions identified.` });
+      toast({ title: 'Templates Imported', description: `${templates.length} group definitions identified.` });
     } catch (error) {
       toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -276,6 +277,14 @@ export function SettingsWorkstation() {
       </Card>
     </div>
   );
+
+  if (!settingsLoaded || !draftSettings) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -342,7 +351,7 @@ export function SettingsWorkstation() {
               </SettingSection>
 
               {isAdmin && (
-                <SettingSection title="Registry Mode" description="Operational logic" icon={Smartphone}>
+                <SettingSection title="System Mode" description="Operational logic" icon={Smartphone}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { id: 'management', label: 'Registry Admin', desc: 'Full governance and data engineering system.' },
@@ -478,7 +487,7 @@ export function SettingsWorkstation() {
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Exit Settings</Button>
         <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3 transition-transform active:scale-95">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />}
-          Apply Global Settings
+          Save System Settings
         </Button>
       </div>
 
