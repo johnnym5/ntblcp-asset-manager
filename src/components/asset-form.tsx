@@ -3,7 +3,7 @@
 /**
  * @fileOverview AssetForm - Record Detail Workstation.
  * Hardened: restricted editing based on Admin status or user permission.
- * Phase 1205: Integrated Verification mode overrides for assessment fields.
+ * Phase 1205: Added guidance tooltips explaining header terminology.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -53,7 +53,7 @@ import { Badge } from "./ui/badge";
 import { getCanonicalGroup } from "@/lib/condition-logic";
 import type { Asset, ConditionAuditEntry } from "@/types/domain";
 import { ClassificationEngine } from "@/lib/classification-engine";
-import { VALIDATION_GROUPS } from "@/lib/validation-rules";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { addNotification } from "@/hooks/use-notifications";
 
 interface AssetFormProps {
@@ -73,7 +73,7 @@ export default function AssetForm({
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { activeGrantId, appSettings } = useAppState();
+  const { activeGrantId, appSettings, headers: globalHeaders } = useAppState();
   
   const form = useForm<Asset>({
     resolver: zodResolver(AssetSchema),
@@ -125,9 +125,7 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
-        // Approval Logic Pulse
         if (!isAdmin && !canUserEditFull && asset) {
-          // Identify changes for the approval diff
           const changes: Partial<Asset> = {};
           (Object.keys(data) as Array<keyof Asset>).forEach(key => {
             if (JSON.stringify(data[key]) !== JSON.stringify((asset as any)[key])) {
@@ -156,18 +154,6 @@ export default function AssetForm({
           }
         }
 
-        if (asset && asset.condition !== data.condition) {
-          const audit: ConditionAuditEntry = {
-            oldCondition: asset.condition,
-            newCondition: data.condition,
-            changedBy: userProfile?.displayName || 'System User',
-            timestamp: new Date().toISOString(),
-            reason: data.remarks || 'Assessment Update',
-            isBulkAction: false
-          };
-          nextAsset.conditionHistory = [audit, ...(asset.conditionHistory || [])];
-        }
-
         await onSave(nextAsset);
     } finally {
         setIsSaving(false);
@@ -175,27 +161,42 @@ export default function AssetForm({
   };
 
   const formValues = form.watch();
-  const activeClassification = useMemo(() => {
-    return formValues.classification || (asset ? ClassificationEngine.classify(asset) : null);
-  }, [formValues.classification, asset]);
-
-  /**
-   * Hardened Field Logic:
-   * 1. Admins bypass all locks.
-   * 2. Verification Mode allows non-admins to update Status, Condition, and Remarks.
-   * 3. Full Editing is ONLY available if explicitly enabled in user profile.
-   */
+  
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
-    
     const assessmentFields = ['status', 'condition', 'remarks'];
-    
-    // Permission Override Pulse
     if (isVerificationMode && assessmentFields.includes(fieldName)) return false;
     if (canUserEditFull) return false;
-
     return true;
+  };
+
+  const LabelWithInfo = ({ label, name }: { label: string, name: string }) => {
+    const header = globalHeaders.find(h => h.normalizedName === name.toLowerCase().replace(/ /g, '_'));
+    return (
+      <div className="flex items-center gap-2 mb-1.5">
+        <FormLabel className="text-[9px] font-black uppercase text-white/40 mb-0">{label}</FormLabel>
+        {header?.guidance && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40 hover:opacity-100" /></div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
+                <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
+                <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
+                {header.example && (
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <p className="text-[10px] font-bold text-white/40 uppercase">Example</p>
+                    <p className="text-[10px] font-mono text-primary">{header.example}</p>
+                  </div>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -213,11 +214,6 @@ export default function AssetForm({
                 </DialogDescription>
               </div>
             </div>
-            {!isAdmin && !canUserEditFull && (
-              <Badge variant="outline" className="h-8 px-4 border-primary/20 text-primary bg-primary/5 font-black uppercase text-[10px] tracking-widest gap-2">
-                <GitPullRequest className="h-3 w-3" /> Approval Workflow Active
-              </Badge>
-            )}
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
@@ -232,20 +228,32 @@ export default function AssetForm({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="description" render={({ field }) => (
                           <FormItem className="sm:col-span-2">
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Identification</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 sm:h-14 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase placeholder:opacity-20" placeholder="e.g. Toyota Hilux 2024" /></FormControl>
+                            <LabelWithInfo label="Asset Identification" name="asset description" />
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 sm:h-14 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase" placeholder="e.g. Toyota Hilux 2024" /></FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Manufacturer Serial</FormLabel>
+                            <LabelWithInfo label="Manufacturer Serial" name="serial number" />
                             <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="SN-XXXX-XXXX" /></FormControl>
                           </FormItem>
                         )}/>
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Tag ID</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="TAG-XXX" /></FormControl>
+                            <LabelWithInfo label="NTBLCP Asset ID / Tag" name="asset id code" />
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="NTBLCP/XX/001" /></FormControl>
+                          </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="chassisNo" render={({ field }) => (
+                          <FormItem>
+                            <LabelWithInfo label="Chassis Number (VIN)" name="chassis no" />
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('chassisNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="For vehicles only" /></FormControl>
+                          </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="engineNo" render={({ field }) => (
+                          <FormItem>
+                            <LabelWithInfo label="Engine Number" name="engine no" />
+                            <FormControl><Input {...field} readOnly={isFieldDisabled('engineNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="Unique Motor ID" /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
@@ -258,7 +266,7 @@ export default function AssetForm({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="condition" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Physical Condition</FormLabel>
+                            <LabelWithInfo label="Physical State" name="condition" />
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('condition')}>
                               <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
@@ -269,7 +277,7 @@ export default function AssetForm({
                         )}/>
                         <FormField control={form.control} name="status" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Registry Status</FormLabel>
+                            <LabelWithInfo label="Registry Status" name="status" />
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
                               <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
@@ -278,12 +286,6 @@ export default function AssetForm({
                                 <SelectItem value="DISCREPANCY" className="text-destructive font-black">DISCREPANCY</SelectItem>
                               </SelectContent>
                             </Select>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="remarks" render={({ field }) => (
-                          <FormItem className="sm:col-span-2">
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Field Observations</FormLabel>
-                            <FormControl><Textarea {...field} readOnly={isFieldDisabled('remarks')} className="min-h-[100px] bg-black border-2 border-white/10 rounded-2xl p-4 text-xs italic" placeholder="Document any discrepancies or site findings..." /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
@@ -296,13 +298,6 @@ export default function AssetForm({
             <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 sm:p-8 shrink-0 border-t md:border-t-0 border-white/5 hidden sm:block">
               <div className="space-y-10">
                 <AssetChecklist values={formValues as any} />
-                <div className="p-6 rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10 space-y-4">
-                  <div className="flex items-center gap-2 opacity-40 text-[9px] font-black uppercase tracking-widest"><Info className="h-3 w-3" /> Data Intelligence</div>
-                  <div className="space-y-2 text-[8px] uppercase">
-                    <div className="flex justify-between"><span className="text-white/20">Class</span><span className="text-white/60 font-bold">{activeClassification?.group || 'Unclassified'}</span></div>
-                    <div className="flex justify-between"><span className="text-white/20">Quality</span><span className="text-primary font-black">{formValues.overallFidelityScore}% Fidelity</span></div>
-                  </div>
-                </div>
               </div>
             </ScrollArea>
           </div>

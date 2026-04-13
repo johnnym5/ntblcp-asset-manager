@@ -29,6 +29,8 @@ export interface RegistryHeader {
   locked?: boolean;           // essential headers cannot be removed
   group?: "Identity" | "Location" | "Classification" | "Procurement" | "Condition" | "Metadata" | "Hierarchy";
   schemaName?: string;        // schema variant this belongs to
+  guidance?: string;          // Explain what this field is for
+  example?: string;           // Provide a sample pulse value
 }
 
 export interface RegistryFieldValue {

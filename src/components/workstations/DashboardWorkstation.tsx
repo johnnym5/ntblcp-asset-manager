@@ -3,6 +3,7 @@
 /**
  * @fileOverview Dashboard Center - Registry Overview.
  * Phase 1602: Hardened Chassis/Engine identification logic for vehicles.
+ * Phase 1603: Added deep inspection of metadata for missing record identification.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -107,8 +108,14 @@ export function DashboardWorkstation() {
       const catFuzzy = getFuzzySignature(a.category);
       const isVehicle = catFuzzy.includes('motor') || catFuzzy.includes('vehicle');
       
-      const hasChassis = !!a.chassisNo && a.chassisNo !== 'N/A' && a.chassisNo.trim() !== '';
-      const hasEngine = !!a.engineNo && a.engineNo !== 'N/A' && a.engineNo.trim() !== '';
+      const meta = a.metadata || {};
+      
+      // Robust detection: Check core property OR metadata pulse
+      const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
+                        Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
+      
+      const hasEngine = (!!a.engineNo && a.engineNo !== 'N/A') || 
+                       Object.keys(meta).some(k => getFuzzySignature(k) === 'engineno' && meta[k]);
       
       if (mode === 'verification' && a.status !== 'VERIFIED') issues.push("Unverified");
       if (['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')) issues.push(`State: ${a.condition}`);
@@ -118,7 +125,9 @@ export function DashboardWorkstation() {
         if (!hasChassis) issues.push("No Chassis");
         if (!hasEngine) issues.push("No Engine");
       } else {
-        if (!a.serialNumber || a.serialNumber === 'N/A') issues.push("No Serial");
+        const hasSerial = (!!a.serialNumber && a.serialNumber !== 'N/A') ||
+                         Object.keys(meta).some(k => getFuzzySignature(k) === 'serialnumber' && meta[k]);
+        if (!hasSerial) issues.push("No Serial");
       }
 
       return { ...a, activeIssues: issues };

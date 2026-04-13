@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Simplified for deployment with standard Asset Management language.
  * Phase 1801: Implemented logic for diagnostic token filtering (Summary Cards).
+ * Phase 1802: Hardened diagnostic logic to inspect metadata for vehicles.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -252,12 +253,22 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       } else if (searchTerm === 'MISSING_CHASSIS') {
         results = results.filter(a => {
           const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
-          return isVehicle && (!a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === '');
+          if (!isVehicle) return false;
+          
+          const meta = a.metadata || {};
+          const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
+                            Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
+          return !hasChassis;
         });
       } else if (searchTerm === 'MISSING_ENGINE') {
         results = results.filter(a => {
           const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
-          return isVehicle && (!a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === '');
+          if (!isVehicle) return false;
+          
+          const meta = a.metadata || {};
+          const hasEngine = (!!a.engineNo && a.engineNo !== 'N/A') || 
+                           Object.keys(meta).some(k => getFuzzySignature(k) === 'engineno' && meta[k]);
+          return !hasEngine;
         });
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));

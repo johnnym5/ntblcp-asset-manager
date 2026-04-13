@@ -3,6 +3,7 @@
  * Handles header normalization, hierarchical data transformation, and color coding.
  * Phase 810: Hardened for independent folder templates and fuzzy property mapping.
  * Phase 811: Optimized transformAssetToRecord to handle Chassis/Engine for vehicles.
+ * Phase 812: Added Guidance Dictionary for field explanations.
  */
 
 import type { Asset } from "@/types/domain";
@@ -56,11 +57,70 @@ export function getColorForSource(source: string, branding?: Record<string, stri
  * Note: These are used as fallbacks only. Folder-specific templates override these.
  */
 export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">[] = [
-  { rawName: "S/N", displayName: "S/N", normalizedName: "sn", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", locked: true, group: "Identity" },
-  { rawName: "Asset Description", displayName: "Asset Description", normalizedName: "asset_description", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Asset ID Code", displayName: "Asset ID Code", normalizedName: "asset_id_code", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity" },
-  { rawName: "Location", displayName: "Location", normalizedName: "location", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location" },
-  { rawName: "Condition", displayName: "Condition", normalizedName: "condition", visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition" },
+  { 
+    rawName: "S/N", 
+    displayName: "S/N", 
+    normalizedName: "sn", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", locked: true, group: "Identity",
+    guidance: "The record's positional sequence number in the project register.",
+    example: "1, 2, 3..."
+  },
+  { 
+    rawName: "Asset Description", 
+    displayName: "Asset Description", 
+    normalizedName: "asset_description", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
+    guidance: "A human-readable name for the asset. Should include type and brand.",
+    example: "Toyota Hilux 4x4 or HP EliteBook 840"
+  },
+  { 
+    rawName: "Asset ID Code", 
+    displayName: "Asset ID Code", 
+    normalizedName: "asset_id_code", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
+    guidance: "The unique NTBLCP-assigned tracking number found on the physical tag. Essential for program auditing.",
+    example: "NTBLCP/TB/LAG/001"
+  },
+  { 
+    rawName: "Location", 
+    displayName: "Location", 
+    normalizedName: "location", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location",
+    guidance: "The physical State or Facility where the asset is currently deployed.",
+    example: "Lagos State or Abuja Zonal Store"
+  },
+  { 
+    rawName: "Condition", 
+    displayName: "Condition", 
+    normalizedName: "condition", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition",
+    guidance: "The current physical state of the item.",
+    example: "New, Used-Good, or Stolen"
+  },
+  { 
+    rawName: "Serial Number", 
+    displayName: "Serial Number", 
+    normalizedName: "serial_number", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
+    guidance: "The unique manufacturer's code. For vehicles, use Chassis/Engine instead.",
+    example: "ABC123456789"
+  },
+  { 
+    rawName: "Chassis No", 
+    displayName: "Chassis No", 
+    normalizedName: "chassis_no", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
+    guidance: "The unique Vehicle Identification Number (VIN) stamped on the frame. Primary ID for vehicles.",
+    example: "VIN-XXXX-XXXX"
+  },
+  { 
+    rawName: "Engine No", 
+    displayName: "Engine No", 
+    normalizedName: "engine_no", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
+    guidance: "The unique ID of the vehicle's physical motor block.",
+    example: "E-12345-6789"
+  }
 ];
 
 /**

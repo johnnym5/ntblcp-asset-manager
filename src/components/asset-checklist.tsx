@@ -1,16 +1,18 @@
 'use client';
 
 /**
- * @fileOverview AssetDataChecklist - High-Fidelity Data Quality Monitor.
- * Hardened for absolute data resolution resilience using fuzzy lookup logic.
- * Phase 409: Renamed to Asset Data Checklist. Added Chassis/Engine detection.
+ * @fileOverview AssetDataChecklist - Category-Aware Guidance logic.
+ * Correctly identifies that Vehicles do not need standard Serials if Chassis/Engine exists.
+ * Phase 1002: Hardened metadata inspection for Chassis/Engine pulses.
  */
 
 import React from 'react';
 import { 
   CheckCircle2, 
   XCircle, 
-  Info
+  Info,
+  Car,
+  Laptop
 } from 'lucide-react';
 import type { Asset } from '@/types/domain';
 import { cn, getFuzzySignature } from '@/lib/utils';
@@ -51,61 +53,56 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
     return headers.filter(h => h.inChecklist);
   }, [headers]);
 
+  // Category Logic: Identification of Vehicle vs Electronic Pulse
+  const isVehicle = React.useMemo(() => {
+    const cat = (values.category || '').toLowerCase();
+    return cat.includes('motor') || cat.includes('vehicle');
+  }, [values.category]);
+
   const items = checklistHeaders.map(header => {
     let val: any = "";
     
-    // 1. Attempt to resolve from core domain properties first
+    // Core Domain Mapping
     switch(header.normalizedName) {
       case "sn": val = values.sn; break;
       case "location": val = values.location; break;
-      case "assignee_location": val = values.custodian; break;
       case "asset_description": val = values.description || values.name; break;
       case "asset_id_code": val = values.assetIdCode; break;
       case "serial_number": val = values.serialNumber; break;
       case "chassis_no": val = values.chassisNo; break;
       case "engine_no": val = values.engineNo; break;
       case "asset_class": val = values.category; break;
-      case "manufacturer": val = values.manufacturer; break;
-      case "model_number": val = values.modelNumber; break;
       case "condition": val = values.condition; break;
-      case "remarks": val = values.remarks; break;
       default:
-        val = undefined;
+        val = (values as any)[header.normalizedName] || (values.metadata as any)?.[header.rawName];
     }
 
-    // 2. Fuzzy Metadata Crawl: If domain prop was empty or unmapped, search metadata
-    const isActuallyEmpty = val === undefined || val === null || String(val).trim() === "" || String(val).trim() === "---" || String(val).trim().toLowerCase() === "nil" || String(val).trim().toLowerCase() === "n/a";
-    
-    if (isActuallyEmpty) {
+    // Deep Meta Pulse Inspection
+    if (!val || val === "---" || val === "N/A") {
       const meta = values.metadata || {};
-      
-      // Exact Match Pulse
-      val = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName];
-      
-      // Fuzzy Crawl Pulse (Handles naming variations like "Chasis no" vs "Chassis No")
-      if (val === undefined || val === null || val === "") {
-        const fuzzyHeader = getFuzzySignature(header.displayName);
-        const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
-        if (matchedKey) val = meta[matchedKey];
+      const fuzzyTarget = getFuzzySignature(header.displayName);
+      const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyTarget);
+      if (matchedKey) val = meta[matchedKey];
+    }
+
+    const sVal = String(val || '').trim().toLowerCase();
+    const isEmpty = !val || sVal === "" || sVal === "---" || sVal === "n/a" || sVal === "nil";
+
+    // Intelligence Override: Vehicles use Chassis/Engine, not standard Serials.
+    let isCompleted = !isEmpty;
+    
+    if (isVehicle) {
+      if (header.normalizedName === 'serial_number') {
+        const hasChassis = !!values.chassisNo || !!(values.metadata as any)?.['Chassis no'] || !!(values.metadata as any)?.['Chasis no'];
+        const hasEngine = !!values.engineNo || !!(values.metadata as any)?.['Engine no'];
+        if (hasChassis || hasEngine) isCompleted = true; // Serial is not required if vehicle anchors exist.
       }
     }
 
-    // 3. Final validation check
-    const sVal = String(val || '').trim().toLowerCase();
-    const isMissing = !val || 
-                      sVal === "" || 
-                      sVal === "---" || 
-                      sVal === "n/a" || 
-                      sVal === "nil" ||
-                      sVal === "none" || 
-                      sVal === "undefined" || 
-                      sVal === "null" || 
-                      sVal === "unset";
-
     return {
       label: header.displayName,
-      completed: !isMissing,
-      icon: Info
+      completed: isCompleted,
+      icon: isVehicle ? Car : Laptop
     };
   });
 
@@ -113,7 +110,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="space-y-1">
         <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Asset Data Checklist</h3>
-        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">Global validation pulse</p>
+        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">Fidelity Guidance Pulse</p>
       </div>
 
       <div className="space-y-3">
