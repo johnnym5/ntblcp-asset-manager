@@ -4,6 +4,7 @@
  * @fileOverview Asset Registry - Main Management Workstation.
  * Reverted to Folder Independence: Headers update dynamically based on selected folder.
  * Phase 1507: Fixed visibility logic for disabled folders in multi-project view.
+ * Phase 1508: Implemented fuzzy category deduplication and TactileMenu actions for folders.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -31,7 +32,9 @@ import {
   Tag,
   CheckCircle2,
   XCircle,
-  FolderOpen
+  FolderOpen,
+  FileDown,
+  ArrowRight
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,7 +48,7 @@ import { SortDrawer } from '@/components/registry/SortDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord, normalizeHeaderName } from '@/lib/registry-utils';
-import { cn, sanitizeSearch } from '@/lib/utils';
+import { cn, sanitizeSearch, getFuzzySignature } from '@/lib/utils';
 import { enqueueMutation } from '@/offline/queue';
 import { Input } from '@/components/ui/input';
 import { addNotification } from '@/hooks/use-notifications';
@@ -75,6 +78,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-bat
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
+import { TactileMenu } from '@/components/TactileMenu';
 import type { Asset, SheetDefinition } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -196,9 +200,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
     });
 
-    // 2. Filter list by enabled status and sort
-    return Array.from(allEnabledSheets).sort();
-  }, [appSettings?.grants, activeGrantIds]);
+    // 2. Logic Pulse: Deduplicate and filter out empty shadows
+    const list = Array.from(allEnabledSheets);
+    const withAssets = list.filter(cat => (groupStats[cat]?.total || 0) > 0);
+    const emptyEnabled = list.filter(cat => (groupStats[cat]?.total || 0) === 0);
+
+    // Only show an empty enabled sheet if its fuzzy signature doesn't match an asset-populated one
+    const assetSignatures = new Set(withAssets.map(a => getFuzzySignature(a)));
+    const filteredEmpty = emptyEnabled.filter(cat => !assetSignatures.has(getFuzzySignature(cat)));
+
+    return [...withAssets, ...filteredEmpty].sort();
+  }, [appSettings?.grants, activeGrantIds, groupStats]);
 
   const processedAssets = useMemo(() => {
     let results = [...filteredAssets];
@@ -597,41 +609,63 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           {!showList ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
               {categories.map(cat => (
-                <Card 
-                  key={cat} 
-                  onClick={() => handleExploreFolder(cat)}
-                  className={cn(
-                    "bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer", 
-                    selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border"
-                  )}
+                <TactileMenu
+                  key={cat}
+                  title="Folder Context"
+                  options={[
+                    { label: 'Explore Records', icon: FolderOpen, onClick: () => handleExploreFolder(cat) },
+                    { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) },
+                    ...(isAdmin ? [
+                      { label: 'Setup Folder', icon: Wrench, onClick: () => {
+                        if (mergedSheetDefinitions[cat]) {
+                          setSelectedSheetDef(mergedSheetDefinitions[cat]);
+                          setOriginalSheetName(cat);
+                          setIsColumnSheetOpen(true);
+                        }
+                      }},
+                      { label: 'Purge Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true }
+                    ] : [])
+                  ]}
                 >
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="p-2.5 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform"><LayoutGrid className="h-5 w-5 text-primary" /></div>
-                    <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={() => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat])} className="h-5 w-5 rounded-lg border-border" />
-                  </div>
-                  
-                  <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-tight mb-4 min-h-[2.5em] line-clamp-3 overflow-hidden" title={cat}>
-                    {cat}
-                  </h3>
-                  
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-3xl font-black tracking-tighter text-foreground leading-none">{groupStats[cat]?.total || 0}</p>
-                    <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
-                  </div>
-
-                  {isVerificationMode && (
-                    <div className="mt-6 space-y-2 pt-4 border-t border-dashed border-border/40">
-                      <div className="flex justify-between items-center text-[9px] font-black uppercase">
-                        <span className="text-muted-foreground opacity-60">Audit Pulse</span>
-                        <span className="text-primary font-bold">{groupStats[cat]?.verified || 0} / {groupStats[cat]?.total || 0}</span>
+                  <Card 
+                    onClick={() => handleExploreFolder(cat)}
+                    className={cn(
+                      "bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer min-h-[220px] flex flex-col justify-between", 
+                      selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border"
+                    )}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="p-2.5 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform"><LayoutGrid className="h-5 w-5 text-primary" /></div>
+                        <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={(c) => { setSelectedCategories(!!c ? [...selectedCategories, cat] : selectedCategories.filter(x => x !== cat)); }} className="h-5 w-5 rounded-lg border-border" onClick={e => e.stopPropagation()} />
                       </div>
-                      <Progress 
-                        value={groupStats[cat]?.total > 0 ? (groupStats[cat]?.verified / groupStats[cat]?.total) * 100 : 0} 
-                        className="h-1 bg-muted" 
-                      />
+                      
+                      <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-tight mb-4 line-clamp-3 overflow-hidden" title={cat}>
+                        {cat}
+                      </h3>
                     </div>
-                  )}
-                </Card>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-3xl font-black tracking-tighter text-foreground leading-none">{groupStats[cat]?.total || 0}</p>
+                        <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
+                      </div>
+
+                      {isVerificationMode && (
+                        <div className="space-y-2 pt-4 border-t border-dashed border-border/40">
+                          <div className="flex justify-between items-center text-[9px] font-black uppercase">
+                            <span className="text-muted-foreground opacity-60">Audit Pulse</span>
+                            <span className="text-primary font-bold">{groupStats[cat]?.verified || 0} / {groupStats[cat]?.total || 0}</span>
+                          </div>
+                          <Progress 
+                            value={groupStats[cat]?.total > 0 ? (groupStats[cat]?.verified / groupStats[cat]?.total) * 100 : 0} 
+                            className="h-1 bg-muted" 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </TactileMenu>
               ))}
             </div>
           ) : (
@@ -842,7 +876,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   newSheetDefs[newDef.name] = newDef;
                   if (orig && orig !== newDef.name) delete newSheetDefs[orig];
                 }
-                return { ...g, sheetDefinitions: newSheetDefs };
+                return { ...grant, sheetDefinitions: newSheetDefs };
               }
               return g;
             });
