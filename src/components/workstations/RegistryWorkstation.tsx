@@ -5,6 +5,7 @@
  * Reverted to Folder Independence: Headers update dynamically based on selected folder.
  * Phase 1507: Fixed visibility logic for disabled folders in multi-project view.
  * Phase 1508: Implemented fuzzy category deduplication and TactileMenu actions for folders.
+ * Phase 1509: Added Single-Sheet Import trigger to registry header.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -34,7 +35,8 @@ import {
   XCircle,
   FolderOpen,
   FileDown,
-  ArrowRight
+  ArrowRight,
+  FileUp
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,6 +78,7 @@ import {
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from '@/components/category-batch-edit-form';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
@@ -140,6 +143,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
 
+  // Single Sheet Import State
+  const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
+  const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
+
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
@@ -192,7 +199,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   }, [assets]);
 
   const categories = useMemo(() => {
-    // 1. Get ALL enabled sheets across ALL active projects
     const allEnabledSheets = new Set<string>();
     appSettings?.grants.forEach(g => {
       if (activeGrantIds.includes(g.id)) {
@@ -200,12 +206,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
     });
 
-    // 2. Logic Pulse: Deduplicate and filter out empty shadows
     const list = Array.from(allEnabledSheets);
     const withAssets = list.filter(cat => (groupStats[cat]?.total || 0) > 0);
     const emptyEnabled = list.filter(cat => (groupStats[cat]?.total || 0) === 0);
 
-    // Only show an empty enabled sheet if its fuzzy signature doesn't match an asset-populated one
     const assetSignatures = new Set(withAssets.map(a => getFuzzySignature(a)));
     const filteredEmpty = emptyEnabled.filter(cat => !assetSignatures.has(getFuzzySignature(cat)));
 
@@ -479,21 +483,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
               {showList && isAdmin && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    const cat = selectedCategories[0];
-                    if (cat && mergedSheetDefinitions[cat]) {
-                      setSelectedSheetDef(mergedSheetDefinitions[cat]);
-                      setOriginalSheetName(cat);
-                      setIsColumnSheetOpen(true);
-                    }
-                  }}
-                  className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shrink-0 shadow-sm"
-                >
-                  <Wrench className="h-3.5 w-3.5" /> Setup Folder
-                </Button>
+                <div className="flex gap-2 shrink-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setTargetFolderForImport(selectedCategories[0]);
+                      setIsImportScannerOpen(true);
+                    }}
+                    className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
+                  >
+                    <FileUp className="h-3.5 w-3.5" /> Import into Folder
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      const cat = selectedCategories[0];
+                      if (cat && mergedSheetDefinitions[cat]) {
+                        setSelectedSheetDef(mergedSheetDefinitions[cat]);
+                        setOriginalSheetName(cat);
+                        setIsColumnSheetOpen(true);
+                      }
+                    }}
+                    className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
+                  >
+                    <Wrench className="h-3.5 w-3.5" /> Setup Folder
+                  </Button>
+                </div>
               )}
 
               <div className="flex items-center gap-3 pr-4 border-r border-border shrink-0">
@@ -616,6 +633,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     { label: 'Explore Records', icon: FolderOpen, onClick: () => handleExploreFolder(cat) },
                     { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) },
                     ...(isAdmin ? [
+                      { label: 'Import into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); } },
                       { label: 'Setup Folder', icon: Wrench, onClick: () => {
                         if (mergedSheetDefinitions[cat]) {
                           setSelectedSheetDef(mergedSheetDefinitions[cat]);
@@ -827,6 +845,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         activeFilters={filters}
         onUpdateFilters={setFilters}
         optionsMap={optionsMap}
+      />
+
+      <ImportScannerDialog 
+        isOpen={isImportScannerOpen}
+        onOpenChange={setIsImportScannerOpen}
+        targetFolderName={targetFolderForImport}
       />
 
       <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>

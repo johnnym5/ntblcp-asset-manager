@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Import Orchestrator - Two-Stage Ingestion Pulse.
- * Phase 186: Removed redundant manual close button.
+ * Phase 186: Added targetFolderName enforcement for Single-Sheet imports.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -12,7 +12,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { addNotification } from '@/hooks/use-notifications';
-import { Loader2, FileCheck2, ScanSearch, Check, X, FileSpreadsheet, Activity, Layers, ListFilter, DatabaseZap, ChevronRight } from 'lucide-react';
+import { Loader2, FileCheck2, ScanSearch, Check, X, FileSpreadsheet, Activity, Layers, ListFilter, DatabaseZap, ChevronRight, FolderOpen } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ParserEngine } from '@/parser/engine';
 import { storage } from '@/offline/storage';
@@ -27,9 +27,10 @@ import type { DiscoveredGroup, GroupImportContainer } from '@/parser/types';
 interface ImportScannerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  targetFolderName?: string | null;
 }
 
-export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialogProps) {
+export function ImportScannerDialog({ isOpen, onOpenChange, targetFolderName }: ImportScannerDialogProps) {
   const { appSettings, activeGrantId, setDataSource, refreshRegistry } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -85,15 +86,22 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
     try {
       const selectedGroups = scanResults.filter(g => selectedSheets.includes(g.id));
       const results = engineRef.current.ingestGroups(activeSheetData.name, activeSheetData.data, selectedGroups);
+      
       const taggedAssets = results.flatMap(c => c.assets).map(a => ({
         ...a,
+        // Override category if a specific target folder was selected
+        category: targetFolderName || a.category,
         grantId: activeGrantId,
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName || 'System Import',
       }));
+
       if (taggedAssets.length > 0) {
         await storage.saveToSandbox(taggedAssets as any[]);
-        addNotification({ title: 'Sandbox Ready', description: `Staged ${taggedAssets.length} assets for reconciliation.` });
+        addNotification({ 
+          title: 'Sandbox Ready', 
+          description: `Staged ${taggedAssets.length} assets${targetFolderName ? ` for ${targetFolderName}` : ''}.` 
+        });
         setDataSource('SANDBOX');
         await refreshRegistry();
         onOpenChange(false);
@@ -122,9 +130,20 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
       <DialogContent className="max-w-3xl bg-black border-white/10 p-0 overflow-hidden rounded-[2.5rem] text-white shadow-3xl">
         <div className="p-8 pb-6 border-b border-white/5 bg-white/[0.02]">
           <DialogHeader>
-            <div className="space-y-1">
-              <DialogTitle className="text-2xl font-black uppercase text-white tracking-tight">Workbook Scanner</DialogTitle>
-              <DialogDescription className="text-[11px] text-white/40 uppercase tracking-widest font-bold">Discovery Pulse: identifying internal registry blocks</DialogDescription>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <DialogTitle className="text-2xl font-black uppercase text-white tracking-tight">
+                  {targetFolderName ? 'Folder-Specific Ingestion' : 'Workbook Scanner'}
+                </DialogTitle>
+                <DialogDescription className="text-[11px] text-white/40 uppercase tracking-widest font-bold">
+                  {targetFolderName ? `Mapping records to: ${targetFolderName}` : 'Discovery Pulse: identifying internal registry blocks'}
+                </DialogDescription>
+              </div>
+              {targetFolderName && (
+                <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-xl shadow-lg">
+                  <FolderOpen className="h-3.5 w-3.5 mr-2" /> {targetFolderName}
+                </Badge>
+              )}
             </div>
           </DialogHeader>
         </div>
@@ -148,7 +167,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                   <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                     <ScanSearch className="h-4 w-4" /> Discovered Groups
                   </h4>
-                  <Badge variant="outline" className="h-6 px-3 border-primary/20 text-primary bg-primary/5 font-black text-[9px]">
+                  <Badge variant="outline" className="h-6 px-3 border-white/10 text-white/40 font-mono text-[9px]">
                     {scanResults.length} NODES IDENTIFIED
                   </Badge>
                 </div>

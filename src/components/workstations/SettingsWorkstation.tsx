@@ -5,6 +5,7 @@
  * Standardized terminology for professional asset management.
  * Implemented Concurrent Multi-Project Selection and Integrated Import.
  * Phase 1910: Added Delete Project pulse with deterministic cleanup.
+ * Phase 1911: Added Single-Sheet Import trigger to folder list.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -64,6 +65,7 @@ import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -116,6 +118,10 @@ export function SettingsWorkstation() {
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Grant | null>(null);
   const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
+
+  // Single Sheet Import State
+  const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
+  const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -471,7 +477,7 @@ export function SettingsWorkstation() {
                                   <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide specific asset groups</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Load Template</Button>
+                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3.5 w-3.5" /> Load Template</Button>
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -501,6 +507,7 @@ export function SettingsWorkstation() {
                                       </div>
                                       <div className="flex items-center gap-2 text-white/20 shrink-0">
                                         {!isSheetEditing && <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>}
+                                        <button className="p-1.5 hover:text-primary transition-colors" title="Import into this folder" onClick={() => { setTargetFolderForImport(name); setIsImportScannerOpen(true); }}><ScanSearch className="h-3.5 w-3.5" /></button>
                                         <button className="p-1.5 hover:text-primary transition-colors" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>
                                         <button className="p-1.5 hover:text-destructive transition-colors" onClick={() => handleDeleteSheet(grant.id, name)}><Trash2 className="h-3.5 w-3.5" /></button>
                                       </div>
@@ -556,6 +563,12 @@ export function SettingsWorkstation() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportScannerDialog 
+        isOpen={isImportScannerOpen}
+        onOpenChange={setIsImportScannerOpen}
+        targetFolderName={targetFolderForImport}
+      />
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
