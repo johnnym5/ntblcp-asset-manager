@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Terminology update: Dashboard, Registry, Settings, History.
+ * Centralized workstation routing and global navigation.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -57,6 +57,7 @@ import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
+import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -152,6 +153,7 @@ export default function SPAHub() {
       case 'AUDIT_LOG': return <AuditLogWorkstation isEmbedded={false} />;
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
+      case 'SYNC_QUEUE': return <SyncQueueWorkstation isEmbedded={false} />;
       default: return <DashboardWorkstation />;
     }
   }, [activeView]);
@@ -263,7 +265,7 @@ export default function SPAHub() {
                   className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
                   onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
                 />
-                <button onClick={() => setIsMobileSearchOpen(false)}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                <button onClick={() => { setIsMobileSearchOpen(false); setSearchTerm(''); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
               </motion.div>
             ) : (
               <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
