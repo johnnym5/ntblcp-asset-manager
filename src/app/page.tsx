@@ -343,10 +343,22 @@ export default function SPAHub() {
           <div 
             {...syncLongPress}
             onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
-            className="flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
+            className={cn(
+              "flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer transition-all",
+              isSyncing && "bg-primary/10 border-primary/30 px-3"
+            )}
           >
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
+            {isSyncing ? (
+              <div className="flex items-center gap-2 py-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
+              </div>
+            ) : (
+              <>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
+              </>
+            )}
           </div>
 
           <div className="relative">
