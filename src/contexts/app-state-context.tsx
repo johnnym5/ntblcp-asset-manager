@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Deployment Pulse: Hardened sorting protocol and high-availability sync exposure.
- * Phase 1700: Implemented activeGrantIds (plural) for multi-project concurrency.
+ * Simplified for deployment with standard Asset Management language.
+ * Phase 1800: Implemented multi-project enablement state.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -50,7 +50,6 @@ interface AppStateContextType {
   refreshRegistry: () => Promise<void>;
   manualDownload: () => Promise<void>;
   manualUpload: () => Promise<void>;
-  setSelectedProjectIds: (ids: string[]) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
   
   headers: RegistryHeader[];
@@ -60,8 +59,6 @@ interface AppStateContextType {
   sortDir: 'asc' | 'desc';
   setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
 
-  globalStateFilter: string;
-  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   selectedLocations: string[];
   setSelectedLocations: Dispatch<SetStateAction<string[]>>;
   selectedAssignees: string[];
@@ -137,7 +134,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -248,39 +244,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
-      const isVehicle = (a: any) => {
-        const cat = (a.category || '').toLowerCase();
-        return cat.includes('motor') || cat.includes('vehicle');
-      };
-
-      if (searchTerm === 'MISSING_ID') {
-        results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
-      } else if (searchTerm === 'MISSING_SN') {
-        results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
-      } else if (searchTerm === 'MISSING_MODEL') {
-        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A'));
-      } else if (searchTerm === 'MISSING_CHASSIS') {
-        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A'));
-      } else if (searchTerm === 'MISSING_ENGINE') {
-        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A'));
-      } else if (searchTerm === 'WITH_REMARKS') {
-        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
-      } else if (searchTerm === 'STATUS_UNVERIFIED') {
-        results = results.filter(a => a.status === 'UNVERIFIED');
-      } else if (searchTerm.startsWith('CONDITION_')) {
-        const group = searchTerm.replace('CONDITION_', '').replace(/^\w/, c => c.toUpperCase());
-        results = results.filter(a => a.conditionGroup === group);
-      } else if (searchTerm === 'MISSING_SERIAL') {
-        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A'));
-      } else if (searchTerm === 'CONDITION_BAD') {
-        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
-      } else {
-        const fuzzySearch = getFuzzySignature(searchTerm);
-        results = results.filter(a => {
-          const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
-          return getFuzzySignature(hay).includes(fuzzySearch);
-        });
-      }
+      const fuzzySearch = getFuzzySignature(searchTerm);
+      results = results.filter(a => {
+        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
+        return getFuzzySignature(hay).includes(fuzzySearch);
+      });
     }
 
     if (sortKey) {
@@ -361,26 +329,21 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         setAppSettings(remoteSettings);
         if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) setHeaders(remoteSettings.globalHeaders);
         await storage.saveSettings(remoteSettings);
-        
-        // Parallel multi-project download
         const currentGrantIds = remoteSettings.activeGrantIds || [];
         let allRemoteAssets: Asset[] = [];
-        
         for (const gid of currentGrantIds) {
           const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
           allRemoteAssets = [...allRemoteAssets, ...projectAssets];
         }
-
         const localAssets = await storage.getAssets();
         const taggedRemote = allRemoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-        // Keep assets from projects not currently active
         const otherAssets = localAssets.filter(a => !currentGrantIds.includes(a.grantId));
         await storage.saveAssets([...otherAssets, ...taggedRemote]);
-        addNotification({ title: "Protocol Synchronized", variant: "success" });
+        addNotification({ title: "System Synchronized", variant: "success" });
       }
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Update Error", variant: "destructive" });
+      addNotification({ title: "Sync Error", variant: "destructive" });
     } finally { setIsSyncing(false); }
   }, [isOnline, refreshRegistry]);
 
@@ -401,12 +364,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantIds, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload,
-      setSelectedProjectIds: async (ids) => { if (!appSettings) return; const next = { ...appSettings, activeGrantIds: ids }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantIds: ids }); setAppSettings(next); await refreshRegistry(); },
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
-      globalStateFilter, setGlobalStateFilter,
-      selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
-      selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
-      missingFieldFilter, setMissingFieldFilter,
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions, categoryOptions,
       isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,

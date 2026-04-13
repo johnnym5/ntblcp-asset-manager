@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Settings - Main Operational Control Center.
- * Restoration Pulse: Re-integrated Projects, Personnel, and Folder Setup.
- * Phase 1700: Implemented Multi-Project selection via Checkboxes.
+ * Simplified for deployment with standard Asset Management language.
+ * Phase 1800: Fixed TabsContent error by ensuring Tabs root is correctly placed.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -18,7 +18,6 @@ import {
   Wrench,
   X,
   Loader2,
-  Zap,
   CheckCircle2,
   Lock,
   Sun,
@@ -43,7 +42,9 @@ import {
   Trash2,
   Eye,
   FileDown,
-  Check
+  Check,
+  Activity,
+  History
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -84,7 +85,6 @@ export function SettingsWorkstation() {
     settingsLoaded,
     setActiveView,
     activeGrantIds,
-    setSelectedProjectIds,
     assets,
     isSyncing 
   } = useAppState();
@@ -100,6 +100,12 @@ export function SettingsWorkstation() {
   const [editProjectValue, setEditProjectValue] = useState('');
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
+  // Passcode Manager State
+  const [currentPasscode, setCurrentPasscode] = useState('');
+  const [newPasscode, setNewPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
+  const [isUpdatingPasscode, setIsUpdatingPasscode] = useState(false);
+
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
@@ -110,7 +116,6 @@ export function SettingsWorkstation() {
   // RBAC Gating
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const isAdmin = userProfile?.role === 'ADMIN' || isSuperAdmin;
-  const isZonalAdmin = !!userProfile?.isZonalAdmin;
 
   useEffect(() => {
     if (appSettings) {
@@ -137,9 +142,46 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      addNotification({ title: `Registry Protocol Saved`, variant: "success" });
+      addNotification({ title: `Settings Saved Successfully`, variant: "success" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePasscode = async () => {
+    if (newPasscode !== confirmPasscode) {
+      toast({ variant: "destructive", title: "Passcodes Match Failure", description: "The new passcodes do not match." });
+      return;
+    }
+    if (newPasscode.length < 4) {
+      toast({ variant: "destructive", title: "Passcode Too Short", description: "Minimum 4 characters required." });
+      return;
+    }
+
+    setIsUpdatingPasscode(true);
+    try {
+      // Find the user in settings and update
+      if (!draftSettings) return;
+      const updatedUsers = draftSettings.authorizedUsers.map(u => {
+        if (u.loginName === userProfile?.loginName) {
+          return { ...u, password: newPasscode };
+        }
+        return u;
+      });
+      
+      const updatedSettings = { ...draftSettings, authorizedUsers: updatedUsers };
+      if (isOnline) await FirestoreService.updateSettings(updatedSettings);
+      await storage.saveSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      
+      toast({ title: "Passcode Updated", description: "Your system access credentials have been changed." });
+      setCurrentPasscode('');
+      setNewPasscode('');
+      setConfirmPasscode('');
+    } catch (e) {
+      toast({ variant: "destructive", title: "Update Failed" });
+    } finally {
+      setIsUpdatingPasscode(false);
     }
   };
 
@@ -155,13 +197,6 @@ export function SettingsWorkstation() {
     setNewProjectName('');
   };
 
-  const handleRenameProject = async (id: string) => {
-    if (!editProjectValue.trim() || !draftSettings) return;
-    const updated = draftSettings.grants.map(g => g.id === id ? { ...g, name: editProjectValue.trim() } : g);
-    handleSettingChange('grants', updated);
-    setEditingProjectId(null);
-  };
-
   const toggleProject = (id: string, enabled: boolean) => {
     if (!draftSettings) return;
     const current = draftSettings.activeGrantIds || [];
@@ -169,44 +204,6 @@ export function SettingsWorkstation() {
       ? [...current, id]
       : current.filter(cid => cid !== id);
     handleSettingChange('activeGrantIds', next);
-  };
-
-  const handleApplyGlobalSNPatch = async () => {
-    if (!assets || assets.length === 0) return;
-    setIsPatching(true);
-    try {
-      const categories = Array.from(new Set(assets.map(a => a.category)));
-      const updatedAssets = [...assets];
-      let patchCount = 0;
-
-      for (const cat of categories) {
-        const catAssets = assets.filter(a => a.category === cat)
-          .sort((a, b) => (a.assetIdCode || '').localeCompare(b.assetIdCode || '', undefined, { numeric: true }));
-        
-        catAssets.forEach((asset, idx) => {
-          const mainIdx = updatedAssets.findIndex(a => a.id === asset.id);
-          if (mainIdx > -1) {
-            const updated: Asset = {
-              ...updatedAssets[mainIdx],
-              sn: String(idx + 1),
-              lastModified: new Date().toISOString(),
-              lastModifiedBy: userProfile?.displayName || 'System Normalization'
-            };
-            updatedAssets[mainIdx] = updated;
-            enqueueMutation('UPDATE', 'assets', updated);
-            patchCount++;
-          }
-        });
-      }
-
-      await storage.saveAssets(updatedAssets);
-      await refreshRegistry();
-      addNotification({ title: "S/N Normalization Complete", description: `Re-indexed ${patchCount} records.`, variant: "success" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Normalization Failure" });
-    } finally {
-      setIsPatching(false);
-    }
   };
 
   const handleImportTemplate = () => {
@@ -220,7 +217,6 @@ export function SettingsWorkstation() {
 
     try {
       const templates = await parseExcelForTemplate(file);
-      // For multi-select, we apply to the first selected project as target or ask user
       const targetId = draftSettings.activeGrantIds[0] || draftSettings.grants[0]?.id;
       if (!targetId) return;
 
@@ -229,17 +225,13 @@ export function SettingsWorkstation() {
 
       const nextGrant = { ...draftSettings.grants[activeGrantIdx] };
       const nextSheetDefs = { ...nextGrant.sheetDefinitions };
-      
-      templates.forEach(t => {
-        nextSheetDefs[t.name] = t;
-      });
-
+      templates.forEach(t => { nextSheetDefs[t.name] = t; });
       nextGrant.sheetDefinitions = nextSheetDefs;
+      
       const nextGrants = [...draftSettings.grants];
       nextGrants[activeGrantIdx] = nextGrant;
-
       handleSettingChange('grants', nextGrants);
-      toast({ title: 'Templates Imported', description: `${templates.length} group definitions identified.` });
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions identified.` });
     } catch (error) {
       toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -267,206 +259,163 @@ export function SettingsWorkstation() {
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
-        <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
-          <SettingSection title="Visual Identity" description="Surface language settings" icon={Palette}>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Sun className="h-4 w-4" /> Light Mode
-              </Button>
-              <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                <Moon className="h-4 w-4" /> Dark Mode
-              </Button>
-            </div>
-          </SettingSection>
+    <div className="flex flex-col h-full bg-background">
+      <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0">
+        <div className="px-1 mb-6 shrink-0">
+          <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto flex flex-wrap gap-2 border-2 border-border/40 w-fit">
+            <TabsTrigger value="general" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
+              <SettingsIcon className="h-3.5 w-3.5" /> General
+            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="projects" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
+                <LayoutGrid className="h-3.5 w-3.5" /> Project Scope
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="users" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
+                <Users className="h-3.5 w-3.5" /> Personnel
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="history" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
+              <History className="h-3.5 w-3.5" /> History
+            </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="health" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
+                <HeartPulse className="h-3.5 w-3.5" /> System Health
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
-          {isAdmin && (
-            <SettingSection title="Registry Admin" description="Technical Normalization" icon={Wrench}>
-              <div className="p-6 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
-                <div className="flex items-center gap-3">
-                  <SortAsc className="h-5 w-5 text-primary" />
-                  <h4 className="text-sm font-black uppercase">Normalize Global S/N Pulse</h4>
+        <ScrollArea className="flex-1 px-1">
+          <div className="pb-40">
+            <TabsContent value="general" className="space-y-10 m-0 outline-none">
+              <SettingSection title="Visual Identity" description="Appearance settings" icon={Palette}>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
+                    <Sun className="h-4 w-4" /> Light Mode
+                  </Button>
+                  <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
+                    <Moon className="h-4 w-4" /> Dark Mode
+                  </Button>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                  Re-indexes all assets sequentially based on Asset ID Tag sort order per folder.
-                </p>
-                <Button 
-                  onClick={handleApplyGlobalSNPatch} 
-                  disabled={isPatching}
-                  className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl"
-                >
-                  {isPatching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hash className="h-4 w-4 mr-2" />}
-                  Execute S/N Normalization
-                </Button>
-              </div>
-            </SettingSection>
-          )}
+              </SettingSection>
 
-          {isAdmin && (
-            <SettingSection title="Operational Mode" description="Registry Logic Mode" icon={Smartphone}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { id: 'management', label: 'Registry Admin', desc: 'Full governance and data engineering pulse.' },
-                  { id: 'verification', label: 'Field Assessment', desc: 'Optimized for mobile auditors and reporting.' }
-                ].map(m => (
-                  <button 
-                    key={m.id}
-                    onClick={() => handleSettingChange('appMode', m.id)}
-                    className={cn(
-                      "p-6 rounded-2xl border-2 text-left transition-all relative group",
-                      draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20"
-                    )}
+              <SettingSection title="My Security" description="Passcode management" icon={KeyRound}>
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">New System Passcode</Label>
+                    <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Minimum 4 characters" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm Passcode</Label>
+                    <Input type="password" value={confirmPasscode} onChange={(e) => setConfirmPasscode(e.target.value)} placeholder="Repeat new passcode" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
+                  </div>
+                  <Button 
+                    onClick={handleUpdatePasscode} 
+                    disabled={isUpdatingPasscode || !newPasscode} 
+                    className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
                   >
-                    {draftSettings.appMode === m.id && <CheckCircle2 className="absolute top-4 right-4 h-4 w-4 text-primary" />}
-                    <h4 className="text-sm font-black uppercase text-foreground mb-1 group-hover:text-primary transition-colors">{m.label}</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic">{m.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </SettingSection>
-          )}
-        </TabsContent>
+                    {isUpdatingPasscode ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldIcon className="h-4 w-4 mr-2" />}
+                    Change My Passcode
+                  </Button>
+                </div>
+              </SettingSection>
 
-        <TabsContent value="projects" className="space-y-10 m-0 outline-none pb-20">
-          <SettingSection title="Project Directory" description="Multi-Project Enablement" icon={LayoutGrid}>
-            <div className="space-y-8">
-              <div className="flex gap-3">
-                <Input 
-                  placeholder="New project label..." 
-                  value={newProjectName} 
-                  onChange={(e) => setNewProjectName(e.target.value)} 
-                  className="h-14 bg-background border-border rounded-xl font-bold text-sm shadow-inner" 
-                />
-                <Button 
-                  onClick={handleAddProject} 
-                  disabled={!newProjectName.trim()} 
-                  className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg"
-                >
-                  Create Project
-                </Button>
-              </div>
+              {isAdmin && (
+                <SettingSection title="Registry Mode" description="Operational logic" icon={Smartphone}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { id: 'management', label: 'Registry Admin', desc: 'Full governance and data engineering system.' },
+                      { id: 'verification', label: 'Field Assessment', desc: 'Optimized for mobile auditors and reporting.' }
+                    ].map(m => (
+                      <button 
+                        key={m.id}
+                        onClick={() => handleSettingChange('appMode', m.id)}
+                        className={cn(
+                          "p-6 rounded-2xl border-2 text-left transition-all relative group",
+                          draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20"
+                        )}
+                      >
+                        {draftSettings.appMode === m.id && <CheckCircle2 className="absolute top-4 right-4 h-4 w-4 text-primary" />}
+                        <h4 className="text-sm font-black uppercase text-foreground mb-1 group-hover:text-primary transition-colors">{m.label}</h4>
+                        <p className="text-[10px] font-medium text-muted-foreground italic">{m.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </SettingSection>
+              )}
+            </TabsContent>
 
-              <div className="space-y-4">
-                {draftSettings.grants.map((grant) => {
-                  const isActive = draftSettings.activeGrantIds?.includes(grant.id);
-                  const isRenaming = editingProjectId === grant.id;
+            <TabsContent value="projects" className="space-y-10 m-0 outline-none">
+              <SettingSection title="Project Scope" description="Multi-Project enablement" icon={LayoutGrid}>
+                <div className="space-y-8">
+                  <div className="flex gap-3">
+                    <Input placeholder="New project label..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
+                    <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Project</Button>
+                  </div>
 
-                  return (
-                    <Card key={grant.id} className={cn(
-                      "border-2 rounded-2xl overflow-hidden transition-all duration-500", 
-                      isActive ? "border-primary bg-primary/[0.02] shadow-2xl" : "border-border bg-muted/10"
-                    )}>
-                      <div className="p-6 flex items-center justify-between group/project">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                            <FolderOpen className="h-5 w-5" />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            {isRenaming ? (
-                              <div className="flex items-center gap-2">
-                                <Input 
-                                  value={editProjectValue} 
-                                  onChange={(e) => setEditProjectValue(e.target.value)}
-                                  className="h-9 bg-background border-primary/40 text-sm font-black uppercase rounded-lg"
-                                  autoFocus
-                                />
-                                <Button size="sm" onClick={() => handleRenameProject(grant.id)} className="h-9 w-9 p-0"><CheckCircle2 className="h-4 w-4"/></Button>
+                  <div className="space-y-4">
+                    {draftSettings.grants.map((grant) => {
+                      const isActive = draftSettings.activeGrantIds?.includes(grant.id);
+                      return (
+                        <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", isActive ? "border-primary bg-primary/[0.02] shadow-xl" : "border-border bg-muted/10")}>
+                          <div className="p-6 flex items-center justify-between group">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}><FolderOpen className="h-5 w-5" /></div>
+                              <div className="flex flex-col min-w-0">
+                                <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
+                                <span className="text-[8px] font-mono opacity-40 uppercase mt-1">ID: {grant.id.split('-')[0]}</span>
                               </div>
-                            ) : (
-                              <h4 className="text-base font-black uppercase text-foreground leading-none truncate">{grant.name}</h4>
-                            )}
-                            <span className="text-[8px] font-mono opacity-40 uppercase mt-1">ID: {grant.id.split('-')[0]}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-6">
-                          <div className="flex items-center gap-3 pr-6 border-r border-border/40">
-                            <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enabled</span>
-                            <Checkbox 
-                              checked={isActive} 
-                              onCheckedChange={(checked) => toggleProject(grant.id, !!checked)} 
-                              className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary"
-                            />
-                          </div>
-                          <div className="flex items-center gap-4 opacity-40 group-hover/project:opacity-100 transition-opacity">
-                            {!isRenaming && (
-                              <button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="text-[10px] font-black uppercase text-primary hover:underline">Rename</button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {isActive && (
-                        <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in slide-in-from-top-2">
-                          <div className="flex items-center justify-between px-1">
-                            <h5 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Registered Folder Nodes</h5>
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black text-[8px] uppercase gap-2 hover:bg-primary/10 text-primary"><FileDown className="h-3.5 w-3.5"/> Import Template</Button>
-                              <Button variant="ghost" size="sm" onClick={() => setActiveView('IMPORT')} className="h-8 px-3 rounded-lg font-black text-[8px] uppercase gap-2 hover:bg-primary/10 text-primary"><ScanSearch className="h-3.5 w-3.5"/> Import Assets</Button>
+                            </div>
+                            <div className="flex items-center gap-3 pr-6 border-r border-border/40">
+                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enabled</span>
+                              <Checkbox checked={isActive} onCheckedChange={(checked) => toggleProject(grant.id, !!checked)} className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
                             </div>
                           </div>
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                              <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
-                                <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                  className="h-8 w-8 rounded-lg text-primary opacity-20 group-hover/folder:opacity-100 hover:bg-primary/5 transition-all"
-                                >
-                                  <Wrench className="h-3.5 w-3.5" />
-                                </Button>
+                          {isActive && (
+                            <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
+                                  <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
+                                    <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
+                                    <Button variant="ghost" size="icon" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }} className="h-8 w-8 rounded-lg text-primary opacity-20 group-hover/folder:opacity-100"><Wrench className="h-3.5 w-3.5" /></Button>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          </SettingSection>
-        </TabsContent>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              </SettingSection>
+            </TabsContent>
 
-        <TabsContent value="users" className="m-0 outline-none pb-20">
-          <SettingSection title="Personnel Directory" description="Identity & Regional Scope" icon={Users}>
-            <UserManagement 
-              users={draftSettings.authorizedUsers} 
-              onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} 
-              adminProfile={userProfile} 
-            />
-          </SettingSection>
-        </TabsContent>
+            <TabsContent value="users" className="m-0 outline-none">
+              <SettingSection title="Personnel directory" description="System access management" icon={Users}>
+                <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+              </SettingSection>
+            </TabsContent>
 
-        <TabsContent value="history" className="m-0 outline-none pb-20">
-          <AuditLogWorkstation isEmbedded={true} />
-        </TabsContent>
+            <TabsContent value="history" className="m-0 outline-none">
+              <AuditLogWorkstation isEmbedded={true} />
+            </TabsContent>
 
-        <TabsContent value="health" className="m-0 outline-none space-y-10 pb-20">
-          <DatabaseWorkstation isEmbedded={true} />
-          <ErrorAuditWorkstation isEmbedded={true} />
-        </TabsContent>
-      </div>
+            <TabsContent value="health" className="m-0 outline-none space-y-10">
+              <DatabaseWorkstation isEmbedded={true} />
+              <ErrorAuditWorkstation isEmbedded={true} />
+            </TabsContent>
+          </div>
+        </ScrollArea>
+      </Tabs>
 
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
-        <Button 
-          variant="ghost" 
-          onClick={() => setActiveView('DASHBOARD')} 
-          className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground"
-        >
-          Discard Pulse
-        </Button>
-        <Button 
-          onClick={handleSaveChange} 
-          disabled={!hasChanges || isSaving} 
-          className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3 transition-transform active:scale-95"
-        >
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0 z-50">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Exit Settings</Button>
+        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3 transition-transform active:scale-95">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />}
-          Save Settings
+          Apply Global Settings
         </Button>
       </div>
 

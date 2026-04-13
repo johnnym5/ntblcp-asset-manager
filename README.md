@@ -1,90 +1,68 @@
 # Assetain | Professional Asset Intelligence
 
-**Assetain** is a mission-critical, enterprise-grade Asset Management and Verification platform engineered for high-integrity operations in geographically dispersed and low-connectivity environments. Built with a "Local-First" philosophy, it transforms complex physical asset registers into actionable intelligence through automated verification workflows, regional governance, and deep data engineering.
+**Assetain** is a mission-critical, enterprise-grade Asset Management and Verification platform engineered for high-integrity operations in geographically dispersed and low-connectivity environments. Built with a "Local-First" philosophy, it transforms complex physical asset registers into actionable intelligence through automated verification workflows and regional governance.
 
 ---
 
-## 🏗 System Architecture: Triple-Layer Redundancy
+## 🏗 System Overview
 
-Assetain utilizes a sophisticated storage topology to ensure 100% data availability regardless of internet stability.
-
-1.  **Cloud Authority (Firestore)**: The primary source of truth. All verified pulses are broadcast here for global reporting and regional dashboards.
-2.  **Shadow Mirror (RTDB)**: A high-speed, hot-standby replica. Every modification to the Cloud Authority is instantly mirrored to the Realtime Database to provide a failover pulse during primary service latency.
-3.  **Local Persistence (IndexedDB)**: The device’s internal engine. All user interactions occur here first. Mutations are enqueued in a Write-Ahead Log (Sync Queue) for background synchronization.
-
----
-
-## 🔐 Identity Governance (RBAC) & Regional Scoping
-
-The system implements a strict Role-Based Access Control (RBAC) model to maintain registry integrity.
-
-| Role | Permissions | Scope |
-| :--- | :--- | :--- |
-| **SuperAdmin** | Full system reset, unrestricted mutation, user provisioning. | Global |
-| **Admin** | Manage projects, edit global configuration, adjudicate requests. | Global |
-| **Manager** | Batch edit, export executive reports, view activity ledger. | Regional / Zonal |
-| **Verifier** | Physical asset assessment, update status/remarks, sync pulse. | State-Locked |
-| **Viewer** | Read-only registry access, view dashboard metrics. | State-Locked |
-
-**Regional Scope Locking**: Non-admin users are cryptographically locked into their authorized geographical zones (e.g., Lagos State). They cannot view or mutate records outside their assigned pulse.
+Assetain utilize a sophisticated three-layer storage architecture to ensure 100% data availability:
+1. **Cloud Database (Authoritative)**: Centralized source of truth for global reporting.
+2. **Shadow Mirror**: Real-time standby replica for high-availability failover.
+3. **Local Storage**: Device-level persistence allowing for 100% offline work.
 
 ---
 
 ## 🖥 Workstation Breakdown
 
-### 1. Mission Control (Dashboard)
-The primary entry pulse. It provides high-density analytics including:
-*   **Audit Coverage**: Real-time percentage of physically verified assets.
-*   **Fidelity Index**: Global score based on data quality and pattern consistency.
-*   **Readiness Hub**: Quick-access tiles for pending tasks and critical alerts.
+### 1. Dashboard (Overview)
+Your primary command hub.
+* **Asset Summary**: High-level statistical pulses across the registry.
+* **Problem Assets**: Intelligent identification of unverified or damaged items.
+* **Quick Glance**: Dynamic samples of registry records for high-speed review.
 
-### 2. Inventory Hub (Registry)
-A dual-mode browser for the entire project register.
-*   **Folder View**: Groups assets into logical categories. Supports multi-select for batch sync, structural renaming, or global purge pulses.
-*   **Table View**: A high-density grid for detailed inspection. Features customizable headers, advanced sorting, and real-time filtering.
-*   **Profile Dossier**: A deep-dive view into an asset’s technical metadata, forensic signatures, and visual evidence.
+### 2. Asset Registry (Inventory)
+The core database workspace.
+* **Folder View**: Browse assets grouped by logical categories (e.g., Laptops, Vehicles).
+* **High-Density Grid**: A professional data workstation with adaptive density.
+* **Technical Dossier**: Detailed record profile including physical evidence and fidelity audit.
 
-### 3. Ingestion Center (Import)
-A deterministic engine designed to parse complex, hierarchical Excel workbooks.
-*   **Structural Discovery**: Automatically identifies group boundaries by traversing "Column A" markers.
-*   **Synthetic Headers**: Automatically maps columns to registry fields (S/N, ID Code, etc.) even when explicit header rows are missing.
-*   **Sandbox Reconciliation**: Stages imported data in an isolated layer for review before merging into the production registry.
+### 3. Field Assessment (Verification)
+Specialized mode for on-site auditors.
+* **Status Updates**: One-tap verification triggers (Verified / Discrepancy).
+* **Condition Reporting**: Record physical state and site observations instantly.
+* **Identity Scanner**: Use your device camera to scan QR labels and open records.
 
-### 4. Records to Review (Verification)
-Optimized for field auditors on the move.
-*   **One-Tap Assessment**: High-speed triggers to mark assets as "Verified" or "Discrepancy".
-*   **Identity Scanner**: Uses the device camera to scan physical QR labels and instantly open the corresponding digital pulse.
+### 4. History (Audit Log)
+An immutable trace of every registry modification.
+* **Change Diffs**: Forensic side-by-side view of "Old Value" vs "New Value".
+* **Undo Function**: Deterministic rollback pulse to restore assets to previous states.
 
-### 5. Pending Sync (Write-Ahead Log)
-Manages the bidirectional movement of data between the device and the cloud.
-*   **Sequential Replay**: Changes are broadcast in chronological order to prevent state corruption.
-*   **Accordion Grouping**: Pending updates are categorized by operation type (New, Edit, Delete) for clear review.
-*   **Select All**: Allows for the batch broadcast of thousands of modifications with a single pulse.
-
-### 6. Activity Ledger (History)
-An immutable audit trail of every modification made to the registry.
-*   **Forensic Diffs**: Shows exactly which fields changed, including "Before" and "After" values.
-*   **Restoration Pulse**: Allows administrators to undo specific mutations and roll back records to their previous verified state.
-
-### 7. Tactical Alerts (Exceptions)
-A dedicated cockpit for managing high-risk registry events.
-*   **Loss Monitoring**: Tracks assets marked as Stolen or Unsalvageable.
-*   **Escalation**: Provides one-tap "Notify Manager" pulses for urgent field issues.
-
-### 8. Infrastructure Command
-The low-level orchestration suite for system maintenance.
-*   **Failover Engine**: Manually pivot the primary read authority between Firestore and the Shadow Mirror.
-*   **Node Purge**: Tiered wipe functions to reset specific storage layers (Local, Mirror, or Global).
-*   **Self-Test**: Executes a holistic heartbeat check across all storage and auth nodes.
+### 5. Settings (Governance)
+Administrative control center.
+* **Project Scope**: Enable one or more project grants concurrently (e.g., TB & C19).
+* **Personnel Directory**: Manage auditor access, passcodes, and regional state-locking.
+* **Folder Setup**: Independent control of table, card, and checklist visibility per folder.
 
 ---
 
-## 🛠 Advanced Logic Pulses
+## 🛠 User Instructions
 
-*   **Integrity Engine**: A heuristic scanner that proactively identifies duplicate serials, inconsistent location naming, and high-value data gaps.
-*   **Version Control**: A global system counter that increments with every committed change, providing a deterministic index for registry snapshots.
-*   **PWA Pulse**: 100% offline functionality with automatic network detection and standalone installation capabilities.
-*   **High-Density Scaling**: All UI elements are scaled to 50% of standard web components to maximize the "Data-to-Pixel" ratio for professional workstations.
+### Initial Setup
+1. **Login**: Enter your **Username** and **Passcode**.
+2. **Region Selection**: If you manage multiple states, select your target regional scope for the session.
+3. **Sync Pulse**: Use the "Pull Cloud" icon in the header to download your authorized registry scope.
+
+### Physical Auditing
+1. Navigate to **Registry** or the **Verification Queue**.
+2. Tap any asset to open its **Dossier**.
+3. Update the **Status** to "Verified" and select the current **Condition**.
+4. Add site **Remarks** if any anomalies are detected.
+5. Save the record. Changes are preserved locally until your next sync.
+
+### Data Synchronization
+* **Push Changes**: Use the "Upload" button to broadcast your local work to the cloud.
+* **Selective Sync**: Right-click (or long-press) any record to sync only that specific item.
 
 ---
-© 2024 Assetain. Professional Asset Intelligence. Deterministic. Resilient. Secure.
+© 2024 Assetain. Professional. Resilient. Secure.
