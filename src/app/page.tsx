@@ -44,7 +44,8 @@ import {
   Inbox,
   LayoutGrid,
   ArrowRight,
-  X
+  X,
+  Terminal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -145,6 +146,7 @@ export default function SPAHub() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
+  const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const CurrentWorkstation = useMemo(() => {
@@ -180,6 +182,36 @@ export default function SPAHub() {
 
   const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
   const bellLongPress = useLongPress(() => setActiveView('AUDIT_LOG'));
+
+  const jumpOptions = useMemo(() => {
+    const base = [
+      { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+      { label: 'Asset Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+      { label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
+      { label: 'Reporting Hub', icon: FileText, onClick: () => setActiveView('REPORTS') },
+      { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
+      { label: 'Anomaly Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+      { label: 'Activity Ledger', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+      { label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') },
+    ];
+
+    if (isAdmin) {
+      base.push(
+        { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+        { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS' as any) },
+        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+      );
+    }
+
+    if (isSuperAdmin) {
+      base.push(
+        { label: 'Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE' as any) },
+        { label: 'Database Explorer', icon: Terminal, onClick: () => setActiveView('DATABASE' as any) }
+      );
+    }
+
+    return base;
+  }, [isAdmin, isSuperAdmin, setActiveView]);
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
@@ -229,12 +261,8 @@ export default function SPAHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="Registry Jumps"
-            options={[
-              { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-              { label: 'Registry', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
-              { label: 'History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') }
-            ]}
+            title="System Jump Pulse"
+            options={jumpOptions}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
               <Boxes className="h-5 w-5" />
