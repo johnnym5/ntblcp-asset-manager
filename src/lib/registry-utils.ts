@@ -11,25 +11,25 @@ import type { RegistryHeader, AssetRecord, RegistryFieldValue, DataType } from "
 import { getFuzzySignature } from "./utils";
 
 /**
- * Normalizes source headers to canonical snake_case keys.
+ * Normalizes source headers to canonical camelCase keys matching the Asset schema.
  */
 export function normalizeHeaderName(name: string): string {
   let n = name.toLowerCase().trim();
   
-  if (n.includes("purchase price") && (n.includes("naira") || n.includes("(n)") || n.includes("ngn"))) return "purchase_price_ngn";
-  if (n.includes("purchase price") && (n.includes("usd") || n.includes("[usd]"))) return "purchase_price_usd";
-  if (n.includes("chq no") || n.includes("goods received note")) return "goods_received_note_no";
-  if (n.includes("assignee")) return "assignee_location";
-  if (n.includes("asset description")) return "asset_description";
-  if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers") || n.includes("tag no")) return "asset_id_code";
-  if (n.includes("asset class") || n.includes("classification")) return "asset_class";
+  if (n.includes("purchase price") && (n.includes("naira") || n.includes("(n)") || n.includes("ngn"))) return "value";
+  if (n.includes("purchase price") && (n.includes("usd") || n.includes("[usd]"))) return "purchasePriceUsd";
+  if (n.includes("chq no") || n.includes("goods received note")) return "grnNo";
+  if (n.includes("assignee")) return "custodian";
+  if (n.includes("asset description")) return "description";
+  if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers") || n.includes("tag no")) return "assetIdCode";
+  if (n.includes("asset class") || n.includes("classification") || n === "category") return "category";
   if (n === "s/n" || n === "sn") return "sn";
-  if (n === "serial number" || n === "serial numbers") return "serial_number";
-  if (n === "model number" || n === "model numbers" || n === "model no") return "model_number";
-  if (n.includes("chasis no") || n.includes("chassis no")) return "chassis_no";
-  if (n.includes("engine no")) return "engine_no";
-  if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "date_purchased_received";
-  if (n.includes("useful life")) return "useful_life_years";
+  if (n === "serial number" || n === "serial numbers") return "serialNumber";
+  if (n === "model number" || n === "model numbers" || n === "model no") return "modelNumber";
+  if (n.includes("chasis no") || n.includes("chassis no")) return "chassisNo";
+  if (n.includes("engine no")) return "engineNo";
+  if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "purchaseDate";
+  if (n.includes("useful life")) return "usefulLifeYears";
 
   return n
     .replace(/[^a-z0-9]/g, "_")
@@ -68,7 +68,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { 
     rawName: "Asset Description", 
     displayName: "Asset Description", 
-    normalizedName: "asset_description", 
+    normalizedName: "description", 
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "A human-readable name for the asset. Should include type and brand.",
     example: "Toyota Hilux 4x4 or HP EliteBook 840"
@@ -76,7 +76,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { 
     rawName: "Asset ID Code", 
     displayName: "Asset ID Code", 
-    normalizedName: "asset_id_code", 
+    normalizedName: "assetIdCode", 
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "The unique NTBLCP-assigned tracking number found on the physical tag. Essential for program auditing.",
     example: "NTBLCP/TB/LAG/001"
@@ -100,7 +100,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { 
     rawName: "Serial Number", 
     displayName: "Serial Number", 
-    normalizedName: "serial_number", 
+    normalizedName: "serialNumber", 
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "The unique manufacturer's code. For vehicles, use Chassis/Engine instead.",
     example: "ABC123456789"
@@ -108,7 +108,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { 
     rawName: "Chassis No", 
     displayName: "Chassis No", 
-    normalizedName: "chassis_no", 
+    normalizedName: "chassisNo", 
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "The unique Vehicle Identification Number (VIN) stamped on the frame. Primary ID for vehicles.",
     example: "VIN-XXXX-XXXX"
@@ -116,7 +116,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   { 
     rawName: "Engine No", 
     displayName: "Engine No", 
-    normalizedName: "engine_no", 
+    normalizedName: "engineNo", 
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "The unique ID of the vehicle's physical motor block.",
     example: "E-12345-6789"
@@ -131,23 +131,23 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = undefined;
     
-    // 1. Resolve from Core Domain Properties
+    // 1. Resolve from Core Domain Properties using camelCase keys
     switch(header.normalizedName) {
       case "sn": rawValue = asset.sn; break;
       case "location": rawValue = asset.location; break;
-      case "assignee_location": rawValue = asset.custodian; break;
-      case "asset_description": rawValue = asset.description || asset.name; break;
-      case "asset_id_code": rawValue = asset.assetIdCode; break;
-      case "serial_number": rawValue = asset.serialNumber; break;
-      case "chassis_no": rawValue = asset.chassisNo; break;
-      case "engine_no": rawValue = asset.engineNo; break;
-      case "asset_class": rawValue = asset.category; break;
+      case "custodian": rawValue = asset.custodian; break;
+      case "description": rawValue = asset.description || asset.name; break;
+      case "assetIdCode": rawValue = asset.assetIdCode; break;
+      case "serialNumber": rawValue = asset.serialNumber; break;
+      case "chassisNo": rawValue = asset.chassisNo; break;
+      case "engineNo": rawValue = asset.engineNo; break;
+      case "category": rawValue = asset.category; break;
       case "condition": rawValue = asset.condition; break;
       case "manufacturer": rawValue = asset.manufacturer; break;
-      case "model_number": rawValue = asset.modelNumber; break;
+      case "modelNumber": rawValue = asset.modelNumber; break;
       case "remarks": rawValue = asset.remarks; break;
-      case "purchase_price_ngn": rawValue = asset.value; break;
-      case "date_purchased_received": rawValue = asset.purchaseDate; break;
+      case "value": rawValue = asset.value; break;
+      case "purchaseDate": rawValue = asset.purchaseDate; break;
       case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
     }

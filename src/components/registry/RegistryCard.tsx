@@ -4,6 +4,7 @@
  * Phase 1408: Added Folder Badge for combined project context.
  * Phase 1409: Added Project Name to header for multi-grant clarity.
  * Phase 1410: Implemented Explicit Save button for Remarks input.
+ * Phase 1411: Updated normalized keys to camelCase.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -51,12 +52,12 @@ export function RegistryCard({
   
   const descriptionField = record.fields.find(f => {
     const h = record.headers.find(header => header.id === f.headerId);
-    return h?.normalizedName === 'asset_description';
+    return h?.normalizedName === 'description';
   });
 
   const tagField = record.fields.find(f => {
     const h = record.headers.find(header => header.id === f.headerId);
-    return h?.normalizedName === 'asset_id_code';
+    return h?.normalizedName === 'assetIdCode';
   });
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
@@ -133,7 +134,7 @@ export function RegistryCard({
         {/* Data Grid */}
         <div className="divide-y divide-border/40 bg-white/[0.01] flex-1">
           {activeHeaders
-            .filter(h => h.normalizedName !== 'asset_description' && h.normalizedName !== 'asset_id_code')
+            .filter(h => h.normalizedName !== 'description' && h.normalizedName !== 'assetIdCode')
             .filter(h => isVerificationMode || !forcedFieldNames.includes(h.normalizedName))
             .slice(0, densityMode === 'compact' ? 2 : 3)
             .map((header) => {
@@ -190,7 +191,7 @@ export function RegistryCard({
                   placeholder="Field observations..." 
                   className={cn(
                     "h-8 text-[9px] font-medium bg-background border-border/40 pr-8 transition-all",
-                    hasUnsavedRemark && "border-primary/40 ring-1 ring-primary/20"
+                    hasUnsavedRemark && "border-primary/40 ring-1 ring-primary/10"
                   )}
                   value={localRemark}
                   onChange={(e) => setLocalRemark(e.target.value)}

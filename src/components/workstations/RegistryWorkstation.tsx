@@ -4,6 +4,7 @@
  * @fileOverview Asset Registry - Main Management Workstation.
  * Phase 1912: Optimized for High-Fidelity Mobile View with collapsible headers.
  * Phase 1913: Fixed AnimatePresence syntax error in header.
+ * Phase 1914: Updated normalization keys to camelCase for schema compliance.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -226,8 +227,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           if (!sortHeader) return "";
           switch(sortHeader.normalizedName) {
             case "sn": return item.sn || "";
-            case "asset_description": return item.description || "";
-            case "asset_id_code": return item.assetIdCode || "";
+            case "description": return item.description || "";
+            case "assetIdCode": return item.assetIdCode || "";
             case "location": return item.location || "";
             case "condition": return item.condition || "";
             default: return String((item.metadata as any)?.[sortHeader.rawName] || "");
@@ -251,7 +252,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           case "location": val = asset.location; break;
           case "condition": val = asset.condition; break;
           case "status": val = asset.status; break;
-          case "asset_class": val = asset.category; break;
+          case "category": val = asset.category; break;
           default: val = String((asset.metadata as any)?.[header.rawName] || "");
         }
         if (val && val !== "---") values.add(val);

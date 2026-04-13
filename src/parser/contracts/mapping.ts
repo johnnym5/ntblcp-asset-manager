@@ -1,7 +1,7 @@
 /**
  * @fileOverview Deterministic Parser Mapping Contracts.
  * Defines explicit rules for converting Excel headers to domain fields.
- * Phase 400: Updated for high-fidelity TB and C19 template support.
+ * Phase 1300: Updated keys to camelCase for root schema compliance.
  */
 
 import type { Asset } from '@/types/domain';
@@ -57,7 +57,7 @@ export const REGISTRY_MAPPING_CONTRACT: HeaderMap = {
   'PURCHASE PRICE (NAIRA)': 'value',
   'CHASIS NO': 'chassisNo',
   'ENGINE NO': 'engineNo',
-  'QTY': 'value', // Some registers use QTY as a count
+  'QTY': 'value', 
 };
 
 export function calculateHeaderIntegrity(row: string[]): number {

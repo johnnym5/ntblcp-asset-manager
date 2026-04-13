@@ -4,6 +4,7 @@
  * @fileOverview Integrated Structural Parser Engine.
  * Enforces strict Row 1 (Name) / Row 2 (Header) discovery.
  * Integrates Template Matching to prevent unmapped asset imports.
+ * Phase 1300: Aligned normalization keys to camelCase for schema compliance.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -166,13 +167,20 @@ export class ParserEngine {
 
       switch(key) {
         case 'sn': asset.sn = strVal; break;
-        case 'asset_description': asset.description = strVal; break;
-        case 'asset_id_code': asset.assetIdCode = strVal; break;
-        case 'serial_number': asset.serialNumber = strVal; break;
-        case 'chassis_no': asset.chassisNo = strVal; break;
-        case 'engine_no': asset.engineNo = strVal; break;
+        case 'description': asset.description = strVal; break;
+        case 'assetIdCode': asset.assetIdCode = strVal; break;
+        case 'serialNumber': asset.serialNumber = strVal; break;
+        case 'chassisNo': asset.chassisNo = strVal; break;
+        case 'engineNo': asset.engineNo = strVal; break;
         case 'location': asset.location = strVal; break;
-        case 'assignee_location': asset.custodian = strVal; break;
+        case 'custodian': asset.custodian = strVal; break;
+        case 'manufacturer': asset.manufacturer = strVal; break;
+        case 'modelNumber': asset.modelNumber = strVal; break;
+        case 'value': 
+          const numericVal = parseFloat(strVal.replace(/[^0-9.]/g, ''));
+          asset.value = isNaN(numericVal) ? 0 : numericVal; 
+          break;
+        case 'purchaseDate': asset.purchaseDate = strVal; break;
         default: 
           const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]\n\r]/g, '_').trim();
           asset.metadata[safeKey] = val;
