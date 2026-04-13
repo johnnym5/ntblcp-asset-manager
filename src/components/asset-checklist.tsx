@@ -1,10 +1,9 @@
-
 'use client';
 
 /**
- * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
+ * @fileOverview AssetDataChecklist - High-Fidelity Data Quality Monitor.
  * Hardened for absolute data resolution resilience using fuzzy lookup logic.
- * Phase 408: Fully synchronized with fuzzy mapping pulse for PDX parity.
+ * Phase 409: Renamed to Asset Data Checklist. Added Chassis/Engine detection.
  */
 
 import React from 'react';
@@ -63,6 +62,8 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
       case "asset_description": val = values.description || values.name; break;
       case "asset_id_code": val = values.assetIdCode; break;
       case "serial_number": val = values.serialNumber; break;
+      case "chassis_no": val = values.chassisNo; break;
+      case "engine_no": val = values.engineNo; break;
       case "asset_class": val = values.category; break;
       case "manufacturer": val = values.manufacturer; break;
       case "model_number": val = values.modelNumber; break;
@@ -81,7 +82,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
       // Exact Match Pulse
       val = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName];
       
-      // Fuzzy Crawl Pulse (Handles casing variations)
+      // Fuzzy Crawl Pulse (Handles naming variations like "Chasis no" vs "Chassis No")
       if (val === undefined || val === null || val === "") {
         const fuzzyHeader = getFuzzySignature(header.displayName);
         const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);
@@ -111,7 +112,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="space-y-1">
-        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Fidelity Audit</h3>
+        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Asset Data Checklist</h3>
         <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">Global validation pulse</p>
       </div>
 

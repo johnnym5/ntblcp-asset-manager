@@ -3,7 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Simplified for deployment with standard Asset Management language.
- * Phase 1800: Implemented multi-project enablement state.
+ * Phase 1801: Implemented logic for diagnostic token filtering (Summary Cards).
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -244,11 +244,35 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
-      const fuzzySearch = getFuzzySignature(searchTerm);
-      results = results.filter(a => {
-        const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
-        return getFuzzySignature(hay).includes(fuzzySearch);
-      });
+      // 1. Handle Diagnostic Tokens (from Summary Cards)
+      if (searchTerm === 'MISSING_ID') {
+        results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
+      } else if (searchTerm === 'MISSING_SN') {
+        results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
+      } else if (searchTerm === 'MISSING_CHASSIS') {
+        results = results.filter(a => {
+          const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
+          return isVehicle && (!a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === '');
+        });
+      } else if (searchTerm === 'MISSING_ENGINE') {
+        results = results.filter(a => {
+          const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
+          return isVehicle && (!a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === '');
+        });
+      } else if (searchTerm === 'CONDITION_BAD') {
+        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
+      } else if (searchTerm === 'STATUS_UNVERIFIED') {
+        results = results.filter(a => a.status === 'UNVERIFIED');
+      } else if (searchTerm === 'WITH_REMARKS') {
+        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
+      } else {
+        // 2. Standard Fuzzy Search
+        const fuzzySearch = getFuzzySignature(searchTerm);
+        results = results.filter(a => {
+          const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
+          return getFuzzySignature(hay).includes(fuzzySearch);
+        });
+      }
     }
 
     // Header-based Filter Pulse

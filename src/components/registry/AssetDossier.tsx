@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetDossier - Professional Technical Registry Hub.
- * Phase 1510: Fully optimized for deployment stability.
+ * Phase 1511: Renamed Fidelity Audit to Asset Data Checklist.
  */
 
 import React from 'react';
@@ -193,10 +193,10 @@ export function AssetDossier({
           </div>
         )}
 
-        {/* Fidelity Checklist */}
+        {/* Data Checklist */}
         <div className="space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Fidelity Audit
+            <ShieldCheck className="h-4 w-4 text-primary" /> Data Checklist
           </h4>
           <AssetChecklist values={record.rawRow as any} />
         </div>

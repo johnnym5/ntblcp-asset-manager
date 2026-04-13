@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Dashboard Center - Registry Overview.
- * Terminology update: Field Assessment, Registry Admin.
+ * Phase 1602: Hardened Chassis/Engine identification logic for vehicles.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -41,7 +41,7 @@ import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, getFuzzySignature } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from 'framer-motion';
 import { transformAssetToRecord } from '@/lib/registry-utils';
@@ -104,15 +104,19 @@ export function DashboardWorkstation() {
   const issueAssets = useMemo(() => {
     const list = assets.map(a => {
       const issues: string[] = [];
-      const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
+      const catFuzzy = getFuzzySignature(a.category);
+      const isVehicle = catFuzzy.includes('motor') || catFuzzy.includes('vehicle');
+      
+      const hasChassis = !!a.chassisNo && a.chassisNo !== 'N/A' && a.chassisNo.trim() !== '';
+      const hasEngine = !!a.engineNo && a.engineNo !== 'N/A' && a.engineNo.trim() !== '';
       
       if (mode === 'verification' && a.status !== 'VERIFIED') issues.push("Unverified");
       if (['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')) issues.push(`State: ${a.condition}`);
       if (!a.assetIdCode || a.assetIdCode === 'N/A') issues.push("No Tag");
       
       if (isVehicle) {
-        if (!a.chassisNo || a.chassisNo === 'N/A') issues.push("No Chassis");
-        if (!a.engineNo || a.engineNo === 'N/A') issues.push("No Engine");
+        if (!hasChassis) issues.push("No Chassis");
+        if (!hasEngine) issues.push("No Engine");
       } else {
         if (!a.serialNumber || a.serialNumber === 'N/A') issues.push("No Serial");
       }
@@ -245,7 +249,7 @@ export function DashboardWorkstation() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-[9px] font-black uppercase text-foreground/40 tracking-[0.3em] flex items-center gap-2">
-              <FileWarning className="h-3 w-3" /> Exception Scanner
+              <FileWarning className="h-3 w-3" /> Problem Record Scanner
             </h3>
           </div>
           <div className="relative group min-h-[200px]">
@@ -281,7 +285,7 @@ export function DashboardWorkstation() {
                             <Badge key={i} variant="outline" className="text-[7px] font-black uppercase border-red-500/20 text-red-600 bg-red-500/5">{issue}</Badge>
                           ))}
                         </div>
-                        <p className="text-[8px] font-bold text-muted-foreground uppercase truncate opacity-60">{issueAssets[issueIndex].location} &bull; {issueAssets[issueIndex].category}</p>
+                        <p className="text-[8px] font-bold text-muted-foreground uppercase truncate opacity-60">{issueAssets[issueIndex].location} • {issueAssets[issueIndex].category}</p>
                       </div>
                     </div>
                   </Card>
