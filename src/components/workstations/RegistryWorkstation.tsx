@@ -2,10 +2,8 @@
 
 /**
  * @fileOverview Asset Registry - Main Management Workstation.
- * Reverted to Folder Independence: Headers update dynamically based on selected folder.
- * Phase 1507: Fixed visibility logic for disabled folders in multi-project view.
- * Phase 1508: Implemented fuzzy category deduplication and TactileMenu actions for folders.
- * Phase 1509: Added Single-Sheet Import trigger to registry header.
+ * Phase 1912: Optimized for High-Fidelity Mobile View with collapsible headers.
+ * Phase 1913: Fixed AnimatePresence syntax error in header.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -143,7 +141,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
 
-  // Single Sheet Import State
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
 
@@ -493,7 +490,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     }}
                     className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
                   >
-                    <FileUp className="h-3.5 w-3.5" /> Import into Folder
+                    <FileUp className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Import into Folder</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -508,7 +505,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     }}
                     className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
                   >
-                    <Wrench className="h-3.5 w-3.5" /> Setup Folder
+                    <Wrench className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Setup Folder</span>
                   </Button>
                 </div>
               )}
@@ -562,7 +559,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </TooltipProvider>
               </div>
 
-              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0">
+              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0 hidden sm:flex">
                 <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg transition-all"><LayoutGrid className="h-4 w-4" /></Button>
                 <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg transition-all"><Columns className="h-4 w-4" /></Button>
               </div>
@@ -602,19 +599,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <div className="p-4 bg-primary rounded-2xl shadow-xl shadow-primary/20">
                     <ShieldCheck className="h-8 w-8 text-black" />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 text-center md:text-left">
                     <h3 className="text-2xl font-black uppercase text-foreground tracking-tight leading-none">Global Coverage</h3>
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{totalVerified} of {filteredAssets.length} Physical Assessments Complete</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-8 min-w-[200px]">
+                <div className="flex items-center gap-8 min-w-[200px] w-full md:w-auto">
                   <div className="flex-1 space-y-2">
                     <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-primary">{totalCoverage}%</span></div>
                     <Progress value={totalCoverage} className="h-2 bg-primary/10" />
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="text-3xl font-black text-foreground tracking-tighter">{totalCoverage}%</span>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40">Registry Total</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40 whitespace-nowrap">Registry Total</span>
                   </div>
                 </div>
               </div>
@@ -690,7 +687,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="flex flex-col h-full">
               <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-10" : ""}>
                 <AnimatePresence mode="popLayout">
-                  {viewMode === 'grid' ? paginatedAssets.map(asset => (
+                  {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <RegistryCard 
                         record={transformAssetToRecord(asset, workstationHeaders, appSettings?.sourceBranding)} 
@@ -722,7 +719,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         {/* 3. Record Overlay (Expanded) */}
         <AnimatePresence>
           {expandedAssetId && (
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[15vh] left-[5vw] right-[5vw] bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[5vh] left-[2.5vw] right-[2.5vw] bottom-[5vh] lg:top-[15vh] lg:left-[5vw] lg:right-[5vw] lg:bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
               <div className="p-6 border-b border-border bg-muted/10 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
@@ -760,7 +757,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
               </div>
               <ScrollArea className="flex-1 custom-scrollbar">
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                   {processedAssets.find(a => a.id === expandedAssetId) && (
                     <AssetDossier 
                       record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, workstationHeaders, appSettings?.sourceBranding)} 

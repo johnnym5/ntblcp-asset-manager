@@ -1,8 +1,10 @@
+
 'use client';
 
 /**
  * @fileOverview Root Shell - Dashboard Command Hub.
  * Standardized terminology for professional asset management.
+ * Phase 1912: Optimized Header Sync Status UI for deterministic feedback.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -85,32 +87,6 @@ import { SyncStatusDialog } from '@/components/SyncStatusDialog';
 import { SyncConfirmationDialog } from '@/components/sync-confirmation-dialog';
 import { useLongPress } from '@/hooks/use-long-press';
 
-function BellNotificationToast({ notification }: { notification: Notification }) {
-  const Icon = notification.variant === 'destructive' ? AlertCircle : notification.variant === 'success' ? CheckCircle2 : Info;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      className={cn(
-        "absolute top-full mt-3 right-0 z-[100] w-[280px] p-3 rounded-2xl border shadow-3xl flex items-start gap-3 backdrop-blur-3xl bg-card/95 border-border origin-top-right",
-        notification.variant === 'destructive' ? "border-destructive/30" : "border-border"
-      )}
-    >
-      <div className={cn(
-        "p-2 rounded-xl shrink-0",
-        notification.variant === 'destructive' ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary"
-      )}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="flex-1 min-w-0 text-left">
-        <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none text-foreground">{notification.title}</p>
-        <p className="text-[9px] font-medium opacity-60 line-clamp-2 mt-1.5 italic leading-relaxed">{notification.description}</p>
-      </div>
-    </motion.div>
-  );
-}
-
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
   const { 
@@ -142,7 +118,6 @@ export default function SPAHub() {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isSyncStatusOpen, setIsSyncStatusOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
@@ -168,17 +143,6 @@ export default function SPAHub() {
   useEffect(() => {
     if (profileSetupComplete && sessionStorage.getItem('assetain-fresh-login') === 'true') setIsWelcomeOpen(true);
   }, [profileSetupComplete]);
-
-  useEffect(() => {
-    if (lastAddedId) {
-      const latest = notifications.find(n => n.id === lastAddedId);
-      if (latest) {
-        setActiveToast(latest);
-        const timer = setTimeout(() => setActiveToast(null), 5000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [lastAddedId, notifications]);
 
   const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
   const bellLongPress = useLongPress(() => setActiveView('AUDIT_LOG'));
@@ -349,9 +313,9 @@ export default function SPAHub() {
             )}
           >
             {isSyncing ? (
-              <div className="flex items-center gap-2 py-1.5">
+              <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Asset Syncing...</span>
               </div>
             ) : (
               <>

@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1905: Implemented Strict Folder Visibility & Autonomous Local Purge.
+ * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -181,7 +182,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (currentGrantIds.length === 0) return false;
         if (!currentGrantIds.includes(a.grantId)) return false;
         
-        // Folder-level visibility pulse
         const grant = localSettings?.grants.find(g => g.id === a.grantId);
         return grant?.enabledSheets.includes(a.category);
       });
@@ -192,79 +192,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       console.error("Registry Refresh Error:", e); 
     }
   }, []);
-
-  // --- Auto-Sync & Local Purge Lifecycle Pulse ---
-  useEffect(() => {
-    if (!isHydrated || !appSettings) return;
-
-    const handleAutoMaintenance = async () => {
-      // 1. Resolve current enabled Scoped Keys (ProjectID:Folder)
-      const currentScopedKeys = appSettings.activeGrantIds.flatMap(gid => {
-        const grant = appSettings.grants.find(g => g.id === gid);
-        return (grant?.enabledSheets || []).map(sheet => `${gid}:${sheet}`);
-      });
-
-      const prevScopedKeysStr = localStorage.getItem('assetain-prev-scoped-keys');
-      const prevScopedKeys: string[] = prevScopedKeysStr ? JSON.parse(prevScopedKeysStr) : [];
-
-      const removedKeys = prevScopedKeys.filter(k => !currentScopedKeys.includes(k));
-      const addedKeys = currentScopedKeys.filter(k => !prevScopedKeys.includes(k));
-
-      // A. Perform Deterministic Local Purge for disabled scopes
-      if (removedKeys.length > 0) {
-        const local = await storage.getAssets();
-        const next = local.filter(a => {
-          const key = `${a.grantId}:${a.category}`;
-          return !removedKeys.includes(key);
-        });
-        await storage.saveAssets(next);
-        await refreshRegistry();
-        addNotification({ 
-          title: "Registry Purged", 
-          description: "Records from disabled projects or folders removed from local storage.", 
-          variant: "default" 
-        });
-      }
-
-      // B. Perform Deterministic Local Provisioning for newly enabled scopes
-      if (addedKeys.length > 0 && isOnline) {
-        const addedProjectIds = Array.from(new Set(addedKeys.map(k => k.split(':')[0])));
-        setIsSyncing(true);
-        try {
-          let newlyFetched: Asset[] = [];
-          for (const gid of addedProjectIds) {
-            const projectAssets = await FirestoreService.getProjectAssets(gid);
-            newlyFetched = [...newlyFetched, ...projectAssets];
-          }
-          
-          const currentLocal = await storage.getAssets();
-          const localMap = new Map(currentLocal.map(a => [a.id, a]));
-
-          // Only merge assets that are actually enabled in the current project settings
-          newlyFetched.forEach(a => {
-            const grant = appSettings.grants.find(g => g.id === a.grantId);
-            if (grant?.enabledSheets.includes(a.category)) {
-              localMap.set(a.id, { ...a, syncStatus: 'synced' });
-            }
-          });
-          
-          await storage.saveAssets(Array.from(localMap.values()));
-          await refreshRegistry();
-          addNotification({ 
-            title: "Registry Updated", 
-            description: "Synchronized fresh records for enabled scopes.", 
-            variant: "success" 
-          });
-        } finally {
-          setIsSyncing(false);
-        }
-      }
-
-      localStorage.setItem('assetain-prev-scoped-keys', JSON.stringify(currentScopedKeys));
-    };
-
-    handleAutoMaintenance();
-  }, [appSettings?.grants, appSettings?.activeGrantIds, isOnline, isHydrated, refreshRegistry]);
 
   useEffect(() => { 
     setIsHydrated(true);
@@ -318,7 +245,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
     let results = [...source];
 
-    // Core Filtering logic: Search, Location, Assignee, etc.
     if (selectedLocations.length > 0) {
       const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
       results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.location)));
@@ -443,10 +369,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
+  // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
   const manualDownload = useCallback(async () => {
     if (!isOnline) return;
     setIsSyncing(true);
-    addNotification({ title: "Scanning Cloud...", description: "Identifying new and existing records." });
+    addNotification({ title: "Scanning Cloud Authority...", description: "Reconciling timestamps for global parity." });
     
     try {
       const currentGrantIds = appSettings?.activeGrantIds || [];
@@ -456,7 +383,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
 
-      // Filter fetched assets to only include enabled sheets
       const filteredRemote = allRemoteAssets.filter(a => {
         const grant = appSettings?.grants.find(g => g.id === a.grantId);
         return grant?.enabledSheets.includes(a.category);
@@ -467,14 +393,38 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
       const newItems: Asset[] = [];
       const existingItems: Asset[] = [];
+      const autoUpdateItems: Asset[] = [];
 
       filteredRemote.forEach(remote => {
         const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
-        if (localMap.has(id)) existingItems.push(remote);
-        else newItems.push(remote);
+        const local = localMap.get(id);
+        
+        if (!local) {
+          newItems.push(remote);
+        } else {
+          // Timestamp pulse: determine which is latest
+          const remoteTime = new Date(remote.lastModified).getTime();
+          const localTime = new Date(local.lastModified).getTime();
+          
+          if (remoteTime > localTime) {
+            // Cloud is newer -> mark for update. 
+            // If local wasn't edited (no 'local' status), we can auto-apply later.
+            autoUpdateItems.push(remote);
+          } else if (localTime > remoteTime && local.syncStatus === 'local') {
+            // Local is newer AND has pending changes -> True Conflict.
+            existingItems.push(remote);
+          }
+        }
       });
 
-      setSyncSummary({ type: 'DOWNLOAD', newItems, existingItems, totalCount: filteredRemote.length });
+      // If there are no true conflicts (local newer drift), we can potentially automate the sync.
+      // But for fidelity, we show the summary of what will happen.
+      setSyncSummary({ 
+        type: 'DOWNLOAD', 
+        newItems: [...newItems, ...autoUpdateItems], 
+        existingItems, 
+        totalCount: newItems.length + autoUpdateItems.length + existingItems.length 
+      });
       setIsSyncConfirmOpen(true);
     } catch (e) {
       addNotification({ title: "Sync Scan Failed", variant: "destructive" });
@@ -491,7 +441,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const pending = queue.filter(q => q.status === 'PENDING');
       
       if (pending.length === 0) {
-        addNotification({ title: "Registry Up-to-Date", description: "Zero local changes pending upload." });
+        addNotification({ title: "Local Store Synchronized", description: "Zero modifications pending upload." });
         setIsSyncing(false);
         return;
       }
@@ -519,9 +469,20 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
 
         let nextAssets = [...local];
-        syncSummary.newItems.forEach(item => { nextAssets.push({ ...item, syncStatus: 'synced' }); });
+        
+        // Apply New and Remote-Newer items automatically
+        syncSummary.newItems.forEach(item => {
+          const id = getFuzzySignature(item.assetIdCode || item.serialNumber || item.id);
+          const existing = localMap.get(id);
+          if (existing) {
+            nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...item, syncStatus: 'synced' } : a);
+          } else {
+            nextAssets.push({ ...item, syncStatus: 'synced' });
+          }
+        });
 
-        if (strategy === 'UPDATE') {
+        // Resolve True Conflicts based on user strategy
+        if (strategy === 'UPDATE' && syncSummary.existingItems.length > 0) {
           syncSummary.existingItems.forEach(remote => {
             const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
             nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...remote, syncStatus: 'synced' } : a);
@@ -529,7 +490,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
 
         await storage.saveAssets(nextAssets);
-        addNotification({ title: "Download Complete", description: `Processed ${syncSummary.totalCount} records.`, variant: "success" });
+        addNotification({ title: "Registry Parity Established", description: `Processed ${syncSummary.totalCount} record pulses.`, variant: "success" });
       } else {
         await processSyncQueue();
       }
