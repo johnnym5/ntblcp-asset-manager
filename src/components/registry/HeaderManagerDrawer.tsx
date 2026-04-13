@@ -4,6 +4,7 @@
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
  * Phase 38: Implemented Triple-View Toggles (Card, List, Check).
  * Phase 39: Converted to focused Dialog window with vertical group stacking.
+ * Phase 40: Reinforced administrative access pulse.
  */
 
 import React, { useState } from 'react';
@@ -45,6 +46,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { storage } from '@/offline/storage';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { addNotification } from '@/hooks/use-notifications';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface HeaderManagerProps {
   isOpen: boolean;
@@ -79,24 +81,23 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
     if (isOpen) setLocalHeaders(headers);
   }, [isOpen, headers]);
 
+  if (!isAdmin) return null;
+
   const toggleFlag = (id: string, key: 'visible' | 'table' | 'quickView' | 'inChecklist') => {
-    if (!isAdmin) return;
     setLocalHeaders(prev => prev.map(h => h.id === id ? { ...h, [key]: !h[key] } : h));
   };
 
   const renameHeader = (id: string, newName: string) => {
-    if (!isAdmin) return;
     setLocalHeaders(prev => prev.map(h => h.id === id ? { ...h, displayName: newName } : h));
   };
 
   const handleReset = () => {
-    if (!isAdmin) return;
     const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[];
     setLocalHeaders(initial);
   };
 
   const handleCommit = async () => {
-    if (!isAdmin || !appSettings) return;
+    if (!appSettings) return;
     
     const updatedSettings = { ...appSettings, globalHeaders: localHeaders };
     
@@ -129,7 +130,6 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                   </DialogDescription>
                 </div>
               </div>
-              {!isAdmin && <Badge className="bg-muted text-muted-foreground border-border h-7 px-3 rounded-full font-black uppercase text-[8px] tracking-widest gap-2"><Lock className="h-3 w-3" /> Read Only</Badge>}
             </div>
           </DialogHeader>
         </div>
@@ -175,7 +175,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                           <div className="cursor-grab opacity-20 group-hover:opacity-100 transition-opacity"><GripVertical className="h-4 w-4" /></div>
                           <div className="space-y-1.5 flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <Input value={header.displayName} onChange={(e) => renameHeader(header.id, e.target.value)} className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none truncate" disabled={!header.editable || !isAdmin} />
+                              <Input value={header.displayName} onChange={(e) => renameHeader(header.id, e.target.value)} className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none truncate" disabled={!header.editable} />
                               {header.locked && <Lock className="h-3 w-3 text-primary opacity-40 shrink-0" />}
                             </div>
                             <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-40 truncate">SRC: {header.rawName}</span>
@@ -186,7 +186,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                                <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} className="data-[state=checked]:bg-primary" />
                               </TooltipTrigger>
                               <TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent>
                             </Tooltip>
@@ -195,7 +195,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                                <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} className="data-[state=checked]:bg-primary" />
                               </TooltipTrigger>
                               <TooltipContent className="text-[8px] font-black uppercase">Table View</TooltipContent>
                             </Tooltip>
@@ -204,7 +204,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Switch checked={header.inChecklist} onCheckedChange={() => toggleFlag(header.id, 'inChecklist')} disabled={!isAdmin} className="data-[state=checked]:bg-primary" />
+                                <Switch checked={header.inChecklist} onCheckedChange={() => toggleFlag(header.id, 'inChecklist')} className="data-[state=checked]:bg-primary" />
                               </TooltipTrigger>
                               <TooltipContent className="text-[8px] font-black uppercase">Fidelity Check</TooltipContent>
                             </Tooltip>
@@ -220,24 +220,14 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
         </ScrollArea>
 
         <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center gap-3">
-          {isAdmin ? (
-            <>
-              <Button variant="ghost" onClick={handleReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
-                <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset Default
-              </Button>
-              <Button onClick={handleCommit} className="flex-[2] h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-                <CheckCircle2 className="mr-2 h-4 w-4" /> Commit Arrangement Pulse
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => onOpenChange(false)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] bg-muted text-muted-foreground">
-              Exit Arrangement View
-            </Button>
-          )}
+          <Button variant="ghost" onClick={handleReset} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all">
+            <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset Default
+          </Button>
+          <Button onClick={handleCommit} className="flex-[2] h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
+            <CheckCircle2 className="mr-2 h-4 w-4" /> Commit Arrangement Pulse
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

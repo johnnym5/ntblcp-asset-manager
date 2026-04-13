@@ -3,7 +3,7 @@
 /**
  * @fileOverview Asset Registry - Main Management Workstation.
  * Deployment Pulse: Hardened sorting protocol and independent folder independence.
- * Optimized: Adaptive density for mobile/desktop workstations.
+ * Phase 1503: Restricted Header Management button strictly to administrators.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -142,7 +142,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
@@ -683,21 +683,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       Save Layout
                     </Button>
                   )}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
-                          className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
-                        >
-                          <Columns className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-[8px] font-black uppercase">Edit Field Labels</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  {isAdmin && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
+                            className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
+                          >
+                            <Columns className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-[8px] font-black uppercase">Edit Field Labels</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10 transition-colors shadow-sm"><X className="h-5 w-5" /></button>
                 </div>
               </div>

@@ -4,6 +4,7 @@
  * @fileOverview AssetForm - Record Detail Workstation.
  * Hardened: restricted editing based on Admin status or user permission.
  * Phase 1205: Added guidance tooltips explaining header terminology.
+ * Phase 1206: Fixed scrolling pulse for high-density field editing.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -202,7 +203,7 @@ export default function AssetForm({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1100px] w-full h-[100dvh] sm:h-[85vh] sm:w-[95vw] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 sm:rounded-[2.5rem] shadow-3xl">
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
           <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between">
             <div className="space-y-1">
               <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
@@ -216,8 +217,8 @@ export default function AssetForm({
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-            <ScrollArea className="flex-1 border-r border-white/5">
+          <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden bg-black">
+            <ScrollArea className="flex-1 border-r border-white/5 h-full">
               <div className="p-6 sm:p-8 space-y-10 sm:space-y-12 pb-32">
                 <Form {...form}>
                   <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 sm:space-y-12">
@@ -295,7 +296,7 @@ export default function AssetForm({
               </div>
             </ScrollArea>
 
-            <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 sm:p-8 shrink-0 border-t md:border-t-0 border-white/5 hidden sm:block">
+            <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 sm:p-8 shrink-0 border-t md:border-t-0 border-white/5 h-full">
               <div className="space-y-10">
                 <AssetChecklist values={formValues as any} />
               </div>
