@@ -6,6 +6,7 @@
  * Implemented Concurrent Multi-Project Selection and Integrated Import.
  * Phase 1910: Added Delete Project pulse with deterministic cleanup.
  * Phase 1911: Added Single-Sheet Import trigger to folder list.
+ * Phase 1912: Explicit Commit pattern for all renames.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -421,7 +422,9 @@ export function SettingsWorkstation() {
                 <div className="space-y-8">
                   <div className="flex gap-3">
                     <Input placeholder="Enter new project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
-                    <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Add Project</Button>
+                    <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">
+                      <PlusCircle className="h-4 w-4 mr-2" /> Add Project
+                    </Button>
                   </div>
                   <div className="space-y-4">
                     {draftSettings.grants.map((grant) => {
@@ -438,7 +441,10 @@ export function SettingsWorkstation() {
                               </div>
                               <div className="flex flex-col min-w-0">
                                 {isEditing ? (
-                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}><Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-8 w-48 text-sm font-black uppercase" /><Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
+                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                    <Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-10 w-64 text-sm font-black uppercase border-primary/40" />
+                                    <Button size="icon" className="h-10 w-10 bg-primary text-black" onClick={commitProjectRename}><Save className="h-4 w-4" /></Button>
+                                  </div>
                                 ) : (
                                   <div className="flex items-center gap-2">
                                     <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
@@ -497,7 +503,10 @@ export function SettingsWorkstation() {
                                           className="data-[state=checked]:bg-primary scale-75"
                                         />
                                         {isSheetEditing ? (
-                                          <div className="flex items-center gap-2 flex-1"><Input value={editSheetValue} onChange={(e) => setEditSheetValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)} className="h-8 text-[10px] font-black uppercase" /><Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <Input value={editSheetValue} onChange={(e) => setEditSheetValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)} className="h-10 text-[10px] font-black uppercase border-primary/40" />
+                                            <Button size="icon" className="h-10 w-10 bg-primary text-black" onClick={() => commitSheetRename(grant.id, name)}><Save className="h-4 w-4" /></Button>
+                                          </div>
                                         ) : (
                                           <div className="flex flex-col min-w-0">
                                             <span className={cn("text-[11px] font-black uppercase truncate leading-none", isSheetEnabled ? "text-foreground" : "text-muted-foreground")}>{name}</span>

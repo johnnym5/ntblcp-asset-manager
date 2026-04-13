@@ -4,9 +4,10 @@
  * @fileOverview AssetDossier - Professional Technical Registry Hub.
  * Phase 1511: Renamed Fidelity Audit to Asset Data Checklist.
  * Phase 1512: Added Project Name badge for multi-grant clarity.
+ * Phase 1513: Implemented Explicit Save button for inline Remarks.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -26,7 +27,8 @@ import {
   ClipboardCheck,
   CheckCircle2,
   XCircle,
-  Database
+  Database,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -39,6 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const DetailField = ({ 
   headerId, 
@@ -57,6 +60,8 @@ const DetailField = ({
 }) => {
   const { headers } = useAppState();
   const header = headers.find(h => h.id === headerId);
+  const [localLabel, setLocalLabel] = useState(label);
+  const hasLabelChanges = localLabel !== label;
 
   return (
     <div className={cn(
@@ -75,13 +80,20 @@ const DetailField = ({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         {isEditing ? (
-          <Input 
-            value={label} 
-            onChange={(e) => onRename?.(e.target.value)}
-            className="h-6 bg-transparent border-none p-0 text-[8px] font-black uppercase tracking-[0.2em] text-primary focus-visible:ring-0 shadow-none"
-          />
+          <div className="flex items-center gap-2 flex-1">
+            <Input 
+              value={localLabel} 
+              onChange={(e) => setLocalLabel(e.target.value)}
+              className="h-6 bg-transparent border-none p-0 text-[8px] font-black uppercase tracking-[0.2em] text-primary focus-visible:ring-0 shadow-none"
+            />
+            {hasLabelChanges && (
+              <Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={() => onRename?.(localLabel)}>
+                <Save className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         ) : (
           <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
             {label}
@@ -109,6 +121,13 @@ export function AssetDossier({
   isHeaderEditingMode?: boolean
 }) {
   const { headers, setHeaders, appSettings } = useAppState();
+  const [remarkValue, setRemarkValue] = useState(String(record.rawRow.remarks || ''));
+  const hasUnsavedRemark = remarkValue !== (record.rawRow.remarks || '');
+
+  useEffect(() => {
+    setRemarkValue(String(record.rawRow.remarks || ''));
+  }, [record.rawRow.remarks]);
+
   const isVerificationMode = appSettings?.appMode === 'verification';
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
@@ -122,6 +141,10 @@ export function AssetDossier({
 
   const handleRenameHeader = (headerId: string, newName: string) => {
     setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, displayName: newName } : h));
+  };
+
+  const handleSaveRemark = () => {
+    onQuickUpdate?.(record.id, { remarks: remarkValue });
   };
 
   return (
@@ -185,12 +208,26 @@ export function AssetDossier({
 
               <div className="space-y-1.5">
                 <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Auditor Remarks</label>
-                <Input 
-                  placeholder="Field observations..." 
-                  className="h-11 text-[10px] font-medium bg-background border-border rounded-xl focus-visible:ring-primary/20"
-                  value={String(record.rawRow.remarks || '')}
-                  onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Field observations..." 
+                    className={cn(
+                      "h-11 text-[10px] font-medium bg-background border-border rounded-xl focus-visible:ring-primary/20 flex-1",
+                      hasUnsavedRemark && "border-primary/40 ring-1 ring-primary/10"
+                    )}
+                    value={remarkValue}
+                    onChange={(e) => setRemarkValue(e.target.value)}
+                  />
+                  <AnimatePresence>
+                    {hasUnsavedRemark && (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                        <Button size="icon" onClick={handleSaveRemark} className="h-11 w-11 rounded-xl bg-primary text-black">
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>

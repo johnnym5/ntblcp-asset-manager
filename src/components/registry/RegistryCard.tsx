@@ -3,11 +3,12 @@
  * Phase 1407: Integrated high-speed verification controls (Red/Green Toggle, Condition, Remarks).
  * Phase 1408: Added Folder Badge for combined project context.
  * Phase 1409: Added Project Name to header for multi-grant clarity.
+ * Phase 1410: Implemented Explicit Save button for Remarks input.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck } from 'lucide-react';
+import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
@@ -38,6 +39,11 @@ export function RegistryCard({
   densityMode = 'comfortable'
 }: RegistryCardProps) {
   const { appSettings, headers: globalHeaders } = useAppState();
+  const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
+
+  useEffect(() => {
+    setLocalRemark(String(record.rawRow.remarks || ''));
+  }, [record.rawRow.remarks]);
 
   const isVerificationMode = appSettings?.appMode === 'verification';
   const activeHeaders = globalHeaders.filter(h => h.quickView);
@@ -66,6 +72,12 @@ export function RegistryCard({
     e.preventDefault();
     onToggleSelect?.(record.id);
   };
+
+  const handleSaveRemark = () => {
+    onQuickUpdate?.(record.id, { remarks: localRemark });
+  };
+
+  const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
 
   return (
     <Card 
@@ -172,16 +184,34 @@ export function RegistryCard({
               </Select>
             </div>
 
-            <div className="relative group/remark">
-              <Input 
-                placeholder="Field observations..." 
-                className="h-8 text-[9px] font-medium bg-background border-border/40 pr-8"
-                value={String(record.rawRow.remarks || '')}
-                onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20">
-                <Edit3 className="h-3 w-3" />
+            <div className="relative flex items-center gap-1.5">
+              <div className="relative flex-1 group/remark">
+                <Input 
+                  placeholder="Field observations..." 
+                  className={cn(
+                    "h-8 text-[9px] font-medium bg-background border-border/40 pr-8 transition-all",
+                    hasUnsavedRemark && "border-primary/40 ring-1 ring-primary/20"
+                  )}
+                  value={localRemark}
+                  onChange={(e) => setLocalRemark(e.target.value)}
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20">
+                  <Edit3 className="h-3 w-3" />
+                </div>
               </div>
+              <AnimatePresence>
+                {hasUnsavedRemark && (
+                  <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}>
+                    <Button 
+                      size="icon" 
+                      onClick={handleSaveRemark}
+                      className="h-8 w-8 rounded-lg bg-primary text-black shadow-lg"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         )}

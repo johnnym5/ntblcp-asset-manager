@@ -5,9 +5,10 @@
  * Phase 1500: Rebuilt with a 12-column grid pulse for deterministic alignment.
  * Phase 1501: Integrated inline high-speed verification controls with color-coding.
  * Phase 1502: Added Folder column for combined project views.
+ * Phase 1503: Implemented Explicit Save button for Remarks input.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  FolderOpen
+  FolderOpen,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -34,6 +36,7 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -45,6 +48,41 @@ interface RegistryTableProps {
   onQuickUpdate?: (id: string, updates: any) => void;
 }
 
+const TableRemarkInput = ({ record, onUpdate }: { record: AssetRecord, onUpdate: (id: string, updates: any) => void }) => {
+  const [val, setVal] = useState(String(record.rawRow.remarks || ''));
+  const hasChanges = val !== (record.rawRow.remarks || '');
+
+  useEffect(() => {
+    setVal(String(record.rawRow.remarks || ''));
+  }, [record.rawRow.remarks]);
+
+  return (
+    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+      <div className="relative flex-1 group/remark">
+        <Input 
+          placeholder="Remark..." 
+          className={cn(
+            "h-9 text-[9px] font-medium bg-muted/20 border-border/40 pr-8 rounded-xl focus-visible:ring-primary/20 transition-all",
+            hasChanges && "border-primary/40 ring-1 ring-primary/10"
+          )}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+        />
+        <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 opacity-20 group/remark:opacity-40 transition-opacity pointer-events-none" />
+      </div>
+      <AnimatePresence>
+        {hasChanges && (
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+            <Button size="icon" className="h-9 w-9 rounded-xl bg-primary text-black shadow-lg" onClick={() => onUpdate(record.id, { remarks: val })}>
+              <Save className="h-4 w-4" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export function RegistryTable({ 
   records, 
   selectedIds, 
@@ -53,7 +91,7 @@ export function RegistryTable({
   onToggleExpand,
   onQuickUpdate
 }: RegistryTableProps) {
-  const { appSettings, headers: globalHeaders } = useAppState();
+  const { appSettings } = useAppState();
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isVerificationMode = appSettings?.appMode === 'verification';
@@ -189,15 +227,7 @@ export function RegistryTable({
                         </SelectContent>
                       </Select>
 
-                      <div className="flex-1 relative group/remark">
-                        <Input 
-                          placeholder="Remark..." 
-                          className="h-9 text-[9px] font-medium bg-muted/20 border-border/40 pr-8 rounded-xl focus-visible:ring-primary/20"
-                          value={String(record.rawRow.remarks || '')}
-                          onChange={(e) => onQuickUpdate?.(record.id, { remarks: e.target.value })}
-                        />
-                        <Edit3 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 opacity-20 group/remark:opacity-40 transition-opacity pointer-events-none" />
-                      </div>
+                      {onQuickUpdate && <TableRemarkInput record={record} onUpdate={onQuickUpdate} />}
                     </div>
                   ) : (
                     <div className="flex justify-end pr-4">
