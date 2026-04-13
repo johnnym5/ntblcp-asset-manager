@@ -1,9 +1,11 @@
+
 'use client';
 
 /**
  * @fileOverview ImportWorkstation - Multi-Sheet Workbook Ingestion.
  * Phase 1115: Implemented Full Workbook Traversal. Now scans and imports every sheet.
  * Phase 1116: Hardened Reconciliation for cross-sheet duplicate detection.
+ * Phase 1117: Integrated immediate local storage update for instant registry visibility.
  */
 
 import React, { useState, useRef } from 'react';
@@ -41,6 +43,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { StructurePreview } from '@/modules/import/components/StructurePreview';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
 import { cn } from '@/lib/utils';
+import { FirestoreService } from '@/services/firebase/firestore';
 
 type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 type MergeStrategy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
@@ -52,7 +55,9 @@ export function ImportWorkstation() {
     activeGrantIds, 
     setDataSource, 
     setActiveView, 
-    appSettings
+    appSettings,
+    setAppSettings,
+    isOnline
   } = useAppState();
   const { userProfile } = useAuth();
   
@@ -64,10 +69,7 @@ export function ImportWorkstation() {
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
   
-  // Entire Workbook Data Map
   const [workbookData, setWorkbookData] = useState<Record<string, any[][]>>({});
-  
-  // Conflict Strategy State
   const [mergeStrategy, setMergeStrategy] = useState<MergeStrategy>('SKIP_EXISTING');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +92,6 @@ export function ImportWorkstation() {
       
       engineRef.current = new ParserEngine(file.name, existingAssets);
 
-      // Iterate through all sheet names in the workbook
       for (let i = 0; i < workbook.SheetNames.length; i++) {
         const sheetName = workbook.SheetNames[i];
         const sheet = workbook.Sheets[sheetName];
@@ -101,7 +102,6 @@ export function ImportWorkstation() {
         const groups = engineRef.current!.discoverGroups(sheetName, data);
         allGroups.push(...groups);
         
-        // Update progress pulse
         setProgress(Math.round(((i + 1) / workbook.SheetNames.length) * 100));
       }
 
@@ -127,8 +127,6 @@ export function ImportWorkstation() {
 
     try {
       const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
-      
-      // Group selected groups by their source sheet for ingestion
       const groupsBySheet: Record<string, DiscoveredGroup[]> = {};
       selectedGroups.forEach(g => {
         if (!groupsBySheet[g.sheetName]) groupsBySheet[g.sheetName] = [];
@@ -189,32 +187,65 @@ export function ImportWorkstation() {
     setIsProcessing(true);
     try {
       const validAssets = stagedAssets.filter(a => !a.validation.isRejected);
-      
       const assetsToProcess = validAssets.filter(a => {
         if (!a.validation.isUpdate) return true;
         return mergeStrategy === 'OVERWRITE_EXISTING';
       });
 
       if (assetsToProcess.length === 0) {
-        addNotification({ title: "Strategy Pulse: Empty", description: "Zero records selected based on conflict strategy." });
+        addNotification({ title: "Import Complete", description: "No records were changed based on conflict strategy." });
         setCurrentStep('SUMMARY');
         return;
       }
 
+      // 1. Prepare Local State Update
+      const localAssets = await storage.getAssets();
+      const localMap = new Map(localAssets.map(a => [a.id, a]));
+      const newImportedCategories: string[] = [];
+
+      // 2. Process Records
       for (const asset of assetsToProcess) {
         const finalAsset = { 
           ...asset, 
           grantId: targetGrantId,
+          syncStatus: 'local' as const, // Mark as locally modified
           ...(asset.validation.isUpdate && { id: asset.validation.existingAssetId })
         };
+        
+        // Update local map
+        localMap.set(finalAsset.id, finalAsset as any);
+        
+        // Track categories to auto-enable
+        if (!newImportedCategories.includes(asset.category)) {
+          newImportedCategories.push(asset.category);
+        }
+
+        // Enqueue for cloud sync
         const op = asset.validation.isUpdate ? 'UPDATE' : 'CREATE';
         await enqueueMutation(op, 'assets', finalAsset);
       }
 
+      // 3. Auto-Enable Categories in Settings
+      const updatedGrants = appSettings.grants.map(g => {
+        if (g.id === targetGrantId) {
+          const nextEnabled = Array.from(new Set([...g.enabledSheets, ...newImportedCategories]));
+          return { ...g, enabledSheets: nextEnabled };
+        }
+        return g;
+      });
+
+      const nextSettings = { ...appSettings, grants: updatedGrants };
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+
+      // 4. Save Final Local Asset State
+      await storage.saveAssets(Array.from(localMap.values()));
       await storage.clearSandbox();
+      
       addNotification({ 
-        title: "Registry Pulses Committed", 
-        description: `Successfully processed ${assetsToProcess.length} workbook records.`,
+        title: "Registry Updated", 
+        description: `Successfully processed ${assetsToProcess.length} records.`,
         variant: "success" 
       });
       
