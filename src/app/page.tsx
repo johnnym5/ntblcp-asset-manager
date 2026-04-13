@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Dashboard Command Hub.
  * Standardized terminology for professional asset management.
  * Phase 1912: Optimized Header Sync Status UI for deterministic feedback.
+ * Phase 1913: Added smart parity check to manual sync triggers.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -85,6 +86,7 @@ import { InboxSheet } from '@/components/inbox-sheet';
 import { SyncStatusDialog } from '@/components/SyncStatusDialog';
 import { SyncConfirmationDialog } from '@/components/sync-confirmation-dialog';
 import { useLongPress } from '@/hooks/use-long-press';
+import { addNotification } from '@/hooks/use-notifications';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -135,9 +137,9 @@ export default function SPAHub() {
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       case 'SYNC_QUEUE': return <SyncQueueWorkstation isEmbedded={false} />;
-      case 'USERS' as any: return <RegistryWorkstation />; // Redirect or specific component
-      case 'INFRASTRUCTURE' as any: return <DashboardWorkstation />; // Needs dedicated component
-      case 'DATABASE' as any: return <DashboardWorkstation />; // Needs dedicated component
+      case 'USERS' as any: return <RegistryWorkstation />; 
+      case 'INFRASTRUCTURE' as any: return <DashboardWorkstation />; 
+      case 'DATABASE' as any: return <DashboardWorkstation />; 
       default: return <DashboardWorkstation />;
     }
   }, [activeView]);
@@ -178,6 +180,22 @@ export default function SPAHub() {
 
     return base;
   }, [isAdmin, isSuperAdmin, setActiveView]);
+
+  const handleManualUploadWithFeedback = async () => {
+    if (!isOnline) {
+      addNotification({ title: "Offline Scope", description: "Connect to the cloud to synchronize modifications.", variant: "destructive" });
+      return;
+    }
+    await manualUpload();
+  };
+
+  const handleManualDownloadWithFeedback = async () => {
+    if (!isOnline) {
+      addNotification({ title: "Offline Scope", description: "Connect to the cloud to fetch latest registry pulses.", variant: "destructive" });
+      return;
+    }
+    await manualDownload();
+  };
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
@@ -321,8 +339,8 @@ export default function SPAHub() {
               </div>
             ) : (
               <>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
               </>
             )}
           </div>

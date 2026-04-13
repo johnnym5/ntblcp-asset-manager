@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
+ * Phase 1911: Added Deep Equality parity check to skip redundant updates.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -369,6 +369,24 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
+  /**
+   * Deep Parity Check Logic.
+   * Identifies if two asset objects are functionally identical, ignoring audit metadata.
+   */
+  const areAssetsIdentical = useCallback((local: Asset, remote: Asset): boolean => {
+    const keysToIgnore = ['syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'updateCount', 'unseenUpdateFields', 'importMetadata'];
+    
+    const localClean = Object.keys(local)
+      .filter(k => !keysToIgnore.includes(k))
+      .reduce((obj, key) => ({ ...obj, [key]: (local as any)[key] }), {});
+      
+    const remoteClean = Object.keys(remote)
+      .filter(k => !keysToIgnore.includes(k))
+      .reduce((obj, key) => ({ ...obj, [key]: (remote as any)[key] }), {});
+
+    return JSON.stringify(localClean) === JSON.stringify(remoteClean);
+  }, []);
+
   // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
   const manualDownload = useCallback(async () => {
     if (!isOnline) return;
@@ -402,23 +420,28 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (!local) {
           newItems.push(remote);
         } else {
-          // Timestamp pulse: determine which is latest
-          const remoteTime = new Date(remote.lastModified).getTime();
-          const localTime = new Date(local.lastModified).getTime();
-          
-          if (remoteTime > localTime) {
-            // Cloud is newer -> mark for update. 
-            // If local wasn't edited (no 'local' status), we can auto-apply later.
-            autoUpdateItems.push(remote);
-          } else if (localTime > remoteTime && local.syncStatus === 'local') {
-            // Local is newer AND has pending changes -> True Conflict.
-            existingItems.push(remote);
+          // Optimization: Only act if there is a functional data drift
+          if (!areAssetsIdentical(local, remote)) {
+            const remoteTime = new Date(remote.lastModified).getTime();
+            const localTime = new Date(local.lastModified).getTime();
+            
+            if (remoteTime > localTime) {
+              // Cloud is newer -> mark for update. 
+              autoUpdateItems.push(remote);
+            } else if (localTime > remoteTime && local.syncStatus === 'local') {
+              // Local is newer AND has pending changes -> True Conflict.
+              existingItems.push(remote);
+            }
           }
         }
       });
 
-      // If there are no true conflicts (local newer drift), we can potentially automate the sync.
-      // But for fidelity, we show the summary of what will happen.
+      if (newItems.length === 0 && autoUpdateItems.length === 0 && existingItems.length === 0) {
+        addNotification({ title: "Parity Confirmed", description: "Your local registry is in absolute sync with the cloud." });
+        setIsSyncing(false);
+        return;
+      }
+
       setSyncSummary({ 
         type: 'DOWNLOAD', 
         newItems: [...newItems, ...autoUpdateItems], 
@@ -431,7 +454,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, appSettings]);
+  }, [isOnline, appSettings, areAssetsIdentical]);
 
   const manualUpload = useCallback(async () => {
     if (!isOnline) return;

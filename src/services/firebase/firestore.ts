@@ -1,6 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
  * Forensic update: Captures diffs and previous state automatically for the audit trail.
+ * Optimization Pulse: Implemented partial updates to send only modified fields.
  */
 
 import { 
@@ -96,6 +97,10 @@ export const FirestoreService = {
     }
   },
 
+  /**
+   * Saves an asset with differential detection.
+   * Only changed fields are transmitted to the cloud during updates.
+   */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE'): Promise<void> {
     if (!db) return;
 
@@ -104,39 +109,61 @@ export const FirestoreService = {
     // Fetch current state for forensic diff and reversion buffer
     let oldData: any = null;
     let changes: Record<string, { old: any; new: any }> = {};
+    let partialUpdate: Record<string, any> = {};
+    let hasFunctionalChanges = false;
+
     try {
       const currentSnap = await getDoc(assetRef);
       if (currentSnap.exists()) {
         const snapData = currentSnap.data();
-        // Capture a clean version of the old state (without nested previousState) for the buffer
         const { previousState, ...cleanOldData } = snapData;
         oldData = cleanOldData;
 
-        const keys = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks'];
+        // Determine minimal diff for standard fields
+        const keys = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
         keys.forEach(k => {
           const oldVal = (oldData as any)[k];
           const newVal = (asset as any)[k];
-          if (oldVal !== newVal) {
+          
+          if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
             changes[k] = { old: oldVal || 'EMPTY', new: newVal || 'EMPTY' };
+            partialUpdate[k] = newVal;
+            hasFunctionalChanges = true;
           }
         });
       }
     } catch (e) {}
 
+    // Parity Check: If nothing functionally changed and it's an update, skip the cloud pulse
+    if (operation === 'UPDATE' && !hasFunctionalChanges && oldData) {
+      return;
+    }
+
     const validation = AssetSchema.safeParse(asset);
     if (!validation.success) return;
 
-    // Inject historical buffer into the asset record
-    const dataToSave = {
-      ...validation.data,
-      previousState: oldData || null,
-      lastModified: new Date().toISOString()
-    };
-
-    const sanitized = sanitizeForFirestore(dataToSave);
     try {
-      await setDoc(assetRef, sanitized, { merge: true });
-      mirrorToRtdb([sanitized as Asset]).catch(() => {});
+      if (operation === 'UPDATE' && oldData) {
+        // Differential Update Pulse
+        const updatePayload = {
+          ...partialUpdate,
+          previousState: oldData, // Store previous version for undo capability
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: asset.lastModifiedBy
+        };
+        await updateDoc(assetRef, sanitizeForFirestore(updatePayload));
+      } else {
+        // Full Object Pulse (CREATE or RESTORE)
+        const fullPayload = {
+          ...validation.data,
+          previousState: oldData || null,
+          lastModified: new Date().toISOString()
+        };
+        await setDoc(assetRef, sanitizeForFirestore(fullPayload), { merge: true });
+      }
+
+      // Always mirror full object to RTDB for failover consistency
+      mirrorToRtdb([sanitizeForFirestore(asset) as Asset]).catch(() => {});
       
       await this.logActivity({
         assetId: asset.id,
@@ -147,7 +174,7 @@ export const FirestoreService = {
         changes: Object.keys(changes).length > 0 ? changes : undefined
       });
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'update', err, sanitized);
+      this.handlePermissionError(assetRef, 'update', err, asset);
       throw err;
     }
   },
