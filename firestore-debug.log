@@ -1,4 +1,4 @@
-Apr 10, 2026 7:07:04 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
+Apr 13, 2026 8:28:45 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
 INFO: Started WebSocket server on ws://127.0.0.1:9150
 API endpoint: http://127.0.0.1:8080
 If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:
@@ -12,11 +12,11 @@ If you are running a Firestore in Datastore Mode project, run:
 Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
 Dev App Server is now running.
 
-Apr 10, 2026 8:55:07 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel
-INFO: Connected to new websocket client
-Apr 10, 2026 8:55:08 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+Apr 13, 2026 8:28:49 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected non-HTTP/2 connection.
-Apr 10, 2026 8:55:10 AM io.grpc.netty.NettyServerTransport notifyTerminated
+Apr 13, 2026 8:28:49 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected HTTP/2 connection.
+Apr 13, 2026 8:29:19 AM io.grpc.netty.NettyServerTransport notifyTerminated
 INFO: Transport failed
 io.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET / 
 	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
@@ -43,9 +43,9 @@ io.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET /
 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
 	at java.base/java.lang.Thread.run(Thread.java:1583)
 
-Apr 10, 2026 8:55:10 AM io.grpc.netty.NettyServerTransport notifyTerminated
+Apr 13, 2026 8:29:19 AM io.grpc.netty.NettyServerTransport notifyTerminated
 INFO: Transport failed
-io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105c2010005be0303b17aaa00481dbdd89f303d002a
+io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105c2010005be03033ad528e6b3ae191720db6d6712
 	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
 	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:319)
 	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)
@@ -70,3 +70,7 @@ io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missin
 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
 	at java.base/java.lang.Thread.run(Thread.java:1583)
 
+Apr 13, 2026 8:29:20 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel
+INFO: Connected to new websocket client
+Apr 13, 2026 8:29:21 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected non-HTTP/2 connection.

@@ -216,7 +216,7 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   readAuthority: AuthorityNode;
-  activeGrantId: string | null;
+  activeGrantIds: string[]; // Enabled multiple projects
   grants: Grant[];
   uxMode: UXMode;
   onboardingComplete: boolean;

@@ -3,7 +3,7 @@
 /**
  * @fileOverview Settings - Main Operational Control Center.
  * Restoration Pulse: Re-integrated Projects, Personnel, and Folder Setup.
- * Phase 1650: Hardened RBAC and independent folder schema triggers.
+ * Phase 1700: Implemented Multi-Project selection via Checkboxes.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -42,7 +42,8 @@ import {
   SortAsc,
   Trash2,
   Eye,
-  FileDown
+  FileDown,
+  Check
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,6 +52,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { UserManagement } from '@/components/admin/user-management';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
@@ -81,8 +83,8 @@ export function SettingsWorkstation() {
     isOnline, 
     settingsLoaded,
     setActiveView,
-    setActiveGrantId,
-    activeGrantId,
+    activeGrantIds,
+    setSelectedProjectIds,
     assets,
     isSyncing 
   } = useAppState();
@@ -160,6 +162,15 @@ export function SettingsWorkstation() {
     setEditingProjectId(null);
   };
 
+  const toggleProject = (id: string, enabled: boolean) => {
+    if (!draftSettings) return;
+    const current = draftSettings.activeGrantIds || [];
+    const next = enabled 
+      ? [...current, id]
+      : current.filter(cid => cid !== id);
+    handleSettingChange('activeGrantIds', next);
+  };
+
   const handleApplyGlobalSNPatch = async () => {
     if (!assets || assets.length === 0) return;
     setIsPatching(true);
@@ -203,13 +214,17 @@ export function SettingsWorkstation() {
   };
 
   const handleFileImportTemplate = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!draftSettings || !activeGrantId) return;
+    if (!draftSettings) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
       const templates = await parseExcelForTemplate(file);
-      const activeGrantIdx = draftSettings.grants.findIndex(g => g.id === activeGrantId);
+      // For multi-select, we apply to the first selected project as target or ask user
+      const targetId = draftSettings.activeGrantIds[0] || draftSettings.grants[0]?.id;
+      if (!targetId) return;
+
+      const activeGrantIdx = draftSettings.grants.findIndex(g => g.id === targetId);
       if (activeGrantIdx === -1) return;
 
       const nextGrant = { ...draftSettings.grants[activeGrantIdx] };
@@ -252,41 +267,8 @@ export function SettingsWorkstation() {
   );
 
   return (
-    <Tabs defaultValue={isZonalAdmin ? "users" : "general"} className="animate-in fade-in duration-700 h-full flex flex-col relative max-w-6xl mx-auto w-full">
-      {/* 1. Integrated Toolbar Header */}
-      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-1 pb-3 px-1 border-b border-border mb-6 -mx-1 shrink-0">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><SettingsIcon className="h-5 w-5 text-primary" /></div>
-              <div className="space-y-0.5">
-                <h2 className="text-xl font-black uppercase text-foreground tracking-tight leading-none">Settings</h2>
-                <p className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest">Global Governance</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {hasChanges && (
-                <Badge className="bg-orange-500 text-white font-black uppercase text-[8px] h-6 px-3 rounded-full animate-pulse">Pending Changes</Badge>
-              )}
-              <button onClick={() => setActiveView('DASHBOARD')} className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm">
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-          <div className="bg-muted/30 p-0.5 rounded-xl border border-border shadow-inner flex overflow-x-auto no-scrollbar">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
-              <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Environment</TabsTrigger>
-              {isAdmin && <TabsTrigger value="projects" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Projects</TabsTrigger>}
-              {(isAdmin || isZonalAdmin) && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Personnel</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Audit Log</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="health" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest data-[state=active]:bg-background data-[state=active]:text-foreground transition-all">Infrastructure</TabsTrigger>}
-            </TabsList>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Scrollable Workstation Surface */}
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
         <TabsContent value="general" className="space-y-10 m-0 outline-none pb-20">
           <SettingSection title="Visual Identity" description="Surface language settings" icon={Palette}>
             <div className="grid grid-cols-2 gap-3">
@@ -347,7 +329,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="projects" className="space-y-10 m-0 outline-none pb-20">
-          <SettingSection title="Project Directory" description="Active Registry Scope" icon={LayoutGrid}>
+          <SettingSection title="Project Directory" description="Multi-Project Enablement" icon={LayoutGrid}>
             <div className="space-y-8">
               <div className="flex gap-3">
                 <Input 
@@ -367,7 +349,7 @@ export function SettingsWorkstation() {
 
               <div className="space-y-4">
                 {draftSettings.grants.map((grant) => {
-                  const isActive = activeGrantId === grant.id;
+                  const isActive = draftSettings.activeGrantIds?.includes(grant.id);
                   const isRenaming = editingProjectId === grant.id;
 
                   return (
@@ -380,27 +362,38 @@ export function SettingsWorkstation() {
                           <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
                             <FolderOpen className="h-5 w-5" />
                           </div>
-                          {isRenaming ? (
-                            <div className="flex items-center gap-2">
-                              <Input 
-                                value={editProjectValue} 
-                                onChange={(e) => setEditProjectValue(e.target.value)}
-                                className="h-9 bg-background border-primary/40 text-sm font-black uppercase rounded-lg"
-                                autoFocus
-                              />
-                              <Button size="sm" onClick={() => handleRenameProject(grant.id)} className="h-9 w-9 p-0"><CheckCircle2 className="h-4 w-4"/></Button>
-                            </div>
-                          ) : (
-                            <h4 className="text-base font-black uppercase text-foreground leading-none">{grant.name}</h4>
-                          )}
+                          <div className="flex flex-col min-w-0">
+                            {isRenaming ? (
+                              <div className="flex items-center gap-2">
+                                <Input 
+                                  value={editProjectValue} 
+                                  onChange={(e) => setEditProjectValue(e.target.value)}
+                                  className="h-9 bg-background border-primary/40 text-sm font-black uppercase rounded-lg"
+                                  autoFocus
+                                />
+                                <Button size="sm" onClick={() => handleRenameProject(grant.id)} className="h-9 w-9 p-0"><CheckCircle2 className="h-4 w-4"/></Button>
+                              </div>
+                            ) : (
+                              <h4 className="text-base font-black uppercase text-foreground leading-none truncate">{grant.name}</h4>
+                            )}
+                            <span className="text-[8px] font-mono opacity-40 uppercase mt-1">ID: {grant.id.split('-')[0]}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 opacity-40 group-hover/project:opacity-100 transition-opacity">
-                          {!isActive && (
-                            <Button variant="outline" size="sm" onClick={() => setActiveGrantId(grant.id)} className="h-8 rounded-lg font-black text-[8px] uppercase border-2">Set Active</Button>
-                          )}
-                          {!isRenaming && (
-                            <button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="text-[10px] font-black uppercase text-primary hover:underline">Rename</button>
-                          )}
+                        
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-3 pr-6 border-r border-border/40">
+                            <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enabled</span>
+                            <Checkbox 
+                              checked={isActive} 
+                              onCheckedChange={(checked) => toggleProject(grant.id, !!checked)} 
+                              className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-4 opacity-40 group-hover/project:opacity-100 transition-opacity">
+                            {!isRenaming && (
+                              <button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="text-[10px] font-black uppercase text-primary hover:underline">Rename</button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -459,7 +452,6 @@ export function SettingsWorkstation() {
         </TabsContent>
       </div>
 
-      {/* 3. Global Action Pulse */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0">
         <Button 
           variant="ghost" 
@@ -474,7 +466,7 @@ export function SettingsWorkstation() {
           className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3 transition-transform active:scale-95"
         >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />}
-          Commit Protocol
+          Save Settings
         </Button>
       </div>
 
@@ -505,6 +497,6 @@ export function SettingsWorkstation() {
           }}
         />
       )}
-    </Tabs>
+    </div>
   );
 }

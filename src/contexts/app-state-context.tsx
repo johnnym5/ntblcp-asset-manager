@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Deployment Pulse: Hardened sorting protocol and high-availability sync exposure.
+ * Phase 1700: Implemented activeGrantIds (plural) for multi-project concurrency.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -43,13 +44,13 @@ interface AppStateContextType {
   setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
   isHydrated: boolean;
-  activeGrantId: string | null;
+  activeGrantIds: string[];
   activeView: WorkstationView;
   setActiveView: (view: WorkstationView) => void;
   refreshRegistry: () => Promise<void>;
   manualDownload: () => Promise<void>;
   manualUpload: () => Promise<void>;
-  setActiveGrantId: (id: string) => Promise<void>;
+  setSelectedProjectIds: (ids: string[]) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
   
   headers: RegistryHeader[];
@@ -150,7 +151,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [isExplored, setIsExplored] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
-  const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
+  const activeGrantIds = useMemo(() => appSettings?.activeGrantIds || [], [appSettings]);
 
   const refreshRegistry = useCallback(async () => {
     try {
@@ -168,8 +169,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
       
-      const currentGrantId = localSettings?.activeGrantId || null;
-      const filtered = (localAssets || []).filter(a => !currentGrantId || a.grantId === currentGrantId);
+      const currentGrantIds = localSettings?.activeGrantIds || [];
+      const filtered = (localAssets || []).filter(a => currentGrantIds.length === 0 || currentGrantIds.includes(a.grantId));
         
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
@@ -360,14 +361,22 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         setAppSettings(remoteSettings);
         if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) setHeaders(remoteSettings.globalHeaders);
         await storage.saveSettings(remoteSettings);
-        if (remoteSettings.activeGrantId) {
-          const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
-          const localAssets = await storage.getAssets();
-          const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-          const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
-          await storage.saveAssets([...otherAssets, ...taggedRemote]);
-          addNotification({ title: "Protocol Synchronized", variant: "success" });
+        
+        // Parallel multi-project download
+        const currentGrantIds = remoteSettings.activeGrantIds || [];
+        let allRemoteAssets: Asset[] = [];
+        
+        for (const gid of currentGrantIds) {
+          const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
+          allRemoteAssets = [...allRemoteAssets, ...projectAssets];
         }
+
+        const localAssets = await storage.getAssets();
+        const taggedRemote = allRemoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
+        // Keep assets from projects not currently active
+        const otherAssets = localAssets.filter(a => !currentGrantIds.includes(a.grantId));
+        await storage.saveAssets([...otherAssets, ...taggedRemote]);
+        addNotification({ title: "Protocol Synchronized", variant: "success" });
       }
       await refreshRegistry();
     } catch (e) {
@@ -390,9 +399,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantId, activeView, setActiveView: setActiveViewStatus,
+      activeGrantIds, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload,
-      setActiveGrantId: async (id) => { if (!appSettings) return; const next = { ...appSettings, activeGrantId: id }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id }); setAppSettings(next); await refreshRegistry(); },
+      setSelectedProjectIds: async (ids) => { if (!appSettings) return; const next = { ...appSettings, activeGrantIds: ids }; await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ activeGrantIds: ids }); setAppSettings(next); await refreshRegistry(); },
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
