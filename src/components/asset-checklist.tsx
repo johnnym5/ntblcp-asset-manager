@@ -1,18 +1,19 @@
 'use client';
 
 /**
- * @fileOverview AssetDataChecklist - Category-Aware Guidance logic.
- * Correctly identifies that Vehicles do not need standard Serials if Chassis/Engine exists.
- * Phase 1002: Hardened metadata inspection for Chassis/Engine pulses.
+ * @fileOverview AssetDataChecklist - Template-Driven Fidelity Pulse.
+ * Automatically tracks completion based on the folder's configured schema.
+ * Phase 1210: Dynamically resolves items from the sheet definition.
  */
 
 import React from 'react';
 import { 
   CheckCircle2, 
   XCircle, 
-  Info,
+  Tag,
   Car,
-  Laptop
+  Laptop,
+  Database
 } from 'lucide-react';
 import type { Asset } from '@/types/domain';
 import { cn, getFuzzySignature } from '@/lib/utils';
@@ -32,7 +33,7 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
         <Icon className="h-3 w-3" />
       </div>
       <span className={cn(
-        "text-[10px] font-black uppercase tracking-tight transition-colors",
+        "text-[10px] font-black uppercase tracking-tight transition-colors truncate max-w-[180px]",
         isCompleted ? "text-foreground" : "text-foreground/40"
       )}>{label}</span>
     </div>
@@ -47,80 +48,73 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
 );
 
 export function AssetChecklist({ values }: AssetChecklistProps) {
-  const { headers } = useAppState();
+  const { appSettings } = useAppState();
 
-  const checklistHeaders = React.useMemo(() => {
-    return headers.filter(h => h.inChecklist);
-  }, [headers]);
+  // 1. Resolve active template for this asset's category
+  const activeTemplate = React.useMemo(() => {
+    if (!values.category || !appSettings) return null;
+    const grant = appSettings.grants.find(g => 
+      Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(values.category))
+    );
+    if (!grant) return null;
+    const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(values.category));
+    return defKey ? grant.sheetDefinitions[defKey] : null;
+  }, [values.category, appSettings]);
 
-  // Category Logic: Identification of Vehicle vs Electronic Pulse
-  const isVehicle = React.useMemo(() => {
-    const cat = (values.category || '').toLowerCase();
-    return cat.includes('motor') || cat.includes('vehicle');
-  }, [values.category]);
+  // 2. Map completion status using template fields
+  const checklistItems = React.useMemo(() => {
+    if (!activeTemplate) return [];
 
-  const items = checklistHeaders.map(header => {
-    let val: any = "";
-    
-    // Core Domain Mapping
-    switch(header.normalizedName) {
-      case "sn": val = values.sn; break;
-      case "location": val = values.location; break;
-      case "asset_description": val = values.description || values.name; break;
-      case "asset_id_code": val = values.assetIdCode; break;
-      case "serial_number": val = values.serialNumber; break;
-      case "chassis_no": val = values.chassisNo; break;
-      case "engine_no": val = values.engineNo; break;
-      case "asset_class": val = values.category; break;
-      case "condition": val = values.condition; break;
-      default:
-        val = (values as any)[header.normalizedName] || (values.metadata as any)?.[header.rawName];
-    }
+    const isVehicle = (values.category || '').toLowerCase().includes('motor') || (values.category || '').toLowerCase().includes('vehicle');
 
-    // Deep Meta Pulse Inspection
-    if (!val || val === "---" || val === "N/A") {
-      const meta = values.metadata || {};
-      const fuzzyTarget = getFuzzySignature(header.displayName);
-      const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyTarget);
-      if (matchedKey) val = meta[matchedKey];
-    }
+    return activeTemplate.displayFields
+      .filter(f => f.inChecklist)
+      .map(field => {
+        const fieldName = field.key as keyof Asset;
+        let val: any = undefined;
 
-    const sVal = String(val || '').trim().toLowerCase();
-    const isEmpty = !val || sVal === "" || sVal === "---" || sVal === "n/a" || sVal === "nil";
+        // Core prop match
+        if (fieldName in values) {
+          val = (values as any)[fieldName];
+        } else {
+          // Metadata match
+          val = (values.metadata as any)?.[field.label];
+        }
 
-    // Intelligence Override: Vehicles use Chassis/Engine, not standard Serials.
-    let isCompleted = !isEmpty;
-    
-    if (isVehicle) {
-      if (header.normalizedName === 'serial_number') {
-        const hasChassis = !!values.chassisNo || !!(values.metadata as any)?.['Chassis no'] || !!(values.metadata as any)?.['Chasis no'];
-        const hasEngine = !!values.engineNo || !!(values.metadata as any)?.['Engine no'];
-        if (hasChassis || hasEngine) isCompleted = true; // Serial is not required if vehicle anchors exist.
-      }
-    }
+        const isEmpty = !val || String(val).trim() === '' || String(val).trim().toLowerCase() === 'n/a' || String(val).trim().toLowerCase() === '---';
+        
+        // Intelligence Pulse: Vehicles handle Serials differently
+        let isCompleted = !isEmpty;
+        if (isVehicle && field.key === 'serialNumber') {
+          const hasChassis = !!values.chassisNo || !!(values.metadata as any)?.['Chasis no'] || !!(values.metadata as any)?.['Chassis no'];
+          const hasEngine = !!values.engineNo || !!(values.metadata as any)?.['Engine no'];
+          if (hasChassis || hasEngine) isCompleted = true;
+        }
 
-    return {
-      label: header.displayName,
-      completed: isCompleted,
-      icon: isVehicle ? Car : Laptop
-    };
-  });
+        return {
+          label: field.label,
+          completed: isCompleted,
+          icon: isVehicle ? Car : Laptop
+        };
+      });
+  }, [activeTemplate, values]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="space-y-1">
-        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Asset Data Checklist</h3>
-        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">Fidelity Guidance Pulse</p>
+        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Record Fidelity</h3>
+        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">FOLDER-SPECIFIC PULSE</p>
       </div>
 
       <div className="space-y-3">
-        {items.length > 0 ? (
-          items.map((item) => (
+        {checklistItems.length > 0 ? (
+          checklistItems.map((item) => (
             <ChecklistItem key={item.label} {...item} />
           ))
         ) : (
-          <div className="p-4 rounded-xl border-2 border-dashed border-border/40 text-center">
-            <p className="text-[8px] font-black uppercase text-muted-foreground opacity-40 italic">No checklist markers configured</p>
+          <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">
+            <Database className="h-6 w-6 opacity-20" />
+            <p className="text-[8px] font-black uppercase text-muted-foreground opacity-40 italic">Zero checklist markers<br/>configured for this folder</p>
           </div>
         )}
       </div>

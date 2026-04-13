@@ -1,10 +1,9 @@
 "use client";
 
 /**
- * @fileOverview AssetForm - Record Detail Workstation.
- * Hardened: restricted editing based on Admin status or user permission.
- * Phase 1205: Added guidance tooltips explaining header terminology.
- * Phase 1206: Fixed scrolling pulse for high-density field editing.
+ * @fileOverview AssetForm - Dynamic Record Workstation.
+ * Fully Template-Driven: Renders fields based on the Folder's Sheet Definition.
+ * Phase 1210: Eliminated hardcoded fields to prevent "ghost" headers.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -40,20 +39,20 @@ import {
   Activity,
   Tag,
   Info,
+  Database,
   Lock,
-  GitPullRequest
+  Terminal
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
-import { cn } from "@/lib/utils";
+import { cn, getFuzzySignature } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
 import { AssetSchema } from "@/core/registry/validation";
 import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
 import { getCanonicalGroup } from "@/lib/condition-logic";
-import type { Asset, ConditionAuditEntry } from "@/types/domain";
-import { ClassificationEngine } from "@/lib/classification-engine";
+import type { Asset } from "@/types/domain";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { addNotification } from "@/hooks/use-notifications";
 
@@ -85,6 +84,21 @@ export default function AssetForm({
   const canUserEditFull = !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
+  // 1. Resolve Template for current folder
+  const currentTemplate = useMemo(() => {
+    const category = asset?.category || form.watch('category');
+    if (!category || !appSettings) return null;
+    
+    // Find grant that contains this category
+    const grant = appSettings.grants.find(g => 
+      Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(category))
+    );
+    
+    if (!grant) return null;
+    const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(category));
+    return defKey ? grant.sheetDefinitions[defKey] : null;
+  }, [asset?.category, form.watch('category'), appSettings]);
+
   useEffect(() => {
     if (isOpen) {
       if (asset) {
@@ -96,7 +110,7 @@ export default function AssetForm({
           status: 'UNVERIFIED',
           condition: 'New',
           conditionGroup: 'Good',
-          location: '',
+          location: userProfile?.state || '',
           description: '',
           category: '',
           custodian: 'Unassigned',
@@ -126,6 +140,7 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
+        // Approval Logic
         if (!isAdmin && !canUserEditFull && asset) {
           const changes: Partial<Asset> = {};
           (Object.keys(data) as Array<keyof Asset>).forEach(key => {
@@ -146,12 +161,7 @@ export default function AssetForm({
               },
               lastModified: new Date().toISOString()
             };
-            addNotification({
-              title: "Changes Submitted",
-              description: "Sent to Admin for review.",
-              variant: "default",
-              assetId: asset.id
-            });
+            addNotification({ title: "Update Submitted", description: "Your changes are awaiting administrative review.", variant: "default", assetId: asset.id });
           }
         }
 
@@ -161,8 +171,6 @@ export default function AssetForm({
     }
   };
 
-  const formValues = form.watch();
-  
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
@@ -173,7 +181,7 @@ export default function AssetForm({
   };
 
   const LabelWithInfo = ({ label, name }: { label: string, name: string }) => {
-    const header = globalHeaders.find(h => h.normalizedName === name.toLowerCase().replace(/ /g, '_'));
+    const header = globalHeaders.find(h => h.normalizedName === name || getFuzzySignature(h.displayName) === getFuzzySignature(name));
     return (
       <div className="flex items-center gap-2 mb-1.5">
         <FormLabel className="text-[9px] font-black uppercase text-white/40 mb-0">{label}</FormLabel>
@@ -186,12 +194,6 @@ export default function AssetForm({
               <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
                 <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
                 <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
-                {header.example && (
-                  <div className="mt-3 pt-3 border-t border-white/10">
-                    <p className="text-[10px] font-bold text-white/40 uppercase">Example</p>
-                    <p className="text-[10px] font-mono text-primary">{header.example}</p>
-                  </div>
-                )}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -207,11 +209,11 @@ export default function AssetForm({
           <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between">
             <div className="space-y-1">
               <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
-                {asset ? 'Asset Record' : 'New Entry'}
+                {asset ? 'Record Update' : 'New Entry'}
               </DialogTitle>
               <div className="flex items-center gap-2 mt-1.5">
                 <DialogDescription className="text-[9px] sm:text-xs font-bold text-white/40 uppercase tracking-widest truncate">
-                  {asset ? `ID: ${asset.id.split('-')[0]}` : 'Registry Pulse: Manual'}
+                  {asset ? `System ID: ${asset.id.split('-')[0]}` : 'Registry Pulse: Manual'}
                 </DialogDescription>
               </div>
             </div>
@@ -222,44 +224,50 @@ export default function AssetForm({
               <div className="p-6 sm:p-8 space-y-10 sm:space-y-12 pb-32">
                 <Form {...form}>
                   <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 sm:space-y-12">
+                    
+                    {/* Dynamic Template Fields */}
                     <div className="space-y-6">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                        <Tag className="h-3 w-3" /> Technical Core
+                        <Terminal className="h-3 w-3" /> Technical Attributes
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
-                        <FormField control={form.control} name="description" render={({ field }) => (
-                          <FormItem className="sm:col-span-2">
-                            <LabelWithInfo label="Asset Identification" name="asset description" />
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 sm:h-14 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase" placeholder="e.g. Toyota Hilux 2024" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                          <FormItem>
-                            <LabelWithInfo label="Manufacturer Serial" name="serial number" />
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="SN-XXXX-XXXX" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                          <FormItem>
-                            <LabelWithInfo label="NTBLCP Asset ID / Tag" name="asset id code" />
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="NTBLCP/XX/001" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="chassisNo" render={({ field }) => (
-                          <FormItem>
-                            <LabelWithInfo label="Chassis Number (VIN)" name="chassis no" />
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('chassisNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="For vehicles only" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="engineNo" render={({ field }) => (
-                          <FormItem>
-                            <LabelWithInfo label="Engine Number" name="engine no" />
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('engineNo')} className="h-12 bg-white/[0.03] border-white/5 rounded-xl text-sm" placeholder="Unique Motor ID" /></FormControl>
-                          </FormItem>
-                        )}/>
+                        {currentTemplate ? (
+                          currentTemplate.displayFields.map((field) => {
+                            const fieldName = field.key as any;
+                            const isCoreProp = ['description', 'assetIdCode', 'serialNumber', 'chassisNo', 'engineNo', 'location', 'custodian'].includes(fieldName);
+                            
+                            return (
+                              <FormField 
+                                key={field.key} 
+                                control={form.control} 
+                                name={isCoreProp ? fieldName : `metadata.${field.label}`}
+                                render={({ field: formField }) => (
+                                  <FormItem className={field.key === 'description' ? "sm:col-span-2" : ""}>
+                                    <LabelWithInfo label={field.label} name={field.label} />
+                                    <FormControl>
+                                      <Input 
+                                        {...formField} 
+                                        value={formField.value || ''}
+                                        readOnly={isFieldDisabled(fieldName)} 
+                                        className="h-12 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase" 
+                                        placeholder={`Enter ${field.label}...`}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            );
+                          })
+                        ) : (
+                          <div className="col-span-2 py-10 text-center opacity-20 border-2 border-dashed rounded-2xl">
+                            <Database className="h-10 w-10 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Select category to load attributes</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
+                    {/* Assessment Pulse Section */}
                     <div className="p-6 sm:p-8 rounded-[1.5rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                         <Activity className="h-3 w-3" /> Audit Assessment
@@ -289,6 +297,19 @@ export default function AssetForm({
                             </Select>
                           </FormItem>
                         )}/>
+                        <FormField control={form.control} name="remarks" render={({ field }) => (
+                          <FormItem className="sm:col-span-2">
+                            <LabelWithInfo label="Auditor Remarks" name="remarks" />
+                            <FormControl>
+                              <Textarea 
+                                {...field} 
+                                readOnly={isFieldDisabled('remarks')}
+                                className="min-h-[100px] bg-white/[0.03] border-white/5 rounded-xl text-sm italic" 
+                                placeholder="Record site observations..."
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}/>
                       </div>
                     </div>
                   </form>
@@ -298,7 +319,7 @@ export default function AssetForm({
 
             <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 sm:p-8 shrink-0 border-t md:border-t-0 border-white/5 h-full">
               <div className="space-y-10">
-                <AssetChecklist values={formValues as any} />
+                <AssetChecklist values={form.watch() as any} />
               </div>
             </ScrollArea>
           </div>
