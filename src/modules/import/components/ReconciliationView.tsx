@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview ReconciliationView - The Discovery Pulse visualization.
- * Phase 310: Enhanced with Per-Group Validation Summaries and Positional Logging.
- * Phase 311: Fixed alignment of error logs to ensure visibility.
- * Phase 312: High-density formatting for synthetic header pulses.
+ * Phase 1008: Integrated Duplicate/Update metrics into the summary dashboard.
  */
 
 import React from 'react';
@@ -19,7 +17,9 @@ import {
   Search,
   FileWarning,
   CheckCircle,
-  XCircle
+  XCircle,
+  CopyCheck,
+  Plus
 } from 'lucide-react';
 import type { Asset } from '@/types/domain';
 import type { ImportRunSummary } from '@/parser/types';
@@ -37,6 +37,8 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
       total: assets.length,
       valid: assets.filter(a => !(a as any).validation.isRejected).length,
       invalid: assets.filter(a => (a as any).validation.isRejected).length,
+      updates: assets.filter(a => (a as any).validation.isUpdate && !(a as any).validation.isRejected).length,
+      new: assets.filter(a => !(a as any).validation.isUpdate && !(a as any).validation.isRejected).length,
       groupsCount: summary.groups.length
     };
   }, [assets, summary]);
@@ -53,19 +55,31 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black tracking-tighter text-white">{stats.total}</div>
-            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Ingestion Pulse</p>
+            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Incoming Pulses</p>
           </CardContent>
         </Card>
 
         <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl group">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-green-600 flex items-center gap-2">
-              <CheckCircle className="h-3 w-3" /> Fidelity OK
+            <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 flex items-center gap-2">
+              <Plus className="h-3 w-3" /> New Assets
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black tracking-tighter text-green-600">{stats.valid}</div>
-            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Ready for Registry</p>
+            <div className="text-3xl font-black tracking-tighter text-blue-500">{stats.new}</div>
+            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Fresh Registrations</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl group">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-500 flex items-center gap-2">
+              <CopyCheck className="h-3 w-3" /> Existing
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black tracking-tighter text-orange-500">{stats.updates}</div>
+            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Potential Updates</p>
           </CardContent>
         </Card>
 
@@ -77,19 +91,7 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black tracking-tighter text-destructive">{stats.invalid}</div>
-            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Alignment Errors</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 flex items-center gap-2">
-              <LayoutGrid className="h-3 w-3" /> Asset Groups
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black tracking-tighter text-white">{stats.groupsCount}</div>
-            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Folder Nodes</p>
+            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Fidelity Failures</p>
           </CardContent>
         </Card>
       </div>
@@ -97,8 +99,8 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
       {/* 2. Per-Group Structure Review */}
       <div className="space-y-6 px-1">
         <div className="flex items-center justify-between px-1">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Registry Mapping Summary</h4>
-          <Badge variant="outline" className="h-5 px-2 border-primary/20 text-primary bg-primary/5 font-black text-[7px] tracking-widest">POSITIONAL SYNC ACTIVE</Badge>
+          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Data Drift Analysis</h4>
+          <Badge variant="outline" className="h-5 px-2 border-primary/20 text-primary bg-primary/5 font-black text-[7px] tracking-widest">DUPLICATE CHECK ACTIVE</Badge>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -113,14 +115,14 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[7px] font-black px-1.5 h-5">{group.metrics.valid} OK</Badge>
-                  {group.metrics.invalid > 0 && <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[7px] font-black px-1.5 h-5">{group.metrics.invalid} ERR</Badge>}
+                  <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[7px] font-black px-1.5 h-5">{group.metrics.new} NEW</Badge>
+                  {group.metrics.updates > 0 && <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[7px] font-black px-1.5 h-5">{group.metrics.updates} UPDATE</Badge>}
                 </div>
               </div>
               
               <CardContent className="p-5 space-y-5">
                 <div className="space-y-2">
-                  <p className="text-[8px] font-black uppercase text-white/20 tracking-widest">Mapped Target Schema</p>
+                  <p className="text-[8px] font-black uppercase text-white/20 tracking-widest">Inferred Target Schema</p>
                   <ScrollArea className="w-full">
                     <div className="flex gap-1.5 pb-2">
                       {group.headerSet.map((h, i) => (
@@ -135,7 +137,7 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-destructive pl-1">
                       <FileWarning className="h-3 w-3" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Rejection Logs</span>
+                      <span className="text-[8px] font-black uppercase tracking-widest">Rejection Trace</span>
                     </div>
                     <ScrollArea className="h-24 rounded-xl bg-destructive/[0.03] border border-destructive/20 p-3">
                       <div className="space-y-2">

@@ -46,7 +46,7 @@ export interface DiscoveredGroup {
 
 export interface ValidationLog {
   rowNumber: number;
-  type: 'header_mismatch' | 'missing_columns' | 'extra_columns' | 'empty_row' | 'unassigned_group';
+  type: 'header_mismatch' | 'missing_columns' | 'extra_columns' | 'empty_row' | 'unassigned_group' | 'duplicate_identity';
   message: string;
   rawData: any[];
 }
@@ -57,6 +57,8 @@ export interface ValidationSummary {
   duplicateFlags: string[];
   needsReview: boolean;
   isRejected: boolean;
+  isUpdate: boolean; // Flag indicating the record already exists in the DB
+  existingAssetId?: string; // Reference to the existing record
   logs: ValidationLog[];
 }
 
@@ -74,6 +76,8 @@ export interface GroupImportContainer extends DiscoveredGroup {
   metrics: {
     valid: number;
     invalid: number;
+    updates: number;
+    new: number;
   };
 }
 

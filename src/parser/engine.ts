@@ -3,8 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
- * Phase 1004: Added support for 20-column synthetic templates (Additional Assets).
- * Phase 1005: Added mapping for Chassis and Engine numbers.
+ * Phase 1006: Implemented Duplicate Detection & Identity Fingerprinting.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -56,7 +55,6 @@ export class ParserEngine {
       }
       
       if (type === 'DATA_ROW' && pendingGroupLabel) {
-        // Handle Headerless Data Blocks
         const matchedTpl = this.matchOrGenerateTemplate(row);
         activeGroup = this.createNewGroup(pendingGroupLabel, matchedTpl, 'inferred', idx, sheetName);
         discovered.push(activeGroup);
@@ -77,7 +75,11 @@ export class ParserEngine {
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     return selectedGroups.map(group => {
       const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
-      const container: GroupImportContainer = { ...group, assets: [], metrics: { valid: 0, invalid: 0 } };
+      const container: GroupImportContainer = { 
+        ...group, 
+        assets: [], 
+        metrics: { valid: 0, invalid: 0, updates: 0, new: 0 } 
+      };
       if (!tpl) return container;
 
       for (let i = group.startRow; i <= group.endRow; i++) {
@@ -88,10 +90,13 @@ export class ParserEngine {
         if (rowType === 'DATA_ROW') {
           const asset = this.mapRowToTemplate(rowData, tpl, group, i);
           container.assets.push(asset);
+          
           if (asset.validation.isRejected) {
             container.metrics.invalid++;
           } else {
             container.metrics.valid++;
+            if (asset.validation.isUpdate) container.metrics.updates++;
+            else container.metrics.new++;
           }
         }
       }
@@ -114,7 +119,7 @@ export class ParserEngine {
         importedAt: new Date().toISOString() 
       },
       metadata: {},
-      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
+      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, isUpdate: false, logs: [] },
       hierarchy: { 
         document: group.sheetName, 
         section: group.groupName, 
@@ -151,16 +156,18 @@ export class ParserEngine {
       }
     });
 
-    // Normalization
+    // 1. Normalization
     if (asset.location) {
       const pulse = LocationEngine.normalize(asset.location);
       asset.location = pulse.normalized;
-      asset.normalizedState = pulse.state;
-      asset.normalizedZone = pulse.zone;
     }
 
-    if (asset.custodian) {
-      asset.custodian = asset.custodian.trim().replace(/\b\w/g, (l: string) => l.toUpperCase());
+    // 2. Identity Check: Compare against existing assets to prevent duplicates
+    const existing = this.findExistingAsset(asset);
+    if (existing) {
+      asset.validation.isUpdate = true;
+      asset.validation.existingAssetId = existing.id;
+      // We don't overwrite the generated ID yet, we just flag it
     }
 
     const hasIdentification = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
@@ -176,6 +183,35 @@ export class ParserEngine {
     }
 
     return asset as ParsedAsset;
+  }
+
+  /**
+   * Performs an identity match against the existing local registry.
+   */
+  private findExistingAsset(parsed: Partial<Asset>): Asset | undefined {
+    if (!this.existingAssets || this.existingAssets.length === 0) return undefined;
+
+    const parsedIdCode = getFuzzySignature(parsed.assetIdCode);
+    const parsedSN = getFuzzySignature(parsed.serialNumber);
+    const parsedChassis = getFuzzySignature(parsed.chassisNo);
+    const parsedDesc = getFuzzySignature(parsed.description);
+    const parsedShortSN = getFuzzySignature(parsed.sn);
+
+    return this.existingAssets.find(ex => {
+      // Priority 1: NTBLCP Asset ID Tag Match
+      if (parsedIdCode && parsedIdCode !== 'na' && parsedIdCode === getFuzzySignature(ex.assetIdCode)) return true;
+      
+      // Priority 2: Chassis Number Match (Vehicles)
+      if (parsedChassis && parsedChassis !== 'na' && parsedChassis === getFuzzySignature(ex.chassisNo)) return true;
+
+      // Priority 3: Serial Number Match (Electronics)
+      if (parsedSN && parsedSN !== 'na' && parsedSN === getFuzzySignature(ex.serialNumber)) return true;
+
+      // Priority 4: Combination Match (Description + S/N from register)
+      if (parsedDesc && parsedShortSN && parsedDesc === getFuzzySignature(ex.description) && parsedShortSN === getFuzzySignature(ex.sn)) return true;
+
+      return false;
+    });
   }
 
   private createNewGroup(name: string, tpl: HeaderTemplate, source: HeaderSource, start: number, sheet: string): DiscoveredGroup {
@@ -216,7 +252,6 @@ export class ParserEngine {
   }
 
   private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
-    // Check if we have an existing template with similar column count
     for (const tpl of this.templates.values()) {
       if (Math.abs(tpl.columnCount - row.length) <= 1) return tpl;
     }
@@ -237,7 +272,6 @@ export class ParserEngine {
   }
 
   private getSyntheticHeaders(count: number): string[] {
-    // 20-column template identified in "Additional Assets" / "Additions" groups
     if (count >= 19 && count <= 21) {
       return [
         'S/N', 'Location', 'Assignee', 'Asset Description', 'Asset ID Code',
