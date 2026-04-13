@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Waiting Updates - Cloud Synchronization.
+ * Phase 180: Added Upload button and standardized terminology.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -21,7 +22,8 @@ import {
   Loader2, 
   ChevronRight, 
   Info,
-  ShieldCheck
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,7 +54,7 @@ import {
 } from "@/components/ui/accordion";
 
 export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
-  const { isSyncing, refreshRegistry, manualDownload, isOnline, setIsOnline } = useAppState();
+  const { isSyncing, refreshRegistry, manualDownload, manualUpload, isOnline, setIsOnline } = useAppState();
   const { toast } = useToast();
   
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
@@ -73,15 +75,6 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
   const recentQueue = useMemo(() => {
     return [...queue].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
-  }, [queue]);
-
-  const opGroups = useMemo(() => {
-    return {
-      CREATE: queue.filter(q => q.operation === 'CREATE'),
-      UPDATE: queue.filter(q => q.operation === 'UPDATE'),
-      DELETE: queue.filter(q => q.operation === 'DELETE'),
-      RESTORE: queue.filter(q => q.operation === 'RESTORE'),
-    };
   }, [queue]);
 
   const handleToggleSelect = (id: string) => {
@@ -197,7 +190,8 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase"><Download className="h-4 w-4 mr-2" /> Download</Button>
-              <Button onClick={() => setIsFullViewOpen(true)} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Review Changes</Button>
+              <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline || pendingCount === 0} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase text-primary border-primary/20"><Upload className="h-4 w-4 mr-2" /> Upload Changes</Button>
+              <Button onClick={() => setIsFullViewOpen(true)} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Review Registry</Button>
             </div>
           </div>
           <div className="space-y-2">

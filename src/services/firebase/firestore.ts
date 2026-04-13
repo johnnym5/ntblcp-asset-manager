@@ -1,7 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
  * Forensic update: Captures diffs and previous state automatically for the audit trail.
- * Phase 1105: Implemented State Scope Chunking to bypass Firestore "IN" limit of 30.
  */
 
 import { 
@@ -51,17 +50,12 @@ export const FirestoreService = {
     });
   },
 
-  /**
-   * Fetches assets for projects. 
-   * Hardened: Handles Firestore's 30-item limit for "IN" queries by chunking.
-   */
   async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
     
     const hasStates = stateScopes && stateScopes.length > 0 && !stateScopes.includes('All');
     
-    // Helper to execute query and return assets
     const fetchChunk = async (q: any) => {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
@@ -69,7 +63,6 @@ export const FirestoreService = {
 
     try {
       if (hasStates) {
-        // Firestore limits 'in' queries to 30 items. Nigeria has 37 states.
         const CHUNK_SIZE = 30;
         const stateChunks = [];
         for (let i = 0; i < stateScopes!.length; i += CHUNK_SIZE) {
@@ -79,7 +72,7 @@ export const FirestoreService = {
         let allAssets: Asset[] = [];
         for (const chunk of stateChunks) {
           let q;
-          if (grantId === 'ALL_PROJECTS') {
+          if (grantId === 'ALL_PROJECTS' || grantId === 'ALL') {
             q = query(assetsRef, where('location', 'in', chunk));
           } else {
             q = query(assetsRef, where('grantId', '==', grantId), where('location', 'in', chunk));
@@ -89,9 +82,8 @@ export const FirestoreService = {
         }
         return allAssets;
       } else {
-        // No state filtering
         let q;
-        if (grantId === 'ALL_PROJECTS') {
+        if (grantId === 'ALL_PROJECTS' || grantId === 'ALL') {
           q = query(assetsRef, orderBy('location'));
         } else {
           q = query(assetsRef, where('grantId', '==', grantId));
@@ -115,7 +107,11 @@ export const FirestoreService = {
     try {
       const currentSnap = await getDoc(assetRef);
       if (currentSnap.exists()) {
-        oldData = currentSnap.data();
+        const snapData = currentSnap.data();
+        // Capture a clean version of the old state (without nested previousState) for the buffer
+        const { previousState, ...cleanOldData } = snapData;
+        oldData = cleanOldData;
+
         const keys = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks'];
         keys.forEach(k => {
           const oldVal = (oldData as any)[k];
@@ -160,15 +156,15 @@ export const FirestoreService = {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     const snap = await getDoc(assetRef);
-    if (!snap.exists()) throw new Error("Document not found");
+    if (!snap.exists()) throw new Error("Record not found");
 
     const asset = snap.data() as Asset;
-    if (!asset.previousState) throw new Error("No previous state detected");
+    if (!asset.previousState) throw new Error("No previous version found");
 
     const restoredAsset = {
       ...asset,
       ...asset.previousState,
-      previousState: null, // Clear the buffer after restore
+      previousState: null, 
       lastModified: new Date().toISOString(),
       lastModifiedBy: performedBy
     };
@@ -181,7 +177,7 @@ export const FirestoreService = {
       operation: 'RESTORE',
       performedBy,
       userState: 'System',
-      details: 'Deterministic rollback initiated.'
+      details: 'Deterministic rollback performed.'
     });
   },
 

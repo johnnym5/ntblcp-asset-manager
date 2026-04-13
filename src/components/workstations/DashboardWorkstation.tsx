@@ -33,7 +33,8 @@ import {
   XCircle,
   GitPullRequest,
   Terminal,
-  Database
+  Database,
+  Upload
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -61,7 +62,8 @@ export function DashboardWorkstation() {
     refreshRegistry,
     assets,
     headers,
-    setGroupsViewMode
+    manualUpload,
+    isOnline
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -78,7 +80,6 @@ export function DashboardWorkstation() {
   // Ledger Data State
   const [pendingSync, setPendingSync] = useState<OfflineQueueEntry[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
-  const [myAuditRequests, setMyAuditRequests] = useState<Asset[]>([]);
 
   // --- Load Ledger ---
   useEffect(() => {
@@ -89,14 +90,12 @@ export function DashboardWorkstation() {
       ]);
       setPendingSync(queue.filter(q => q.status === 'PENDING' || q.status === 'FAILED'));
       setRecentActivity(logs);
-      setMyAuditRequests(assets.filter(a => a.approvalStatus === 'PENDING' && a.changeSubmittedBy?.loginName === userProfile?.loginName));
     };
     loadLedger();
     const interval = setInterval(loadLedger, 5000);
     return () => clearInterval(interval);
   }, [assets, userProfile]);
 
-  // --- Data Calculations ---
   const glanceAssets = useMemo(() => {
     return [...assets].sort(() => 0.5 - Math.random()).slice(0, 8);
   }, [assets, randomSeed]);
@@ -335,7 +334,12 @@ export function DashboardWorkstation() {
                       </div>
                     ))}
                   </div>
-                  <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Changes</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="flex-1 h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Changes</Button>
+                    <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline || pendingSync.length === 0} className="flex-1 h-10 rounded-xl font-black uppercase text-[9px] border-2 gap-2 text-primary border-primary/20">
+                      <Upload className="h-3 w-3" /> Upload
+                    </Button>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
 
@@ -367,7 +371,6 @@ export function DashboardWorkstation() {
         </Card>
       </div>
 
-      {/* Overlay: Asset Dossier */}
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
