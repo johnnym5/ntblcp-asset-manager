@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Asset Hub - Main Registry Workstation.
+ * @fileOverview Asset Registry - Main Management Workstation.
  * Deployment Pulse: Hardened sorting protocol and independent folder independence.
  * Optimized: Adaptive density for mobile/desktop workstations.
  */
@@ -31,7 +31,8 @@ import {
   Trash2,
   TrendingUp,
   Activity,
-  Wrench
+  Wrench,
+  Tag
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import AssetForm from '@/components/asset-form';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord, normalizeHeaderName } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -81,6 +83,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     filteredAssets,
+    assets,
     headers: workstationHeaders,
     setHeaders: setWorkstationHeaders,
     refreshRegistry,
@@ -100,6 +103,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsFilterOpen,
     isSortOpen,
     setIsSortOpen,
+    filters,
+    setFilters,
     itemsPerPage,
     setItemsPerPage,
     activeFilterCount,
@@ -184,14 +189,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
-    filteredAssets.forEach(a => {
+    assets.forEach(a => {
       const cat = a.category || 'Uncategorized';
       if (!stats[cat]) stats[cat] = { total: 0, verified: 0 };
       stats[cat].total++;
       if (a.status === 'VERIFIED') stats[cat].verified++;
     });
     return stats;
-  }, [filteredAssets]);
+  }, [assets]);
 
   const categories = useMemo(() => {
     const allKnownFolders = Object.keys(mergedSheetDefinitions).sort();
@@ -228,6 +233,27 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
     return results;
   }, [filteredAssets, sortKey, sortDir, selectedCategories, workstationHeaders]);
+
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    workstationHeaders.forEach(header => {
+      const values = new Set<string>();
+      // Use full active assets pool for filter options to prevent faceted dead-ends
+      assets.filter(a => activeGrantIds.includes(a.grantId)).forEach(asset => {
+        let val = "";
+        switch(header.normalizedName) {
+          case "location": val = asset.location; break;
+          case "condition": val = asset.condition; break;
+          case "status": val = asset.status; break;
+          case "asset_class": val = asset.category; break;
+          default: val = String((asset.metadata as any)?.[header.rawName] || "");
+        }
+        if (val && val !== "---") values.add(val);
+      });
+      map[header.id] = Array.from(values).sort();
+    });
+    return map;
+  }, [workstationHeaders, assets, activeGrantIds]);
 
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / (itemsPerPage as number)), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * (itemsPerPage as number), currentPage * (itemsPerPage as number)), [processedAssets, currentPage, itemsPerPage]);
@@ -286,7 +312,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       setIsHeaderEditingMode(false);
-      addNotification({ title: "Layout Pulse Synchronized", variant: "success" });
+      addNotification({ title: "Layout Saved", variant: "success" });
     } catch (e) {
       addNotification({ title: "Save Failed", variant: "destructive" });
     } finally {
@@ -425,10 +451,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </AnimatePresence>
             <div className="space-y-0.5 min-w-0">
               <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[300px]">
-                {showList ? (selectedCategories[0] || 'Asset Hub') : 'Asset Registry'}
+                {showList ? (selectedCategories[0] || 'Asset Registry') : 'Asset Registry'}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                {showList ? `${processedAssets.length} Records Discovered` : `${filteredAssets.length} Total Registered Nodes`}
+                {showList ? `${processedAssets.length} Records Discovered` : `${filteredAssets.length} Total Registered Records`}
               </p>
             </div>
           </div>
@@ -461,6 +487,46 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   className="h-5 w-5 rounded-lg border-2 border-border data-[state=checked]:bg-primary" 
                 />
                 <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer hidden sm:block">Select Page</label>
+              </div>
+
+              {/* Advanced Controls Cluster */}
+              <div className="flex items-center gap-2 shrink-0">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setIsSortOpen(true)}
+                        className={cn("h-10 w-10 rounded-lg transition-all", isSortOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Sort Records</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setIsFilterOpen(true)}
+                        className={cn("h-10 w-10 rounded-lg transition-all relative", isFilterOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
+                      >
+                        <Filter className="h-4 w-4" />
+                        {activeFilterCount > 0 && (
+                          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg">
+                            {activeFilterCount}
+                          </span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[8px] font-black uppercase">Filter Registry</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
 
               <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0">
@@ -690,7 +756,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AssetForm 
         isOpen={isFormOpen} 
         onOpenChange={setIsFormOpen} 
-        asset={filteredAssets.find(a => a.id === selectedAssetIdForEdit)} 
+        asset={processedAssets.find(a => a.id === selectedAssetIdForEdit)} 
         isReadOnly={false} 
         onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
       />
@@ -716,6 +782,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         sortBy={sortKey} 
         sortDirection={sortDir} 
         onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
+      />
+
+      <FilterDrawer 
+        isOpen={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        headers={workstationHeaders}
+        activeFilters={filters}
+        onUpdateFilters={setFilters}
+        optionsMap={optionsMap}
       />
 
       <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
@@ -762,7 +837,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           sheetDefinition={selectedSheetDef}
           originalSheetName={originalSheetName}
           onSave={(orig, newDef, all) => {
-            // Find which grant this definition belongs to
             const grant = appSettings?.grants.find(g => g.sheetDefinitions[orig || ''] || g.sheetDefinitions[newDef.name]);
             if (!grant) return;
 
@@ -785,7 +859,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               setAppSettings(nextSettings);
               storage.saveSettings(nextSettings);
               if (isOnline) FirestoreService.updateSettings(nextSettings);
-              addNotification({ title: "Folder Layout Synchronized", variant: "success" });
+              addNotification({ title: "Folder Layout Saved", variant: "success" });
             }
           }}
         />

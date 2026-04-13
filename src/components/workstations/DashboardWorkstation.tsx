@@ -372,7 +372,10 @@ export function DashboardWorkstation() {
                       <div key={l.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
                         <span className="text-[9px] font-bold text-muted-foreground truncate w-20">{l.performedBy}</span>
                         <span className="text-[10px] font-black uppercase truncate flex-1 px-4">{l.assetDescription}</span>
-                        <Badge variant="outline" className="text-[7px] font-black border-primary/20 text-primary">{l.operation}</Badge>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[8px] font-mono opacity-40">{formatDistanceToNow(new Date(l.timestamp), { addSuffix: true })}</span>
+                          <Badge variant="outline" className="text-[7px] font-black border-primary/20 text-primary">{l.operation}</Badge>
+                        </div>
                       </div>
                     ))}
                   </div>

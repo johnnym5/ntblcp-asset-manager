@@ -251,6 +251,31 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       });
     }
 
+    // Header-based Filter Pulse
+    if (filters.length > 0) {
+      filters.forEach(filter => {
+        const header = headers.find(h => h.id === filter.headerId);
+        if (!header) return;
+        
+        results = results.filter(asset => {
+          let val = "";
+          switch(header.normalizedName) {
+            case "location": val = asset.location; break;
+            case "condition": val = asset.condition; break;
+            case "status": val = asset.status; break;
+            case "asset_class": val = asset.category; break;
+            default: val = String((asset.metadata as any)?.[header.rawName] || "");
+          }
+          
+          if (filter.operator === 'in') {
+            const allowed = (filter.value as string[]) || [];
+            return allowed.includes(val);
+          }
+          return true;
+        });
+      });
+    }
+
     if (sortKey) {
       const activeHeader = headers.find(h => h.id === sortKey);
       if (activeHeader) {
@@ -273,7 +298,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
 
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers]);
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, filters]);
 
   const locationOptions = useMemo(() => {
     const map = new Map<string, { label: string, count: number }>();
@@ -374,7 +399,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveViewStatus('REGISTRY'); },
       isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
-      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0),
+      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0) + filters.length,
       groupsViewMode, setGroupsViewMode
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
