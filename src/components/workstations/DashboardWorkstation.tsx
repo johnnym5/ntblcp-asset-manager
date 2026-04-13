@@ -149,7 +149,7 @@ export function DashboardWorkstation() {
 
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
-    const asset = assets.find(a => a.id === selectedAssetId);
+    const asset = assets.find(a => a.id === id);
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
