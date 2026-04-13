@@ -3,8 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Governance Control Center.
  * Standardized terminology for professional asset management.
- * Implemented Concurrent Multi-Project Selection and Integrated Ingestion.
- * Phase 1106: Added per-sheet visibility toggles for admins.
+ * Implemented Concurrent Multi-Project Selection and Integrated Import.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -417,7 +416,7 @@ export function SettingsWorkstation() {
                                   onClick={(e) => { e.stopPropagation(); setActiveView('IMPORT'); }}
                                   className="h-9 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest gap-2 shadow-sm"
                                 >
-                                  <FileUp className="h-3.5 w-3.5" /> Import Data
+                                  <FileUp className="h-3.5 w-3.5" /> Import Assets
                                 </Button>
                             </div>
 

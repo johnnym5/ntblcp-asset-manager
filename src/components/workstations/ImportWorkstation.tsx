@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Controlled Asset Ingestion & Reconciliation.
+ * @fileOverview ImportWorkstation - Controlled Asset Ingestion & Review.
  * Phase 1007: Implemented Choice-Based Conflict Resolution (Skip vs Overwrite).
+ * Phase 1008: Fixed activeGrantId resolution logic to prevent 'nothing happening' on apply.
  */
 
 import React, { useState, useRef } from 'react';
@@ -49,7 +50,7 @@ export function ImportWorkstation() {
   const { 
     assets: existingAssets, 
     refreshRegistry, 
-    activeGrantId, 
+    activeGrantIds, // Use the array from context
     setDataSource, 
     setActiveView, 
     appSettings,
@@ -142,8 +143,14 @@ export function ImportWorkstation() {
   };
 
   const handleCommitToRegistry = async () => {
-    if (!activeGrantId || !appSettings) {
-      addNotification({ title: "No Active Project", variant: "destructive" });
+    const targetGrantId = activeGrantIds[0]; // Determine target project
+    
+    if (!targetGrantId || !appSettings) {
+      addNotification({ 
+        title: "No Project Selected", 
+        description: "Please enable at least one project in Settings first.",
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -166,7 +173,7 @@ export function ImportWorkstation() {
       for (const asset of assetsToProcess) {
         const finalAsset = { 
           ...asset, 
-          grantId: activeGrantId,
+          grantId: targetGrantId,
           // If it's an update, use the existing ID to overwrite the record
           ...(asset.validation.isUpdate && { id: asset.validation.existingAssetId })
         };
@@ -257,7 +264,7 @@ export function ImportWorkstation() {
               <div className="p-10 rounded-[3rem] bg-[#0A0A0A] border-2 border-primary/20 space-y-10 shadow-3xl">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Conflict Strategy</h4>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Conflict Resolution</h4>
                     <p className="text-sm font-medium text-white/40 italic">How should the system handle {updatesCount} existing records?</p>
                   </div>
                   <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-full">ACTION REQUIRED</Badge>
@@ -309,7 +316,7 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
               <div className="p-16 bg-green-500/10 rounded-[4rem] text-green-600 border border-green-500/20"><CheckCircle2 className="h-24 w-20" /></div>
               <div className="space-y-2">
-                <h3 className="text-4xl font-black uppercase text-white">Ingestion Complete</h3>
+                <h3 className="text-4xl font-black uppercase text-white">Import Complete</h3>
                 <p className="text-sm font-medium text-white/40 italic">Registry state updated deterministically.</p>
               </div>
               <div className="flex gap-4">
