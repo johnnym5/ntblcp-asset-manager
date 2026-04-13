@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Centralized workstation routing and global navigation.
+ * @fileOverview Root Shell - Dashboard Command Hub.
+ * Standardized terminology for professional asset management.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -196,7 +196,7 @@ export default function SPAHub() {
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
                 <TactileMenu 
-                  title="Registry Navigation"
+                  title="System Navigation"
                   options={[
                     { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
                     { label: 'Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
@@ -218,7 +218,7 @@ export default function SPAHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="Quick Jumps"
+            title="Registry Jumps"
             options={[
               { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
               { label: 'Registry', icon: Boxes, onClick: () => setActiveView('REGISTRY') },
@@ -230,7 +230,7 @@ export default function SPAHub() {
               {!isMobile && (
                 <div className="flex flex-col text-left">
                   <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'ASSESSMENT' : 'GOVERNANCE'}</span>
+                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'ASSESSMENT' : 'MANAGEMENT'}</span>
                 </div>
               )}
             </button>
@@ -261,16 +261,16 @@ export default function SPAHub() {
                 <Search className="h-3.5 w-3.5 text-primary" />
                 <input 
                   autoFocus
-                  placeholder="Search Registry..."
+                  placeholder="Search..."
                   className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
                   onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
                 />
-                <button onClick={() => { setIsMobileSearchOpen(false); setSearchTerm(''); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                <button onClick={() => { setIsMobileSearchOpen(false); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
               </motion.div>
             ) : (
               <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
                 <Search className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Global Registry Search...</span>
                 <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
               </button>
             )}
@@ -296,7 +296,7 @@ export default function SPAHub() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
+                <TooltipContent className="text-[8px] font-black uppercase">Review Requests</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -306,8 +306,8 @@ export default function SPAHub() {
             onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
             className="flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer"
           >
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Pull Cloud</TooltipContent></Tooltip></TooltipProvider>
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Push Changes</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
           </div>
 
           <div className="relative">
@@ -320,9 +320,6 @@ export default function SPAHub() {
               <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
               {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
             </button>
-            <AnimatePresence>
-              {activeToast && <BellNotificationToast notification={activeToast} />}
-            </AnimatePresence>
           </div>
 
           <DropdownMenu>

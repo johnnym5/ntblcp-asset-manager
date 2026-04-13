@@ -1,6 +1,6 @@
 # Assetain | Professional Asset Intelligence
 
-**Assetain** is a mission-critical Asset Management and Verification platform designed for high-integrity operations in challenging environments. Built with a "Local-First" philosophy, it ensures 100% data availability even in remote areas without internet, while providing forensic-level traceability for all registry modifications.
+**Assetain** is a mission-critical Asset Management and Verification platform designed for high-integrity operations. Built with a "Local-First" philosophy, it ensures 100% data availability even in remote areas without internet, while providing forensic-level traceability for all registry modifications.
 
 ---
 
@@ -18,7 +18,7 @@ Assetain uses a triple-layer storage architecture to ensure maximum resilience:
 ### 1. Dashboard (Overview)
 Your primary mission-control hub.
 *   **Asset Summary**: Real-time statistical counters for the entire registry (Total Assets, Good Condition, Critical State, etc.).
-*   **Problem Assets**: An interactive scanner that highlights assets with missing data, discrepancies, or critical conditions.
+*   **Problem Assets**: An interactive scanner that highlights records with missing data, discrepancies, or critical conditions.
 *   **Quick Samples**: A high-fidelity carousel for browsing sample records from your assigned regional scope.
 *   **Activity Ledger**: A collapsible feed showing recent sync status and audit requests.
 
@@ -27,7 +27,7 @@ The core database workspace for managing asset folders.
 *   **Folder View**: Browse assets grouped by logical categories (e.g., Laptops, Motorcycles, Vehicles).
 *   **Multi-Project Support**: Enable and view multiple projects (e.g., TB and C19) concurrently in a single unified view.
 *   **Advanced Table & Cards**: Switch between a high-density table for desktop or an interactive card grid for mobile assessment.
-*   **Technical Dossier**: A comprehensive profile view for every asset, including history, fidelity checklists, and visual evidence.
+*   **Technical Dossier**: A comprehensive profile view for every asset, including history, data checklists, and visual evidence.
 
 ### 3. Field Assessment (Verification)
 A specialized workflow optimized for on-site auditors.
@@ -44,7 +44,7 @@ A deterministic trace of every single modification made to the registry.
 The administrative control center for registry orchestration.
 *   **General Settings**: Manage visual themes and your personal system access passcode.
 *   **Project Scope**: Enable/disable projects, add new grants, and manage asset folder definitions (Rename, Delete, and Setup).
-*   **Personnel Directory**: Provision system auditors, assign regional state scopes, and manage cryptographic access levels.
+*   **Personnel Directory**: Provision system auditors, assign regional state scopes, and manage access levels.
 *   **System Health**: Access granular database explorer tools and error audits (Super-Admin only).
 
 ### 6. Sync Status (Connectivity)

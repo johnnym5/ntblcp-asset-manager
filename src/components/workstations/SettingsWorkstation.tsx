@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Operational Control Center.
- * Standardized terminology for Asset Management.
- * Implemented Multi-Project selection and persistent Import controls.
+ * @fileOverview SettingsWorkstation - Governance Control Center.
+ * Standardized terminology for professional asset management.
+ * Implemented Concurrent Multi-Project Selection and Integrated Ingestion.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -38,7 +38,9 @@ import {
   ScanSearch,
   Database,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Save,
+  ShieldAlert
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -288,7 +290,7 @@ export function SettingsWorkstation() {
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="projects" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
-                <LayoutGrid className="h-3.5 w-3.5" /> Projects
+                <LayoutGrid className="h-3.5 w-3.5" /> Project Scope
               </TabsTrigger>
             )}
             {isAdmin && (
@@ -328,12 +330,12 @@ export function SettingsWorkstation() {
                     <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Min. 4 characters" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm Passcode</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm New Passcode</Label>
                     <Input type="password" value={confirmPasscode} onChange={(e) => setConfirmPasscode(e.target.value)} placeholder="Repeat passcode" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
                   <Button onClick={handleUpdatePasscode} disabled={isUpdatingPasscode || !newPasscode} className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl">
                     {isUpdatingPasscode ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldIcon className="h-4 w-4 mr-2" />}
-                    Update Passcode
+                    Save New Passcode
                   </Button>
                 </div>
               </SettingSection>
@@ -357,10 +359,10 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="projects" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Project Scope" description="Concurrent Multi-Project View" icon={LayoutGrid}>
+              <SettingSection title="Project Management" description="Concurrent Multi-Project View" icon={LayoutGrid}>
                 <div className="space-y-8">
                   <div className="flex gap-3">
-                    <Input placeholder="Project Name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
+                    <Input placeholder="Enter new project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
                     <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Add Project</Button>
                   </div>
                   <div className="space-y-4">
@@ -378,15 +380,27 @@ export function SettingsWorkstation() {
                               </div>
                               <div className="flex flex-col min-w-0">
                                 {isEditing ? (
-                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}><Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-8 w-48 text-sm font-black uppercase" /><Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8"><Check className="h-4 w-4" /></Button></div>
+                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}><Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-8 w-48 text-sm font-black uppercase" /><Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
                                 ) : (
                                   <div className="flex items-center gap-2"><h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4><button onClick={(e) => { e.stopPropagation(); setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all"><Edit3 className="h-3.5 w-3.5" /></button></div>
                                 )}
-                                <span className="text-[8px] font-mono opacity-40 uppercase">ID: {grant.id.split('-')[0]}</span>
+                                <span className="text-[8px] font-mono opacity-40 uppercase">System ID: {grant.id.split('-')[0]}</span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 pr-6 border-r border-border/40">
-                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable</span>
+                            
+                            <div className="flex items-center gap-4 px-6 border-x border-border/40">
+                               <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); setActiveView('IMPORT'); }}
+                                  className="h-9 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest gap-2 shadow-sm"
+                                >
+                                  <FileUp className="h-3.5 w-3.5" /> Import Data
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-3 pl-6">
+                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable Scope</span>
                               <Checkbox checked={isEnabled} onCheckedChange={(checked) => toggleProjectEnablement(grant.id, !!checked)} className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
                             </div>
                           </div>
@@ -394,17 +408,9 @@ export function SettingsWorkstation() {
                           {isExpanded && (
                             <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
                               <div className="flex items-center justify-between px-1">
-                                <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Registered Folder Nodes</h4>
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Registered Folder List</h4>
                                 <div className="flex items-center gap-2">
                                   <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Import Template</Button>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => { setActiveView('IMPORT'); }}
-                                    className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 bg-primary/5 border-primary/20 text-primary"
-                                  >
-                                    <ScanSearch className="h-3 w-3" /> Import Assets
-                                  </Button>
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -449,9 +455,9 @@ export function SettingsWorkstation() {
       </Tabs>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0 z-50">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Exit Settings</Button>
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Discard Changes</Button>
         <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl gap-3">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />} Apply Global Settings
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Settings
         </Button>
       </div>
 

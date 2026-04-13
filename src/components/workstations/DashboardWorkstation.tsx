@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Dashboard Center - Registry Overview.
- * Phase 1602: Hardened Chassis/Engine identification logic for vehicles.
- * Phase 1603: Added deep inspection of metadata for missing record identification.
+ * Standardized terminology for professional asset management.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -81,7 +80,7 @@ export function DashboardWorkstation() {
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
   const [myAuditRequests, setMyAuditRequests] = useState<Asset[]>([]);
 
-  // --- Load Ledger Pulse ---
+  // --- Load Ledger ---
   useEffect(() => {
     const loadLedger = async () => {
       const [queue, logs] = await Promise.all([
@@ -110,7 +109,6 @@ export function DashboardWorkstation() {
       
       const meta = a.metadata || {};
       
-      // Robust detection: Check core property OR metadata pulse
       const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
                         Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
       
@@ -149,7 +147,7 @@ export function DashboardWorkstation() {
 
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
-    const asset = assets.find(a => a.id === id);
+    const asset = assets.find(a => a.id === selectedAssetId);
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
@@ -166,7 +164,7 @@ export function DashboardWorkstation() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-40">
       
-      {/* 1. Protocol Banner */}
+      {/* 1. System Banner */}
       <div className="px-1">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-6 sm:p-8 rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.03] flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -182,23 +180,12 @@ export function DashboardWorkstation() {
             </div>
           </div>
           <div className="flex items-center gap-3 relative z-10">
-            <TactileMenu 
-              title="Operational Controls"
-              options={[
-                { label: 'Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                { label: 'Asset Folders', icon: LayoutGrid, onClick: () => { setGroupsViewMode('category'); setActiveView('GROUPS'); } },
-                { label: 'Condition Hub', icon: Activity, onClick: () => { setGroupsViewMode('condition'); setActiveView('GROUPS'); } },
-                { label: 'Anomalies', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
-                ...(isAdmin ? [{ label: 'Settings', icon: Settings, onClick: () => setActiveView('SETTINGS') }] : [])
-              ]}
+            <Badge 
+              onClick={() => setActiveView('REGISTRY')}
+              className="cursor-pointer bg-primary text-black font-black uppercase text-[9px] tracking-widest px-5 h-9 rounded-full shadow-lg border-2 border-black hover:scale-105 transition-transform"
             >
-              <Badge 
-                onClick={() => setActiveView('REGISTRY')}
-                className="cursor-pointer bg-primary text-black font-black uppercase text-[9px] tracking-widest px-5 h-9 rounded-full shadow-lg border-2 border-black hover:scale-105 transition-transform"
-              >
-                ACCESS REGISTRY CENTER
-              </Badge>
-            </TactileMenu>
+              OPEN REGISTRY CENTER
+            </Badge>
           </div>
         </motion.div>
       </div>
@@ -238,7 +225,7 @@ export function DashboardWorkstation() {
                       <div className="p-5 bg-muted/30 rounded-2xl border-2 border-border/40 shrink-0 shadow-inner"><LayoutGrid className="h-10 w-10 text-primary/40" /></div>
                       <div className="space-y-3 flex-1 min-w-0">
                         <div className="space-y-0.5">
-                          <span className="text-[8px] font-black uppercase text-primary tracking-widest">Registry Glance</span>
+                          <span className="text-[8px] font-black uppercase text-primary tracking-widest">Random Glance</span>
                           <h4 className="text-lg font-black uppercase text-foreground truncate">{glanceAssets[glanceIndex].description}</h4>
                         </div>
                         <div className="flex items-center gap-3">
@@ -309,20 +296,20 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 3. Global Pulse Analytics */}
+      {/* 3. Asset Summary Analytics */}
       <div className="px-1">
         <AssetSummaryDashboard />
       </div>
 
-      {/* 4. Operational Ledger */}
+      {/* 4. Activity History Ledger */}
       <div className="px-1">
         <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 overflow-hidden shadow-2xl">
           <CardHeader className="p-6 border-b bg-muted/20 flex flex-row items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-primary/10 rounded-xl"><Terminal className="h-5 w-5 text-primary" /></div>
               <div className="space-y-0.5">
-                <CardTitle className="text-lg font-black uppercase tracking-tight">Activity History</CardTitle>
-                <CardDescription className="text-[8px] font-black uppercase tracking-widest">Real-time update pulse</CardDescription>
+                <CardTitle className="text-lg font-black uppercase tracking-tight">Activity Ledger</CardTitle>
+                <CardDescription className="text-[8px] font-black uppercase tracking-widest">Real-time update stream</CardDescription>
               </div>
             </div>
             <div className="flex gap-2">
@@ -336,7 +323,7 @@ export function DashboardWorkstation() {
                 <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex items-center gap-4 text-left">
                     <CloudUpload className={cn("h-4 w-4", pendingSync.length > 0 ? "text-orange-500 animate-pulse" : "text-green-500")} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Registry Sync Queue</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">Sync Queue</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-6">
@@ -349,26 +336,6 @@ export function DashboardWorkstation() {
                     ))}
                   </div>
                   <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Changes</Button>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="audit" className="px-6 border-b border-border/40">
-                <AccordionTrigger className="hover:no-underline py-4">
-                  <div className="flex items-center gap-4 text-left">
-                    <GitPullRequest className="h-4 w-4 text-blue-500" />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Decision Inbox</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-6">
-                  <div className="space-y-2 mb-4">
-                    {myAuditRequests.slice(0, 3).map(a => (
-                      <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
-                        <span className="text-[10px] font-black uppercase truncate">{a.description}</span>
-                        <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="outline" onClick={() => setActiveView('REGISTRY')} disabled={myAuditRequests.length === 0} className="w-full h-10 rounded-xl font-black uppercase text-[9px] border-2">Review Requests</Button>
                 </AccordionContent>
               </AccordionItem>
 
