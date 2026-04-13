@@ -5,6 +5,7 @@
  * Overhauled from raw JSON editing to a structured Management Workstation.
  * Phase 300: Implemented Properties/Logic view modes and high-density explorer UI.
  * Phase 305: Implemented maintenance protocol logic (Purge/Wipe/Reset) with feedback pulses.
+ * Phase 306: Grouped maintenance protocols into a collapsible Accordion panel.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -60,6 +61,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -87,7 +94,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
@@ -468,60 +474,74 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
       </div>
 
       {/* Global Maintenance Protocol */}
-      <div className="px-1 space-y-8 mt-12 border-t pt-12 border-dashed">
-        <h3 className="text-xl font-black uppercase tracking-[0.2em] text-foreground flex items-center gap-4 px-1">
-          <ShieldAlert className="h-6 w-6 text-destructive" /> Security & Infrastructure Pulses
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
-            <div className="p-3 bg-muted rounded-xl w-fit"><Smartphone className="h-6 w-6 text-muted-foreground" /></div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Local Registry</h4>
-              <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Clear all asset records and staging queues on this device only.</p>
-            </div>
-            <Button variant="outline" onClick={() => setIsPurgeLocalOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-              Execute Local Purge
-            </Button>
-          </Card>
+      <div className="px-1 mt-12 border-t pt-12 border-dashed">
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="maintenance" className="border-none">
+            <AccordionTrigger className="hover:no-underline py-6 px-6 bg-muted/20 rounded-[2rem] border-2 border-border/40 group data-[state=open]:rounded-b-none data-[state=open]:border-b-0 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-destructive/10 rounded-2xl group-hover:scale-110 transition-transform">
+                  <ShieldAlert className="h-6 w-6 text-destructive" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-xl font-black uppercase tracking-[0.2em] text-foreground leading-none">Security & Infrastructure Pulses</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1.5 opacity-60">Destructive Maintenance Protocols</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="bg-muted/10 border-2 border-t-0 border-border/40 rounded-b-[2rem] p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
+                  <div className="p-3 bg-muted rounded-xl w-fit"><Smartphone className="h-6 w-6 text-muted-foreground" /></div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase">Local Registry</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Clear all asset records and staging queues on this device only.</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setIsPurgeLocalOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+                    Execute Local Purge
+                  </Button>
+                </Card>
 
-          <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
-            <div className="p-3 bg-muted rounded-xl w-fit"><Activity className="h-6 w-6 text-muted-foreground" /></div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Mirror Standby</h4>
-              <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Destroy all hot-standby records in the Realtime Database shadow.</p>
-            </div>
-            <Button variant="outline" onClick={() => setIsWipeMirrorOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-              Execute Mirror Wipe
-            </Button>
-          </Card>
+                <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
+                  <div className="p-3 bg-muted rounded-xl w-fit"><Activity className="h-6 w-6 text-muted-foreground" /></div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase">Mirror Standby</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Destroy all hot-standby records in the Realtime Database shadow.</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setIsWipeMirrorOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+                    Execute Mirror Wipe
+                  </Button>
+                </Card>
 
-          <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
-            <div className="p-3 bg-muted rounded-xl w-fit"><Cloud className="h-6 w-6 text-muted-foreground" /></div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase">Cloud Authority</h4>
-              <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Permanently clear the authoritative assets collection in Firestore.</p>
-            </div>
-            <Button variant="outline" onClick={() => setIsResetCloudOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-              Execute Cloud Reset
-            </Button>
-          </Card>
+                <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
+                  <div className="p-3 bg-muted rounded-xl w-fit"><Cloud className="h-6 w-6 text-muted-foreground" /></div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase">Cloud Authority</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Permanently clear the authoritative assets collection in Firestore.</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setIsResetCloudOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
+                    Execute Cloud Reset
+                  </Button>
+                </Card>
 
-          <Card className="bg-destructive/5 border-2 border-destructive/20 p-6 space-y-6 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5"><Bomb className="h-20 w-20 text-destructive" /></div>
-            <div className="p-3 bg-destructive/10 rounded-xl w-fit"><Hammer className="h-6 w-6 text-destructive" /></div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black uppercase text-destructive">Global Pulse</h4>
-              <p className="text-[10px] font-medium text-destructive/60 italic leading-relaxed">Destroy all data across Cloud, Mirror, and Local storage tiers instantly.</p>
-            </div>
-            <Button onClick={() => setIsNuclearOpen(true)} className="w-full h-12 rounded-xl bg-destructive text-white font-black uppercase text-[9px] tracking-widest shadow-2xl transition-transform active:scale-95">
-              Execute Global Reset
-            </Button>
-          </Card>
-        </div>
+                <Card className="bg-destructive/5 border-2 border-destructive/20 p-6 space-y-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-5"><Bomb className="h-20 w-20 text-destructive" /></div>
+                  <div className="p-3 bg-destructive/10 rounded-xl w-fit"><Hammer className="h-6 w-6 text-destructive" /></div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-destructive">Global Pulse</h4>
+                    <p className="text-[10px] font-medium text-destructive/60 italic leading-relaxed">Destroy all data across Cloud, Mirror, and Local storage tiers instantly.</p>
+                  </div>
+                  <Button onClick={() => setIsNuclearOpen(true)} className="w-full h-12 rounded-xl bg-destructive text-white font-black uppercase text-[9px] tracking-widest shadow-2xl transition-transform active:scale-95">
+                    Execute Global Reset
+                  </Button>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
 
       {/* High-Fidelity Editor Dialog */}
-      <Dialog open={!!editingNode || isCreating} onOpenChange={() => { setEditingNode(null); setIsCreating(false); }}>
+      <Dialog open={!!editingNode || isCreating} onOpenChange={(open) => { if (!open) { setEditingNode(null); setIsCreating(false); } }}>
         <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-background border-none rounded-[2.5rem] shadow-3xl flex flex-col">
           
           {/* Editor Header */}
