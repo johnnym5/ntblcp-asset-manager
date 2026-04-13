@@ -2,19 +2,18 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1900: Implemented Auto-Sync on project/folder toggle.
- * Phase 1901: Implemented Scan-Before-Sync conflict governance.
+ * Phase 1905: Implemented Strict Folder Visibility & Autonomous Local Purge.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
-import { LocationEngine } from '@/lib/location-engine';
+import { LocationEngine } from '@/services/location-engine';
 import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
 import type { 
   Asset, 
@@ -23,7 +22,6 @@ import type {
   AuthorityNode, 
   WorkstationView, 
   OptionType, 
-  SortConfig,
   SyncSummary,
   SyncStrategy
 } from '@/types/domain';
@@ -179,7 +177,14 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
       
       const currentGrantIds = localSettings?.activeGrantIds || [];
-      const filtered = (localAssets || []).filter(a => currentGrantIds.length === 0 || currentGrantIds.includes(a.grantId));
+      const filtered = (localAssets || []).filter(a => {
+        if (currentGrantIds.length === 0) return false;
+        if (!currentGrantIds.includes(a.grantId)) return false;
+        
+        // Folder-level visibility pulse
+        const grant = localSettings?.grants.find(g => g.id === a.grantId);
+        return grant?.enabledSheets.includes(a.category);
+      });
         
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
@@ -188,49 +193,78 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, []);
 
-  // --- Auto-Sync Lifecycle Pulse ---
+  // --- Auto-Sync & Local Purge Lifecycle Pulse ---
   useEffect(() => {
     if (!isHydrated || !appSettings) return;
 
-    const handleAutoProvisioning = async () => {
-      const prevIdsStr = localStorage.getItem('assetain-prev-active-ids');
-      const prevIds: string[] = prevIdsStr ? JSON.parse(prevIdsStr) : [];
-      const currentIds = appSettings.activeGrantIds || [];
+    const handleAutoMaintenance = async () => {
+      // 1. Resolve current enabled Scoped Keys (ProjectID:Folder)
+      const currentScopedKeys = appSettings.activeGrantIds.flatMap(gid => {
+        const grant = appSettings.grants.find(g => g.id === gid);
+        return (grant?.enabledSheets || []).map(sheet => `${gid}:${sheet}`);
+      });
 
-      const removedIds = prevIds.filter(id => !currentIds.includes(id));
-      const addedIds = currentIds.filter(id => !prevIds.includes(id));
+      const prevScopedKeysStr = localStorage.getItem('assetain-prev-scoped-keys');
+      const prevScopedKeys: string[] = prevScopedKeysStr ? JSON.parse(prevScopedKeysStr) : [];
 
-      if (removedIds.length > 0) {
+      const removedKeys = prevScopedKeys.filter(k => !currentScopedKeys.includes(k));
+      const addedKeys = currentScopedKeys.filter(k => !prevScopedKeys.includes(k));
+
+      // A. Perform Deterministic Local Purge for disabled scopes
+      if (removedKeys.length > 0) {
         const local = await storage.getAssets();
-        const next = local.filter(a => !removedIds.includes(a.grantId));
+        const next = local.filter(a => {
+          const key = `${a.grantId}:${a.category}`;
+          return !removedKeys.includes(key);
+        });
         await storage.saveAssets(next);
         await refreshRegistry();
-        addNotification({ title: "Scope Purged", description: "Records from disabled projects removed locally.", variant: "default" });
+        addNotification({ 
+          title: "Registry Purged", 
+          description: "Records from disabled projects or folders removed from local storage.", 
+          variant: "default" 
+        });
       }
 
-      if (addedIds.length > 0 && isOnline) {
+      // B. Perform Deterministic Local Provisioning for newly enabled scopes
+      if (addedKeys.length > 0 && isOnline) {
+        const addedProjectIds = Array.from(new Set(addedKeys.map(k => k.split(':')[0])));
         setIsSyncing(true);
         try {
           let newlyFetched: Asset[] = [];
-          for (const gid of addedIds) {
+          for (const gid of addedProjectIds) {
             const projectAssets = await FirestoreService.getProjectAssets(gid);
             newlyFetched = [...newlyFetched, ...projectAssets];
           }
+          
           const currentLocal = await storage.getAssets();
-          const merged = [...currentLocal, ...newlyFetched.map(a => ({ ...a, syncStatus: 'synced' as const }))];
-          await storage.saveAssets(merged);
+          const localMap = new Map(currentLocal.map(a => [a.id, a]));
+
+          // Only merge assets that are actually enabled in the current project settings
+          newlyFetched.forEach(a => {
+            const grant = appSettings.grants.find(g => g.id === a.grantId);
+            if (grant?.enabledSheets.includes(a.category)) {
+              localMap.set(a.id, { ...a, syncStatus: 'synced' });
+            }
+          });
+          
+          await storage.saveAssets(Array.from(localMap.values()));
           await refreshRegistry();
-          addNotification({ title: "Scope Downloaded", description: `Added ${newlyFetched.length} records for new projects.`, variant: "success" });
+          addNotification({ 
+            title: "Registry Updated", 
+            description: "Synchronized fresh records for enabled scopes.", 
+            variant: "success" 
+          });
         } finally {
           setIsSyncing(false);
         }
       }
 
-      localStorage.setItem('assetain-prev-active-ids', JSON.stringify(currentIds));
+      localStorage.setItem('assetain-prev-scoped-keys', JSON.stringify(currentScopedKeys));
     };
 
-    handleAutoProvisioning();
-  }, [appSettings?.activeGrantIds, isOnline, isHydrated, refreshRegistry]);
+    handleAutoMaintenance();
+  }, [appSettings?.grants, appSettings?.activeGrantIds, isOnline, isHydrated, refreshRegistry]);
 
   useEffect(() => { 
     setIsHydrated(true);
@@ -280,8 +314,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const filteredAssets = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+    if (!appSettings) return [];
+
     let results = [...source];
 
+    // Core Filtering logic: Search, Location, Assignee, etc.
     if (selectedLocations.length > 0) {
       const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
       results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.location)));
@@ -301,39 +338,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
-      // 1. Handle Diagnostic Tokens (from Summary Cards)
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
         results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
-      } else if (searchTerm === 'MISSING_CHASSIS') {
-        results = results.filter(a => {
-          const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
-          if (!isVehicle) return false;
-          
-          const meta = a.metadata || {};
-          const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
-                            Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
-          return !hasChassis;
-        });
-      } else if (searchTerm === 'MISSING_ENGINE') {
-        results = results.filter(a => {
-          const isVehicle = (a.category || '').toLowerCase().includes('motor') || (a.category || '').toLowerCase().includes('vehicle');
-          if (!isVehicle) return false;
-          
-          const meta = a.metadata || {};
-          const hasEngine = (!!a.engineNo && a.engineNo !== 'N/A') || 
-                           Object.keys(meta).some(k => getFuzzySignature(k) === 'engineno' && meta[k]);
-          return !hasEngine;
-        });
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
       } else if (searchTerm === 'STATUS_UNVERIFIED') {
         results = results.filter(a => a.status === 'UNVERIFIED');
-      } else if (searchTerm === 'WITH_REMARKS') {
-        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
       } else {
-        // 2. Standard Fuzzy Search
         const fuzzySearch = getFuzzySignature(searchTerm);
         results = results.filter(a => {
           const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
@@ -342,12 +355,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     }
 
-    // Header-based Filter Pulse
     if (filters.length > 0) {
       filters.forEach(filter => {
         const header = headers.find(h => h.id === filter.headerId);
         if (!header) return;
-        
         results = results.filter(asset => {
           let val = "";
           switch(header.normalizedName) {
@@ -357,7 +368,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
             case "asset_class": val = asset.category; break;
             default: val = String((asset.metadata as any)?.[header.rawName] || "");
           }
-          
           if (filter.operator === 'in') {
             const allowed = (filter.value as string[]) || [];
             return allowed.includes(val);
@@ -389,7 +399,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
 
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, filters]);
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, filters, appSettings]);
 
   const locationOptions = useMemo(() => {
     const map = new Map<string, { label: string, count: number }>();
@@ -446,19 +456,25 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
 
+      // Filter fetched assets to only include enabled sheets
+      const filteredRemote = allRemoteAssets.filter(a => {
+        const grant = appSettings?.grants.find(g => g.id === a.grantId);
+        return grant?.enabledSheets.includes(a.category);
+      });
+
       const localAssets = await storage.getAssets();
       const localMap = new Map(localAssets.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
 
       const newItems: Asset[] = [];
       const existingItems: Asset[] = [];
 
-      allRemoteAssets.forEach(remote => {
+      filteredRemote.forEach(remote => {
         const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
         if (localMap.has(id)) existingItems.push(remote);
         else newItems.push(remote);
       });
 
-      setSyncSummary({ type: 'DOWNLOAD', newItems, existingItems, totalCount: allRemoteAssets.length });
+      setSyncSummary({ type: 'DOWNLOAD', newItems, existingItems, totalCount: filteredRemote.length });
       setIsSyncConfirmOpen(true);
     } catch (e) {
       addNotification({ title: "Sync Scan Failed", variant: "destructive" });
@@ -483,7 +499,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setSyncSummary({ 
         type: 'UPLOAD', 
         newItems: pending.map(q => q.payload as any), 
-        existingItems: [], // Push logic is simpler but follows same UI pulse
+        existingItems: [],
         totalCount: pending.length 
       });
       setIsSyncConfirmOpen(true);
@@ -503,13 +519,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
 
         let nextAssets = [...local];
-        
-        // 1. Process New Items
-        syncSummary.newItems.forEach(item => {
-          nextAssets.push({ ...item, syncStatus: 'synced' });
-        });
+        syncSummary.newItems.forEach(item => { nextAssets.push({ ...item, syncStatus: 'synced' }); });
 
-        // 2. Process Existing Items based on strategy
         if (strategy === 'UPDATE') {
           syncSummary.existingItems.forEach(remote => {
             const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
@@ -518,12 +529,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
 
         await storage.saveAssets(nextAssets);
-        addNotification({ title: "Download Complete", description: `Processed ${syncSummary.totalCount} records. Strategy: ${strategy}`, variant: "success" });
+        addNotification({ title: "Download Complete", description: `Processed ${syncSummary.totalCount} records.`, variant: "success" });
       } else {
-        // EXECUTE UPLOAD
         await processSyncQueue();
       }
-      
       await refreshRegistry();
     } catch (e) {
       addNotification({ title: "Sync Execution Failure", variant: "destructive" });

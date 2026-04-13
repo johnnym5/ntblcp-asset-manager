@@ -3,8 +3,7 @@
 /**
  * @fileOverview Asset Registry - Main Management Workstation.
  * Reverted to Folder Independence: Headers update dynamically based on selected folder.
- * Phase 1505: Implemented Folder-Specific Schema Resolution.
- * Phase 1506: Fixed missing deletion handlers and confirmation dialogs.
+ * Phase 1507: Fixed visibility logic for disabled folders in multi-project view.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -21,12 +20,8 @@ import {
   Filter,
   ArrowLeft,
   LayoutGrid,
-  CloudUpload,
-  Download,
-  FileDown,
   Columns,
   Maximize2,
-  GitMerge,
   Save,
   Edit3,
   Trash2,
@@ -41,7 +36,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -115,8 +110,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     goBack,
     searchTerm,
     setSearchTerm,
-    manualDownload,
-    manualUpload,
     isSyncing
   } = useAppState();
   
@@ -195,12 +188,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   }, [assets]);
 
   const categories = useMemo(() => {
-    const allKnownFolders = Object.keys(mergedSheetDefinitions).sort();
-    return allKnownFolders.filter(cat => {
-      const stats = groupStats[cat];
-      return (stats && stats.total > 0) || appSettings?.enabledSheets?.includes(cat);
+    // 1. Get ALL enabled sheets across ALL active projects
+    const allEnabledSheets = new Set<string>();
+    appSettings?.grants.forEach(g => {
+      if (activeGrantIds.includes(g.id)) {
+        g.enabledSheets.forEach(s => allEnabledSheets.add(s));
+      }
     });
-  }, [mergedSheetDefinitions, groupStats, appSettings?.enabledSheets]);
+
+    // 2. Filter list by enabled status and sort
+    return Array.from(allEnabledSheets).sort();
+  }, [appSettings?.grants, activeGrantIds]);
 
   const processedAssets = useMemo(() => {
     let results = [...filteredAssets];
