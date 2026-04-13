@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Controlled Asset Ingestion & Review.
- * Phase 1007: Implemented Choice-Based Conflict Resolution (Skip vs Overwrite).
- * Phase 1008: Fixed activeGrantId resolution logic to prevent 'nothing happening' on apply.
+ * @fileOverview ImportWorkstation - Multi-Sheet Workbook Ingestion.
+ * Phase 1115: Implemented Full Workbook Traversal. Now scans and imports every sheet.
+ * Phase 1116: Hardened Reconciliation for cross-sheet duplicate detection.
  */
 
 import React, { useState, useRef } from 'react';
@@ -34,7 +34,6 @@ import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
-import { FirestoreService } from '@/services/firebase/firestore';
 import { addNotification } from '@/hooks/use-notifications';
 import * as XLSX from 'xlsx';
 import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
@@ -50,12 +49,10 @@ export function ImportWorkstation() {
   const { 
     assets: existingAssets, 
     refreshRegistry, 
-    activeGrantIds, // Use the array from context
+    activeGrantIds, 
     setDataSource, 
     setActiveView, 
-    appSettings,
-    setAppSettings,
-    isOnline
+    appSettings
   } = useAppState();
   const { userProfile } = useAuth();
   
@@ -66,7 +63,9 @@ export function ImportWorkstation() {
   const [selectedGroupIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
-  const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]} | null>(null);
+  
+  // Entire Workbook Data Map
+  const [workbookData, setWorkbookData] = useState<Record<string, any[][]>>({});
   
   // Conflict Strategy State
   const [mergeStrategy, setMergeStrategy] = useState<MergeStrategy>('SKIP_EXISTING');
@@ -80,56 +79,89 @@ export function ImportWorkstation() {
 
     setCurrentStep('SCANNING');
     setIsProcessing(true);
-    setProgress(10);
+    setProgress(5);
 
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
+      
+      const allGroups: DiscoveredGroup[] = [];
+      const wbData: Record<string, any[][]> = {};
       
       engineRef.current = new ParserEngine(file.name, existingAssets);
-      const groups = engineRef.current!.discoverGroups(sheetName, data);
 
-      setActiveSheetData({ name: sheetName, data });
-      setDiscoveredGroups(groups);
-      setSelectedIds(new Set(groups.map(g => g.id)));
-      setProgress(100);
+      // Iterate through all sheet names in the workbook
+      for (let i = 0; i < workbook.SheetNames.length; i++) {
+        const sheetName = workbook.SheetNames[i];
+        const sheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
+        
+        wbData[sheetName] = data;
+        
+        const groups = engineRef.current!.discoverGroups(sheetName, data);
+        allGroups.push(...groups);
+        
+        // Update progress pulse
+        setProgress(Math.round(((i + 1) / workbook.SheetNames.length) * 100));
+      }
+
+      setWorkbookData(wbData);
+      setDiscoveredGroups(allGroups);
+      setSelectedIds(new Set(allGroups.map(g => g.id)));
 
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('STRUCTURE');
       }, 800);
     } catch (error) {
-      addNotification({ title: "Scanning Error", variant: "destructive" });
+      addNotification({ title: "Scanning Error", description: "Failed to traverse workbook pulse.", variant: "destructive" });
       setCurrentStep('INGEST');
     }
   };
 
   const handleExecuteImport = async () => {
-    if (!engineRef.current || selectedGroupIds.size === 0 || !activeSheetData) return;
+    if (!engineRef.current || selectedGroupIds.size === 0) return;
     
     setIsProcessing(true);
-    setProgress(50);
+    setProgress(0);
 
     try {
       const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
-      const results = engineRef.current!.ingestGroups(activeSheetData.name, activeSheetData.data, selectedGroups);
-      const allStaged = results.flatMap(c => c.assets);
+      
+      // Group selected groups by their source sheet for ingestion
+      const groupsBySheet: Record<string, DiscoveredGroup[]> = {};
+      selectedGroups.forEach(g => {
+        if (!groupsBySheet[g.sheetName]) groupsBySheet[g.sheetName] = [];
+        groupsBySheet[g.sheetName].push(g);
+      });
+
+      const allResults: GroupImportContainer[] = [];
+      const sheetEntries = Object.entries(groupsBySheet);
+
+      for (let i = 0; i < sheetEntries.length; i++) {
+        const [sheetName, groups] = sheetEntries[i];
+        const sheetData = workbookData[sheetName];
+        if (sheetData) {
+          const results = engineRef.current!.ingestGroups(sheetName, sheetData, groups);
+          allResults.push(...results);
+        }
+        setProgress(Math.round(((i + 1) / sheetEntries.length) * 100));
+      }
+
+      const allStaged = allResults.flatMap(c => c.assets);
 
       setSummary({
         workbookName: engineRef.current['workbookName'],
-        sheetName: activeSheetData.name,
-        profileId: 'PRO_V10',
-        totalRows: activeSheetData.data.length,
-        groupCount: results.length,
+        sheetName: 'Multi-Sheet Pulse',
+        profileId: 'PRO_V11',
+        totalRows: allStaged.length,
+        groupCount: allResults.length,
         dataRowsImported: allStaged.filter(a => !a.validation.isRejected).length,
         rowsRejected: allStaged.filter(a => a.validation.isRejected).length,
         duplicatesDetected: allStaged.filter(a => a.validation.isUpdate).length,
         templatesDiscovered: selectedGroupIds.size,
         sectionBreakdown: {},
-        groups: results
+        groups: allResults
       });
 
       setStagedAssets(allStaged);
@@ -137,18 +169,18 @@ export function ImportWorkstation() {
       setIsProcessing(false);
       setCurrentStep('RECONCILE');
     } catch (e) {
-      addNotification({ title: "Import Failed", variant: "destructive" });
+      addNotification({ title: "Extraction Failure", description: "Logical ingestion pulse interrupted.", variant: "destructive" });
       setIsProcessing(false);
     }
   };
 
   const handleCommitToRegistry = async () => {
-    const targetGrantId = activeGrantIds[0]; // Determine target project
+    const targetGrantId = activeGrantIds[0]; 
     
     if (!targetGrantId || !appSettings) {
       addNotification({ 
-        title: "No Project Selected", 
-        description: "Please enable at least one project in Settings first.",
+        title: "No Active Project", 
+        description: "Please enable a project pulse in Settings first.",
         variant: "destructive" 
       });
       return;
@@ -158,14 +190,13 @@ export function ImportWorkstation() {
     try {
       const validAssets = stagedAssets.filter(a => !a.validation.isRejected);
       
-      // Filter based on strategy
       const assetsToProcess = validAssets.filter(a => {
-        if (!a.validation.isUpdate) return true; // Always include new items
-        return mergeStrategy === 'OVERWRITE_EXISTING'; // Only include updates if strategy is OVERWRITE
+        if (!a.validation.isUpdate) return true;
+        return mergeStrategy === 'OVERWRITE_EXISTING';
       });
 
       if (assetsToProcess.length === 0) {
-        addNotification({ title: "No changes to apply", description: "All records were skipped based on your strategy." });
+        addNotification({ title: "Strategy Pulse: Empty", description: "Zero records selected based on conflict strategy." });
         setCurrentStep('SUMMARY');
         return;
       }
@@ -174,7 +205,6 @@ export function ImportWorkstation() {
         const finalAsset = { 
           ...asset, 
           grantId: targetGrantId,
-          // If it's an update, use the existing ID to overwrite the record
           ...(asset.validation.isUpdate && { id: asset.validation.existingAssetId })
         };
         const op = asset.validation.isUpdate ? 'UPDATE' : 'CREATE';
@@ -183,8 +213,8 @@ export function ImportWorkstation() {
 
       await storage.clearSandbox();
       addNotification({ 
-        title: "Registry Synchronized", 
-        description: `Successfully processed ${assetsToProcess.length} records.`,
+        title: "Registry Pulses Committed", 
+        description: `Successfully processed ${assetsToProcess.length} workbook records.`,
         variant: "success" 
       });
       
@@ -205,7 +235,7 @@ export function ImportWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl"><FileUp className="h-8 w-8 text-primary" /></div>
             Import Assets
           </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Registry Ingestion System</p>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Workbook Ingestion Station</p>
         </div>
         {currentStep !== 'INGEST' && currentStep !== 'SUMMARY' && (
           <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] text-destructive border-2"><Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Batch</Button>
@@ -219,9 +249,9 @@ export function ImportWorkstation() {
               <Card className="border-4 border-dashed border-white/5 bg-white/[0.02] hover:border-primary/40 rounded-[3rem] p-16 flex flex-col items-center justify-center text-center h-[450px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 group-hover:scale-110 transition-all shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight">Select Workbook</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed mt-4">The system will automatically scan for duplicates against your current records.</p>
-                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Choose File</Button>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight">Load Whole Workbook</h3>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed mt-4">The system will traverse all sheets and scan for logical record blocks.</p>
+                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Excel Pulse</Button>
               </Card>
             </motion.div>
           )}
@@ -230,8 +260,9 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-32 space-y-10">
               <div className="p-16 bg-primary/10 rounded-[3rem] animate-pulse"><ScanSearch className="h-20 w-20 text-primary" /></div>
               <div className="space-y-4 max-w-sm text-center">
-                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Traversing Registry</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Workbook Pulse Scan</h3>
                 <Progress value={progress} className="h-2 rounded-full" />
+                <p className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">{progress}% Complete</p>
               </div>
             </div>
           )}
@@ -243,15 +274,16 @@ export function ImportWorkstation() {
                 if (next.has(id)) next.delete(id); else next.add(id);
                 setSelectedIds(next);
               }} onSelectAll={(c) => setSelectedIds(c ? new Set(discoveredGroups.map(g => g.id)) : new Set())} />
+              
               <div className="p-10 rounded-[3rem] bg-white/[0.02] border-2 border-dashed border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 shadow-3xl">
                 <div className="flex items-start gap-6 max-w-xl">
                   <div className="p-4 bg-primary/10 rounded-2xl"><Layers className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Identify Data Blocks?</h4>
-                    <p className="text-sm font-medium text-white/40 italic">Reviewing {selectedGroupIds.size} structural folders for ingestion.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Initialize Extraction?</h4>
+                    <p className="text-sm font-medium text-white/40 italic">Found {selectedGroupIds.size} groups across the entire workbook pulse.</p>
                   </div>
                 </div>
-                <Button onClick={handleExecuteImport} disabled={selectedGroupIds.size === 0} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-all">Continue Discovery <ChevronRight className="h-6 w-6" /></Button>
+                <Button onClick={handleExecuteImport} disabled={selectedGroupIds.size === 0} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-all">Extract Data Pulse <ChevronRight className="h-6 w-6" /></Button>
               </div>
             </motion.div>
           )}
@@ -260,14 +292,13 @@ export function ImportWorkstation() {
             <motion.div key="reconcile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
               <ReconciliationView assets={stagedAssets as any} summary={runSummary!} />
               
-              {/* Conflict Strategy Controller */}
               <div className="p-10 rounded-[3rem] bg-[#0A0A0A] border-2 border-primary/20 space-y-10 shadow-3xl">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Conflict Resolution</h4>
-                    <p className="text-sm font-medium text-white/40 italic">How should the system handle {updatesCount} existing records?</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white">Conflict Governance</h4>
+                    <p className="text-sm font-medium text-white/40 italic">Detected {updatesCount} records already in the registry pulse.</p>
                   </div>
-                  <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-full">ACTION REQUIRED</Badge>
+                  <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-full shadow-lg">DECISION REQUIRED</Badge>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -282,8 +313,8 @@ export function ImportWorkstation() {
                       <XCircle className="h-8 w-8" />
                     </div>
                     <div className="space-y-1">
-                      <h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'SKIP_EXISTING' ? "text-primary" : "text-white")}>Skip Existing</h5>
-                      <p className="text-xs font-medium text-white/60 leading-relaxed italic">Only add truly new assets. Current database records will remain unchanged.</p>
+                      <h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'SKIP_EXISTING' ? "text-primary" : "text-white")}>Preserve Registry</h5>
+                      <p className="text-xs font-medium text-white/60 leading-relaxed italic">Only import new assets. Skip all records that already exist in your local pulse.</p>
                     </div>
                   </button>
 
@@ -298,15 +329,15 @@ export function ImportWorkstation() {
                       <CopyCheck className="h-8 w-8" />
                     </div>
                     <div className="space-y-1">
-                      <h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'OVERWRITE_EXISTING' ? "text-primary" : "text-white")}>Overwrite Existing</h5>
-                      <p className="text-xs font-medium text-white/60 leading-relaxed italic">Update your current records with fresh data from the Excel file.</p>
+                      <h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'OVERWRITE_EXISTING' ? "text-primary" : "text-white")}>Update Hierarchy</h5>
+                      <p className="text-xs font-medium text-white/60 leading-relaxed italic">Overwrite existing records with fresh workbook pulses. Essential for bulk corrections.</p>
                     </div>
                   </button>
                 </div>
 
                 <Button onClick={handleCommitToRegistry} disabled={isProcessing} className="h-20 w-full rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 group">
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <ShieldCheck className="h-6 w-6" />} 
-                  Apply {mergeStrategy === 'SKIP_EXISTING' ? 'New Records Only' : 'Full Synchronization'}
+                  Confirm {mergeStrategy === 'SKIP_EXISTING' ? 'New Only' : 'Full Sync'}
                 </Button>
               </div>
             </motion.div>
@@ -316,12 +347,12 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
               <div className="p-16 bg-green-500/10 rounded-[4rem] text-green-600 border border-green-500/20"><CheckCircle2 className="h-24 w-20" /></div>
               <div className="space-y-2">
-                <h3 className="text-4xl font-black uppercase text-white">Import Complete</h3>
-                <p className="text-sm font-medium text-white/40 italic">Registry state updated deterministically.</p>
+                <h3 className="text-4xl font-black uppercase text-white">Workbook Synced</h3>
+                <p className="text-sm font-medium text-white/40 italic">All selected sheet blocks have been merged into the registry pulse.</p>
               </div>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Process More</Button>
-                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black">Open Registry</Button>
+                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Load Another</Button>
+                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black">Review Registry</Button>
               </div>
             </div>
           )}
