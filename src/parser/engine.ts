@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Implements two-stage structural discovery and group-aware mapping.
- * Phase 1006: Implemented Duplicate Detection & Identity Fingerprinting.
+ * @fileOverview Multi-Sheet Structural Parser Engine.
+ * Reverted to "One Sheet = One Folder" paradigm with independent header discovery.
+ * Phase 1100: Implemented parseWorkbook for full-file traversal.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -31,44 +31,72 @@ export class ParserEngine {
     this.existingAssets = existingAssets;
   }
 
+  /**
+   * Authoritative entry point for multi-sheet workbook parsing.
+   */
+  public parseWorkbook(sheetName: string, data: any[][]): GroupImportContainer {
+    // 1. Discover the primary group for this sheet
+    const groups = this.discoverGroups(sheetName, data);
+    
+    // 2. Ingest the data into a container
+    const containers = this.ingestGroups(sheetName, data, groups);
+    
+    // Return the primary container for this sheet
+    return containers[0] || {
+      id: uuidv4(),
+      groupName: sheetName,
+      headerSet: [],
+      headerSource: 'synthetic',
+      headerSetType: 'generated_template',
+      columnCount: 0,
+      rowCount: 0,
+      startRow: 0,
+      endRow: 0,
+      headerStart: null,
+      headerEnd: null,
+      rawText: sheetName,
+      visibleHeaderRow: null,
+      templateId: '',
+      sheetName,
+      workbookName: this.workbookName,
+      assets: [],
+      metrics: { valid: 0, invalid: 0, updates: 0, new: 0 }
+    };
+  }
+
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
-    let pendingGroupLabel: string | null = null;
     let activeGroup: DiscoveredGroup | null = null;
     
     if (!data || data.length === 0) return [];
 
-    data.forEach((row, idx) => {
-      const type = classifyRow(row);
-      
-      if (type === 'GROUP_HEADER') {
-        if (activeGroup) activeGroup.endRow = idx - 1;
-        pendingGroupLabel = String(row[0] || '').trim();
+    // Find the first header row in the sheet
+    let headerRowIndex = -1;
+    for (let i = 0; i < Math.min(data.length, 20); i++) {
+      if (classifyRow(data[i]) === 'SCHEMA_HEADER') {
+        headerRowIndex = i;
+        break;
       }
-      
-      if (type === 'SCHEMA_HEADER') {
-        const signature = this.registerTemplate(row, 'real_template');
-        const tpl = this.templates.get(signature)!;
-        activeGroup = this.createNewGroup(pendingGroupLabel || "GENERAL", tpl, 'explicit', idx, sheetName);
-        discovered.push(activeGroup);
-        pendingGroupLabel = null; 
-      }
-      
-      if (type === 'DATA_ROW' && pendingGroupLabel) {
-        const matchedTpl = this.matchOrGenerateTemplate(row);
-        activeGroup = this.createNewGroup(pendingGroupLabel, matchedTpl, 'inferred', idx, sheetName);
-        discovered.push(activeGroup);
-        pendingGroupLabel = null;
-      }
-    });
+    }
 
-    discovered.forEach((group, idx) => {
-      const nextGroup = discovered[idx + 1];
-      const stopRow = nextGroup ? nextGroup.startRow : data.length;
-      group.rowCount = data.slice(group.startRow, stopRow).filter(r => classifyRow(r) === 'DATA_ROW').length;
-      group.endRow = stopRow - 1;
-    });
+    // If no header found, assume row 0 is a synthetic header or needs review
+    const effectiveHeaderIndex = headerRowIndex === -1 ? 0 : headerRowIndex;
+    const headerRow = data[effectiveHeaderIndex];
+    
+    const signature = this.registerTemplate(headerRow, headerRowIndex === -1 ? 'inferred_template' : 'real_template');
+    const tpl = this.templates.get(signature)!;
+    
+    activeGroup = this.createNewGroup(sheetName, tpl, headerRowIndex === -1 ? 'inferred' : 'explicit', effectiveHeaderIndex, sheetName);
+    activeGroup.startRow = effectiveHeaderIndex + 1;
+    activeGroup.endRow = data.length - 1;
+    
+    // Calculate actual data rows
+    activeGroup.rowCount = data.slice(activeGroup.startRow).filter(r => {
+      const type = classifyRow(r);
+      return type === 'DATA_ROW';
+    }).length;
 
+    discovered.push(activeGroup);
     return discovered;
   }
 
@@ -87,16 +115,21 @@ export class ParserEngine {
         if (!rowData) continue;
         
         const rowType = classifyRow(rowData);
-        if (rowType === 'DATA_ROW') {
+        if (rowType === 'DATA_ROW' || rowType === 'UNKNOWN') {
           const asset = this.mapRowToTemplate(rowData, tpl, group, i);
-          container.assets.push(asset);
           
-          if (asset.validation.isRejected) {
-            container.metrics.invalid++;
-          } else {
-            container.metrics.valid++;
-            if (asset.validation.isUpdate) container.metrics.updates++;
-            else container.metrics.new++;
+          // Check for minimal data presence to prevent empty row ghosting
+          const hasContent = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
+          
+          if (hasContent) {
+            container.assets.push(asset);
+            if (asset.validation.isRejected) {
+              container.metrics.invalid++;
+            } else {
+              container.metrics.valid++;
+              if (asset.validation.isUpdate) container.metrics.updates++;
+              else container.metrics.new++;
+            }
           }
         }
       }
@@ -111,7 +144,7 @@ export class ParserEngine {
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Structural Parser',
+      lastModifiedBy: 'Multi-Sheet Parser',
       importMetadata: { 
         sourceFile: this.workbookName, 
         sheetName: group.sheetName, 
@@ -156,38 +189,20 @@ export class ParserEngine {
       }
     });
 
-    // 1. Normalization
     if (asset.location) {
       const pulse = LocationEngine.normalize(asset.location);
       asset.location = pulse.normalized;
     }
 
-    // 2. Identity Check: Compare against existing assets to prevent duplicates
     const existing = this.findExistingAsset(asset);
     if (existing) {
       asset.validation.isUpdate = true;
       asset.validation.existingAssetId = existing.id;
-      // We don't overwrite the generated ID yet, we just flag it
-    }
-
-    const hasIdentification = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
-
-    if (!hasIdentification) {
-      asset.validation.isRejected = true;
-      asset.validation.logs.push({
-        rowNumber: rowNum + 1,
-        type: 'empty_row',
-        message: 'No identification fields found.',
-        rawData: row
-      });
     }
 
     return asset as ParsedAsset;
   }
 
-  /**
-   * Performs an identity match against the existing local registry.
-   */
   private findExistingAsset(parsed: Partial<Asset>): Asset | undefined {
     if (!this.existingAssets || this.existingAssets.length === 0) return undefined;
 
@@ -195,21 +210,12 @@ export class ParserEngine {
     const parsedSN = getFuzzySignature(parsed.serialNumber);
     const parsedChassis = getFuzzySignature(parsed.chassisNo);
     const parsedDesc = getFuzzySignature(parsed.description);
-    const parsedShortSN = getFuzzySignature(parsed.sn);
 
     return this.existingAssets.find(ex => {
-      // Priority 1: NTBLCP Asset ID Tag Match
       if (parsedIdCode && parsedIdCode !== 'na' && parsedIdCode === getFuzzySignature(ex.assetIdCode)) return true;
-      
-      // Priority 2: Chassis Number Match (Vehicles)
       if (parsedChassis && parsedChassis !== 'na' && parsedChassis === getFuzzySignature(ex.chassisNo)) return true;
-
-      // Priority 3: Serial Number Match (Electronics)
       if (parsedSN && parsedSN !== 'na' && parsedSN === getFuzzySignature(ex.serialNumber)) return true;
-
-      // Priority 4: Combination Match (Description + S/N from register)
-      if (parsedDesc && parsedShortSN && parsedDesc === getFuzzySignature(ex.description) && parsedShortSN === getFuzzySignature(ex.sn)) return true;
-
+      if (parsedDesc && parsedDesc === getFuzzySignature(ex.description)) return true;
       return false;
     });
   }
@@ -272,15 +278,6 @@ export class ParserEngine {
   }
 
   private getSyntheticHeaders(count: number): string[] {
-    if (count >= 19 && count <= 21) {
-      return [
-        'S/N', 'Location', 'Assignee', 'Asset Description', 'Asset ID Code',
-        'Asset Class', 'Manufacturer', 'Internal Code', 'Serial Number', 'Model Number',
-        'Date Received', 'Transfer Type', 'Transfer Method', 'Purchase price (Naira)',
-        'Purchase Price [USD)', 'Funder', 'Useful Life (Years)', 'Condition', 'Remarks', 'Source Category'
-      ];
-    }
-    
     const canonical = ['S/N', 'Location', 'Assignee (Location)', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Received', 'Purchase price (Naira)'];
     return Array.from({ length: count }, (_, i) => i < canonical.length ? canonical[i] : `Column ${i + 1}`);
   }

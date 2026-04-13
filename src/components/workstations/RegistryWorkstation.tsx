@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Asset Registry - Main Management Workstation.
- * Deployment Pulse: Hardened sorting protocol and independent folder independence.
- * Phase 1503: Restricted Header Management button strictly to administrators.
+ * Reverted to Folder Independence: Headers update dynamically based on selected folder.
+ * Phase 1505: Implemented Folder-Specific Schema Resolution.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -146,22 +146,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
-  // Enabled Grants Cluster
-  const enabledGrants = useMemo(() => {
-    return appSettings?.grants.filter(g => activeGrantIds.includes(g.id)) || [];
-  }, [appSettings, activeGrantIds]);
-
   // Aggregate Sheet Definitions from all enabled projects
   const mergedSheetDefinitions = useMemo(() => {
     const defs: Record<string, SheetDefinition> = {};
+    const enabledGrants = appSettings?.grants.filter(g => activeGrantIds.includes(g.id)) || [];
     enabledGrants.forEach(g => {
       Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
         defs[name] = def;
       });
     });
     return defs;
-  }, [enabledGrants]);
+  }, [appSettings?.grants, activeGrantIds]);
 
+  /**
+   * Folder Independence: Synchronize headers with the selected folder's template.
+   */
   useEffect(() => {
     if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
@@ -238,7 +237,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     const map: Record<string, string[]> = {};
     workstationHeaders.forEach(header => {
       const values = new Set<string>();
-      // Use full active assets pool for filter options to prevent faceted dead-ends
       assets.filter(a => activeGrantIds.includes(a.grantId)).forEach(asset => {
         let val = "";
         switch(header.normalizedName) {
@@ -372,43 +370,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setCurrentPage(1);
   };
 
-  const handleMergeSelection = async () => {
-    if (!targetMergeCategory) return;
-    setIsProcessing(true);
-    try {
-      const targetAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
-      for (const asset of targetAssets) {
-        const updated = {
-          ...asset,
-          category: targetMergeCategory,
-          lastModified: new Date().toISOString()
-        };
-        await enqueueMutation('UPDATE', 'assets', updated);
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      setIsMergeDialogOpen(false);
-      addNotification({ title: "Records Migrated", variant: "success" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBatchDeleteAssets = async () => {
-    setIsProcessing(true);
-    try {
-      for (const id of Array.from(selectedAssetIds)) {
-        await enqueueMutation('DELETE', 'assets', { id });
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      setIsAssetDeleteOpen(false);
-      addNotification({ title: "Records Purged", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleSelectionExport = async () => {
     const selectedAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
     if (selectedAssets.length === 0) return;
@@ -489,7 +450,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <label htmlFor="sel-all-master" className="text-[9px] font-black uppercase text-muted-foreground cursor-pointer hidden sm:block">Select Page</label>
               </div>
 
-              {/* Advanced Controls Cluster */}
               <div className="flex items-center gap-2 shrink-0">
                 <TooltipProvider>
                   <Tooltip>
@@ -742,11 +702,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 
                 <Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button>
                 
-                <Button variant="outline" onClick={() => setIsMergeDialogOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><GitMerge className="h-4 w-4" /> Reassign</Button>
-                
-                {isAdmin && (
-                  <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Purge</Button>
-                )}
+                <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Purge</Button>
               </div>
               <ScrollBar orientation="horizontal" className="invisible" />
             </ScrollArea>
@@ -794,29 +750,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onUpdateFilters={setFilters}
         optionsMap={optionsMap}
       />
-
-      <AlertDialog open={isMergeDialogOpen} onOpenChange={setIsMergeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-background text-foreground">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Mass Reassignment</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic">Select the destination folder for these {selectedAssetIds.size} records.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-6">
-            <Select value={targetMergeCategory} onValueChange={setTargetMergeCategory}>
-              <SelectTrigger className="h-14 rounded-2xl bg-muted/20 border-2 border-border/40 font-black text-[10px] uppercase shadow-inner">
-                <SelectValue placeholder="Target Category..." />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-border">
-                {categories.map(c => <SelectItem key={c} value={c} className="text-[10px] font-black uppercase">{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="rounded-xl font-bold border-2 m-0 h-12 flex-1">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMergeSelection} disabled={isProcessing || !targetMergeCategory} className="bg-primary text-black font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 flex-[2] shadow-xl shadow-primary/20">Initialize Move</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">

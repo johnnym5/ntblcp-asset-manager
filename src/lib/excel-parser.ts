@@ -9,8 +9,8 @@ import { sanitizeForFirestore } from './utils';
 
 /**
  * @fileOverview Excel Ingestion Layer.
- * Hardened for deployment: unified domain models and positional group mapping.
- * Optimized: Uses centralized sanitization utility.
+ * Reverted to workbook-centric multi-sheet processing.
+ * Phase 1105: Each sheet is treated as an independent folder.
  */
 
 export { sanitizeForFirestore };
@@ -24,7 +24,7 @@ export interface ScannedSheetInfo {
 }
 
 /**
- * Scans the first sheet of an Excel file for structural groups.
+ * Scans a workbook and identifies sheets containing asset data.
  */
 export async function scanExcelFile(
   fileOrBuffer: File | ArrayBuffer,
@@ -36,25 +36,26 @@ export async function scanExcelFile(
     try {
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
+        const engine = new ParserEngine(fileOrBuffer instanceof File ? fileOrBuffer.name : 'Workbook');
 
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) throw new Error("The workbook contains no sheets.");
-
-        const sheet = workbook.Sheets[sheetName];
-        const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
-        
-        const engine = new ParserEngine(fileOrBuffer instanceof File ? fileOrBuffer.name : 'Unknown');
-        const groups = engine.discoverGroups(sheetName, sheetData);
-
-        if (groups.length > 0) {
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+          
+          const groups = engine.discoverGroups(sheetName, sheetData);
+          if (groups.length > 0) {
             scannedSheets.push({
-                sheetName: sheetName,
-                rowCount: sheetData.length,
-                groupCount: groups.length,
-                headers: groups[0].headerSet,
+              sheetName: sheetName,
+              rowCount: groups[0].rowCount,
+              groupCount: 1,
+              headers: groups[0].headerSet,
+              definitionName: sheetName
             });
-        } else {
-            errors.push("No structural group blocks discovered in the primary sheet.");
+          }
+        }
+
+        if (scannedSheets.length === 0) {
+            errors.push("No compatible asset sheets discovered in this workbook.");
         }
 
     } catch (e) {
@@ -66,13 +67,13 @@ export async function scanExcelFile(
 }
 
 /**
- * Parses the first sheet into group-aware domain assets.
+ * Parses all selected sheets into domain assets.
  */
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
     sheetDefinitions: Record<string, SheetDefinition>, 
     existingAssets: Asset[],
-    scannedSheets?: any[]
+    sheetsToImport?: ScannedSheetInfo[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -85,20 +86,24 @@ export async function parseExcelFile(
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
         const fileName = fileOrBuffer instanceof File ? fileOrBuffer.name : 'Ingested Workbook';
-        
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
-        
         const engine = new ParserEngine(fileName, existingAssets);
-        const groups = engine.discoverGroups(sheetName, data);
-        
-        if (groups.length > 0) {
-            const containers = engine.ingestGroups(sheetName, data, groups);
-            const sheetAssets = containers.flatMap(c => c.assets);
-            result.assets = sheetAssets as unknown as Asset[];
-        } else {
-            result.errors.push("No structural boundaries detected in the sheet.");
+
+        const targetSheets = sheetsToImport || workbook.SheetNames.map(s => ({ sheetName: s }));
+
+        for (const { sheetName } of targetSheets) {
+          const sheet = workbook.Sheets[sheetName];
+          if (!sheet) continue;
+
+          const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+          const groupContainer = engine.parseWorkbook(sheetName, data);
+          
+          groupContainer.assets.forEach(asset => {
+            if (asset.validation.isUpdate) {
+              result.updatedAssets.push(asset as any);
+            } else {
+              result.assets.push(asset as any);
+            }
+          });
         }
 
     } catch (e) {
@@ -110,40 +115,39 @@ export async function parseExcelFile(
 }
 
 /**
- * Scans for templates only, used in the Registry Orchestrator.
+ * Extracts folder templates from a multi-sheet workbook.
  */
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
   const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
-  
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
-  
   const engine = new ParserEngine(file.name);
-  const groups = engine.discoverGroups(sheetName, sheetData);
 
-  if (groups.length > 0) {
-      groups.forEach(group => {
-          const displayFields = group.headerSet.map(h => {
-              const key = normalizeHeaderName(h);
-              const isIdentification = ['sn', 'description', 'location', 'assetIdCode', 'serialNumber'].includes(key);
-              return {
-                  key: key as keyof Asset,
-                  label: h,
-                  table: isIdentification,
-                  quickView: true,
-                  inChecklist: isIdentification // Default check pulse for core data
-              };
-          });
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+    const groups = engine.discoverGroups(sheetName, sheetData);
 
-          templates.push({
-              name: group.groupName,
-              headers: group.headerSet,
-              displayFields
-          });
+    if (groups.length > 0) {
+      const group = groups[0];
+      const displayFields = group.headerSet.map(h => {
+          const key = normalizeHeaderName(h);
+          const isIdentification = ['sn', 'description', 'location', 'asset_id_code', 'serial_number'].includes(key);
+          return {
+              key: key as keyof Asset,
+              label: h,
+              table: isIdentification,
+              quickView: true,
+              inChecklist: isIdentification
+          };
       });
+
+      templates.push({
+          name: sheetName,
+          headers: group.headerSet,
+          displayFields
+      });
+    }
   }
 
   if (templates.length === 0) {
