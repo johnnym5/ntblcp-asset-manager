@@ -3,7 +3,7 @@
 /**
  * @fileOverview Settings - Main Operational Control Center.
  * Simplified for deployment with standard Asset Management language.
- * Phase 1800: Fixed TabsContent error by ensuring Tabs root is correctly placed.
+ * Phase 1801: Added Rename and Delete functionality for Asset Groups.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -29,50 +29,32 @@ import {
   Smartphone,
   KeyRound,
   ShieldCheck as ShieldIcon,
-  FileText,
   FolderOpen,
-  ClipboardCheck,
   RefreshCw,
-  Info,
   HeartPulse,
-  Database,
-  Truck,
-  Hash,
-  SortAsc,
   Trash2,
   Eye,
-  FileDown,
   Check,
-  Activity,
-  History
+  History,
+  Edit3
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { UserManagement } from '@/components/admin/user-management';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
-import { cn } from '@/lib/utils';
-import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
+import { addNotification } from '@/hooks/use-notifications';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
-import { addNotification } from '@/hooks/use-notifications';
-import { enqueueMutation } from '@/offline/queue';
-import type { AppSettings, Grant, SheetDefinition, Asset } from '@/types/domain';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 
@@ -83,10 +65,7 @@ export function SettingsWorkstation() {
     refreshRegistry, 
     isOnline, 
     settingsLoaded,
-    setActiveView,
-    activeGrantIds,
-    assets,
-    isSyncing 
+    setActiveView
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -94,14 +73,17 @@ export function SettingsWorkstation() {
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isPatching, setIsPatching] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectValue, setEditProjectValue] = useState('');
+  
+  // Sheet (Group) Management State
+  const [editingSheetKey, setEditingSheetKey] = useState<{grantId: string, name: string} | null>(null);
+  const [editSheetValue, setEditSheetValue] = useState('');
+
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
   // Passcode Manager State
-  const [currentPasscode, setCurrentPasscode] = useState('');
   const [newPasscode, setNewPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
   const [isUpdatingPasscode, setIsUpdatingPasscode] = useState(false);
@@ -160,7 +142,6 @@ export function SettingsWorkstation() {
 
     setIsUpdatingPasscode(true);
     try {
-      // Find the user in settings and update
       if (!draftSettings) return;
       const updatedUsers = draftSettings.authorizedUsers.map(u => {
         if (u.loginName === userProfile?.loginName) {
@@ -175,7 +156,6 @@ export function SettingsWorkstation() {
       setAppSettings(updatedSettings);
       
       toast({ title: "Passcode Updated", description: "Your system access credentials have been changed." });
-      setCurrentPasscode('');
       setNewPasscode('');
       setConfirmPasscode('');
     } catch (e) {
@@ -206,6 +186,48 @@ export function SettingsWorkstation() {
     handleSettingChange('activeGrantIds', next);
   };
 
+  const commitProjectRename = () => {
+    if (!editingProjectId || !draftSettings) return;
+    const nextGrants = draftSettings.grants.map(g => 
+      g.id === editingProjectId ? { ...g, name: editProjectValue } : g
+    );
+    handleSettingChange('grants', nextGrants);
+    setEditingProjectId(null);
+  };
+
+  const commitSheetRename = (grantId: string, oldName: string) => {
+    if (!draftSettings) return;
+    const nextGrants = draftSettings.grants.map(g => {
+      if (g.id === grantId) {
+        const nextDefs = { ...g.sheetDefinitions };
+        const def = nextDefs[oldName];
+        if (def) {
+          nextDefs[editSheetValue] = { ...def, name: editSheetValue };
+          delete nextDefs[oldName];
+        }
+        const nextEnabled = g.enabledSheets.map(s => s === oldName ? editSheetValue : s);
+        return { ...g, sheetDefinitions: nextDefs, enabledSheets: nextEnabled };
+      }
+      return g;
+    });
+    handleSettingChange('grants', nextGrants);
+    setEditingSheetKey(null);
+  };
+
+  const handleDeleteSheet = (grantId: string, sheetName: string) => {
+    if (!draftSettings) return;
+    const nextGrants = draftSettings.grants.map(g => {
+      if (g.id === grantId) {
+        const nextDefs = { ...g.sheetDefinitions };
+        delete nextDefs[sheetName];
+        const nextEnabled = g.enabledSheets.filter(s => s !== sheetName);
+        return { ...g, sheetDefinitions: nextDefs, enabledSheets: nextEnabled };
+      }
+      return g;
+    });
+    handleSettingChange('grants', nextGrants);
+  };
+
   const handleImportTemplate = () => {
     fileInputRef.current?.click();
   };
@@ -220,16 +242,15 @@ export function SettingsWorkstation() {
       const targetId = draftSettings.activeGrantIds[0] || draftSettings.grants[0]?.id;
       if (!targetId) return;
 
-      const activeGrantIdx = draftSettings.grants.findIndex(g => g.id === targetId);
-      if (activeGrantIdx === -1) return;
-
-      const nextGrant = { ...draftSettings.grants[activeGrantIdx] };
-      const nextSheetDefs = { ...nextGrant.sheetDefinitions };
-      templates.forEach(t => { nextSheetDefs[t.name] = t; });
-      nextGrant.sheetDefinitions = nextSheetDefs;
+      const nextGrants = draftSettings.grants.map(g => {
+        if (g.id === targetId) {
+          const nextDefs = { ...g.sheetDefinitions };
+          templates.forEach(t => { nextDefs[t.name] = t; });
+          return { ...g, sheetDefinitions: nextDefs };
+        }
+        return g;
+      });
       
-      const nextGrants = [...draftSettings.grants];
-      nextGrants[activeGrantIdx] = nextGrant;
       handleSettingChange('grants', nextGrants);
       toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions identified.` });
     } catch (error) {
@@ -238,8 +259,6 @@ export function SettingsWorkstation() {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
-
-  if (!settingsLoaded || !draftSettings) return null;
 
   const SettingSection = ({ title, description, icon: Icon, children }: { title: string, description: string, icon: any, children: React.ReactNode }) => (
     <div className="space-y-4">
@@ -358,13 +377,30 @@ export function SettingsWorkstation() {
                   <div className="space-y-4">
                     {draftSettings.grants.map((grant) => {
                       const isActive = draftSettings.activeGrantIds?.includes(grant.id);
+                      const isEditing = editingProjectId === grant.id;
+
                       return (
                         <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", isActive ? "border-primary bg-primary/[0.02] shadow-xl" : "border-border bg-muted/10")}>
                           <div className="p-6 flex items-center justify-between group">
                             <div className="flex items-center gap-4 flex-1">
                               <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}><FolderOpen className="h-5 w-5" /></div>
                               <div className="flex flex-col min-w-0">
-                                <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
+                                {isEditing ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input 
+                                      value={editProjectValue} 
+                                      onChange={(e) => setEditProjectValue(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()}
+                                      className="h-8 w-48 text-sm font-black uppercase"
+                                    />
+                                    <Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8"><Check className="h-4 w-4" /></Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
+                                    <button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all"><Edit3 className="h-3.5 w-3.5" /></button>
+                                  </div>
+                                )}
                                 <span className="text-[8px] font-mono opacity-40 uppercase mt-1">ID: {grant.id.split('-')[0]}</span>
                               </div>
                             </div>
@@ -375,13 +411,40 @@ export function SettingsWorkstation() {
                           </div>
                           {isActive && (
                             <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
+                              <div className="flex items-center justify-between px-1">
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Asset Groups</h4>
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Import Definition</Button>
+                                </div>
+                              </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => (
-                                  <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
-                                    <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
-                                    <Button variant="ghost" size="icon" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }} className="h-8 w-8 rounded-lg text-primary opacity-20 group-hover/folder:opacity-100"><Wrench className="h-3.5 w-3.5" /></Button>
-                                  </div>
-                                ))}
+                                {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => {
+                                  const isSheetEditing = editingSheetKey?.grantId === grant.id && editingSheetKey?.name === name;
+                                  return (
+                                    <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
+                                      {isSheetEditing ? (
+                                        <div className="flex items-center gap-2 flex-1 mr-4">
+                                          <Input 
+                                            value={editSheetValue} 
+                                            onChange={(e) => setEditSheetValue(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)}
+                                            className="h-8 text-[10px] font-black uppercase"
+                                          />
+                                          <Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
+                                      )}
+                                      <div className="flex items-center gap-2 text-white/20 shrink-0">
+                                        {!isSheetEditing && (
+                                          <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>
+                                        )}
+                                        <button className="p-1.5 hover:text-primary transition-colors" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>
+                                        <button className="p-1.5 hover:text-destructive transition-colors" onClick={() => handleDeleteSheet(grant.id, name)}><Trash2 className="h-3.5 w-3.5" /></button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
