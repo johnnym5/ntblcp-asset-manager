@@ -4,6 +4,7 @@
  * @fileOverview Asset Registry - Main Management Workstation.
  * Reverted to Folder Independence: Headers update dynamically based on selected folder.
  * Phase 1505: Implemented Folder-Specific Schema Resolution.
+ * Phase 1506: Fixed missing deletion handlers and confirmation dialogs.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -32,7 +33,10 @@ import {
   TrendingUp,
   Activity,
   Wrench,
-  Tag
+  Tag,
+  CheckCircle2,
+  XCircle,
+  FolderOpen
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -132,12 +136,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isAssetBatchEditOpen, setIsAssetBatchEditOpen] = useState(false);
-  const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
-  const [targetMergeCategory, setTargetMergeCategory] = useState<string>('');
   const [isAssetDeleteOpen, setIsAssetDeleteOpen] = useState(false);
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
   
-  // Folder Independence States
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
@@ -146,7 +147,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
-  // Aggregate Sheet Definitions from all enabled projects
   const mergedSheetDefinitions = useMemo(() => {
     const defs: Record<string, SheetDefinition> = {};
     const enabledGrants = appSettings?.grants.filter(g => activeGrantIds.includes(g.id)) || [];
@@ -158,9 +158,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return defs;
   }, [appSettings?.grants, activeGrantIds]);
 
-  /**
-   * Folder Independence: Synchronize headers with the selected folder's template.
-   */
   useEffect(() => {
     if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
@@ -313,6 +310,55 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       addNotification({ title: "Layout Saved", variant: "success" });
     } catch (e) {
       addNotification({ title: "Save Failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchDeleteAssets = async () => {
+    setIsProcessing(true);
+    try {
+      const idsToDelete = Array.from(selectedAssetIds);
+      for (const id of idsToDelete) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.filter(a => !selectedAssetIds.has(a.id));
+      await storage.saveAssets(updatedLocal);
+      
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      setIsAssetDeleteOpen(false);
+      addNotification({ title: "Records Purged", description: `Successfully deleted ${idsToDelete.length} records locally. Sync to finalize.`, variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Deletion Failed", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePurgeFolders = async () => {
+    setIsProcessing(true);
+    try {
+      const foldersToPurge = selectedCategories;
+      const assetsToPurge = assets.filter(a => foldersToPurge.includes(a.category));
+      const idsToPurge = assetsToPurge.map(a => a.id);
+
+      for (const id of idsToPurge) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.filter(a => !foldersToPurge.includes(a.category));
+      await storage.saveAssets(updatedLocal);
+
+      await refreshRegistry();
+      setSelectedCategories([]);
+      setIsPurgeDialogOpen(false);
+      addNotification({ title: "Folders Purged", description: `Successfully deleted ${foldersToPurge.length} folders locally. Sync to finalize.`, variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Purge Failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -761,6 +807,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <AlertDialogFooter className="mt-6 flex gap-3">
             <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Destroy Records</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Purge Entire Folders?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will destroy all records within the {selectedCategories.length} selected asset folders. This pulse is irreversible.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePurgeFolders} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Destroy Folders</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
