@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Governance Control Center.
  * Standardized terminology for professional asset management.
  * Implemented Concurrent Multi-Project Selection and Integrated Import.
+ * Phase 1910: Added Delete Project pulse with deterministic cleanup.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -42,7 +43,9 @@ import {
   Save,
   ShieldAlert,
   Eye,
-  EyeOff
+  EyeOff,
+  Hammer,
+  Bomb
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -65,6 +68,16 @@ import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
   const { 
@@ -101,6 +114,8 @@ export function SettingsWorkstation() {
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
   
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Grant | null>(null);
+  const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,6 +198,22 @@ export function SettingsWorkstation() {
     };
     handleSettingChange('grants', [...draftSettings.grants, newGrant]);
     setNewProjectName('');
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete || !draftSettings) return;
+    const nextGrants = draftSettings.grants.filter(g => g.id !== projectToDelete.id);
+    const nextActiveGrantIds = (draftSettings.activeGrantIds || []).filter(id => id !== projectToDelete.id);
+    
+    handleSettingChange('grants', nextGrants);
+    handleSettingChange('activeGrantIds', nextActiveGrantIds);
+    
+    toast({ 
+      title: "Project Marked for Deletion", 
+      description: `"${projectToDelete.name}" removed from scope. Save settings to commit changes.` 
+    });
+    setProjectToDelete(null);
+    setIsProjectDeleteOpen(false);
   };
 
   const toggleProjectEnablement = (id: string, enabled: boolean) => {
@@ -403,7 +434,13 @@ export function SettingsWorkstation() {
                                 {isEditing ? (
                                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}><Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-8 w-48 text-sm font-black uppercase" /><Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
                                 ) : (
-                                  <div className="flex items-center gap-2"><h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4><button onClick={(e) => { e.stopPropagation(); setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all"><Edit3 className="h-3.5 w-3.5" /></button></div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                      <button onClick={(e) => { e.stopPropagation(); setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="p-1 hover:text-primary transition-all"><Edit3 className="h-3.5 w-3.5" /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); setProjectToDelete(grant); setIsProjectDeleteOpen(true); }} className="p-1 hover:text-destructive transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    </div>
+                                  </div>
                                 )}
                                 <span className="text-[8px] font-mono opacity-40 uppercase">System ID: {grant.id.split('-')[0]}</span>
                               </div>
@@ -501,6 +538,24 @@ export function SettingsWorkstation() {
       </div>
 
       <input type="file" ref={fileInputRef} onChange={handleFileImportTemplate} className="hidden" accept=".xlsx,.xls" />
+
+      <AlertDialog open={isProjectDeleteOpen} onOpenChange={setIsProjectDeleteOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Bomb className="h-8 w-8 text-destructive" /></div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Irreversible Deletion?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
+              You are about to permanently delete the project <strong>{projectToDelete?.name}</strong>. This will also trigger an automatic purge of all local records associated with this project. This action is immutable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
+              Execute Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
