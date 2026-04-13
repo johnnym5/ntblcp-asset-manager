@@ -4,6 +4,7 @@
  * @fileOverview ImportWorkstation - Strict Template-Driven Ingestion.
  * Implements "Define Template First" logic for new folders.
  * Phase 1200: Integrated Template Generation into the asset import pulse.
+ * Phase 1201: Fixed project scope resolution for extraction.
  */
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -15,21 +16,13 @@ import {
   ScanSearch, 
   ShieldCheck, 
   Loader2, 
-  DatabaseZap, 
   CheckCircle2,
-  Trash2,
   ChevronRight,
-  ChevronLeft,
-  Activity,
   FileSpreadsheet,
-  Zap,
   Layers,
-  ArrowRightLeft,
   XCircle,
   CopyCheck,
-  Wrench,
-  FileWarning,
-  Info
+  FileWarning
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { ParserEngine } from '@/parser/engine';
@@ -46,7 +39,7 @@ import { ReconciliationView } from '@/modules/import/components/ReconciliationVi
 import { cn, getFuzzySignature } from '@/lib/utils';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { normalizeHeaderName } from '@/lib/registry-utils';
-import type { Asset, SheetDefinition } from '@/types/domain';
+import type { SheetDefinition } from '@/types/domain';
 
 type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 type MergeStrategy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
@@ -81,7 +74,7 @@ export function ImportWorkstation() {
     const defs: Record<string, SheetDefinition> = {};
     appSettings?.grants.forEach(g => {
       Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
-        defs[name] = def;
+        defs[name] = def as any;
       });
     });
     return defs;
@@ -102,7 +95,7 @@ export function ImportWorkstation() {
       const allGroups: DiscoveredGroup[] = [];
       const wbData: Record<string, any[][]> = {};
       
-      engineRef.current = new ParserEngine(file.name, existingAssets, mergedSheetDefinitions);
+      engineRef.current = new ParserEngine(file.name, existingAssets, mergedSheetDefinitions as any);
 
       for (let i = 0; i < workbook.SheetNames.length; i++) {
         const sheetName = workbook.SheetNames[i];
@@ -118,7 +111,6 @@ export function ImportWorkstation() {
 
       setWorkbookData(wbData);
       setDiscoveredGroups(allGroups);
-      // Only auto-select groups that have matched templates
       setSelectedIds(new Set(allGroups.filter(g => g.isTemplateMatched).map(g => g.id)));
 
       setTimeout(() => {
@@ -165,7 +157,6 @@ export function ImportWorkstation() {
       if (isOnline) await FirestoreService.updateSettings(nextSettings);
       setAppSettings(nextSettings);
 
-      // Re-scan current results to update "Matched" status
       setDiscoveredGroups(prev => prev.map(g => g.id === group.id ? { ...g, isTemplateMatched: true } : g));
       setSelectedIds(prev => new Set([...Array.from(prev), group.id]));
       
@@ -275,7 +266,7 @@ export function ImportWorkstation() {
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
                 <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Initialize Workbook Pulse</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">The system will identify folders using Row 1 and Headers using Row 2 across all sheets.</p>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">Identifying asset groups using Row 1 (Title) and Row 2 (Headers).</p>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Project Pulse</Button>
               </Card>
             </motion.div>
@@ -298,8 +289,8 @@ export function ImportWorkstation() {
                 <div className="p-6 rounded-3xl bg-orange-500/5 border-2 border-dashed border-orange-500/20 flex items-start gap-6 mb-10">
                   <div className="p-3 bg-orange-500 rounded-xl"><FileWarning className="h-6 w-6 text-black" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-black uppercase text-orange-600">Unrecognized Folders Detected</h4>
-                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">The system found {unrecognizedCount} blocks that do not match your project settings. You must define them as templates before importing assets.</p>
+                    <h4 className="text-base font-black uppercase text-orange-600">Unrecognized Folders</h4>
+                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found {unrecognizedCount} blocks missing definitions. You must create templates for these before importing.</p>
                   </div>
                 </div>
               )}
@@ -314,7 +305,7 @@ export function ImportWorkstation() {
                     if (next.has(id)) next.delete(id); else next.add(id);
                     setSelectedIds(next);
                   } else {
-                    toast({ title: "Template Required", description: "You must create a folder definition for this block first." });
+                    toast({ title: "Template Required", description: "Create a folder definition first." });
                   }
                 }} 
                 onSelectAll={(c) => setSelectedIds(c ? new Set(discoveredGroups.filter(g => g.isTemplateMatched).map(g => g.id)) : new Set())}
@@ -325,8 +316,8 @@ export function ImportWorkstation() {
                 <div className="flex items-start gap-6">
                   <div className="p-4 bg-primary/10 rounded-2xl shrink-0"><Layers className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Prepare Extraction</h4>
-                    <p className="text-sm font-medium text-white/40 italic">{selectedGroupIds.size} folders enqueued for data ingestion.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Extraction Ready</h4>
+                    <p className="text-sm font-medium text-white/40 italic">{selectedGroupIds.size} folders enqueued for processing.</p>
                   </div>
                 </div>
                 <Button onClick={handleExecuteImport} disabled={!canProceed} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 transition-all">
@@ -364,7 +355,7 @@ export function ImportWorkstation() {
               <div className="p-16 bg-green-500/10 rounded-[4rem] text-green-600 border border-green-500/20 shadow-2xl"><CheckCircle2 className="h-24 w-20" /></div>
               <div className="space-y-2">
                 <h3 className="text-4xl font-black uppercase text-white tracking-tight">Sync Reconciled</h3>
-                <p className="text-sm font-medium text-white/40 italic">Successfully integrated {stagedAssets.length} records into the active registry scope.</p>
+                <p className="text-sm font-medium text-white/40 italic">Integrated {stagedAssets.length} records into the active scope.</p>
               </div>
               <div className="flex gap-4">
                 <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2 transition-all hover:bg-white/5">Start New Session</Button>
