@@ -1,7 +1,6 @@
 /**
- * @fileOverview StructurePreview - The Template Visualization Layer.
- * Phase 750: Enhanced with Header Source (Explicit/Inferred/Synthetic) visibility.
- * Phase 751: Added Select All functionality for discovered groups.
+ * @fileOverview StructurePreview - Strict Template Visualization Layer.
+ * Phase 1205: Added indicator for Template matching status.
  */
 
 import React from 'react';
@@ -24,31 +23,26 @@ import {
   ScanSearch,
   Info,
   Wrench,
-  Activity
+  Activity,
+  XCircle,
+  PlusCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DiscoveredGroup } from '@/parser/types';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 
 interface StructurePreviewProps {
   groups: DiscoveredGroup[];
   selectedIds: Set<string>;
   onToggleId: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
+  onAction?: (group: DiscoveredGroup) => void;
 }
 
-export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll }: StructurePreviewProps) {
-  const allSelected = groups.length > 0 && selectedIds.size === groups.length;
-
-  const getSourceBadge = (source: string) => {
-    switch(source) {
-      case 'explicit': return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[8px] font-black uppercase"><FileCheck className="h-2.5 w-2.5 mr-1" /> Explicit Header</Badge>;
-      case 'inferred': return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[8px] font-black uppercase"><Layers className="h-2.5 w-2.5 mr-1" /> Inferred Pulse</Badge>;
-      case 'synthetic': return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[8px] font-black uppercase"><Wrench className="h-2.5 w-2.5 mr-1" /> Synthetic Template</Badge>;
-      default: return null;
-    }
-  };
+export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll, onAction }: StructurePreviewProps) {
+  const allSelected = groups.length > 0 && selectedIds.size === groups.filter(g => g.isTemplateMatched).length;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -58,7 +52,7 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll 
             <div className="p-2.5 bg-primary/10 rounded-xl">
               <ScanSearch className="h-6 w-6 text-primary" />
             </div>
-            Single-Sheet Registry Skeleton
+            Registry Skeleton
           </h4>
           <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
             Column A discovery pulse: identifying structural register blocks.
@@ -74,7 +68,7 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll 
               className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
             />
             <label htmlFor="select-all-groups" className="text-[11px] font-black uppercase tracking-widest text-primary cursor-pointer">
-              Select All Blocks
+              Select All Registered
             </label>
           </div>
           <Badge variant="outline" className="h-6 px-3 border-white/10 text-white/40 font-mono text-[9px]">{groups.length} Groups Discovered</Badge>
@@ -85,47 +79,65 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll 
         {groups.length > 0 ? (
           groups.map((group) => {
             const isSelected = selectedIds.has(group.id);
+            const isMatched = group.isTemplateMatched;
 
             return (
               <Card 
                 key={group.id} 
                 className={cn(
                   "bg-[#050505] border-2 rounded-[2.5rem] overflow-hidden shadow-3xl transition-all group",
-                  isSelected ? "border-primary/40 bg-primary/[0.01]" : "border-white/5 opacity-60"
+                  isSelected ? "border-primary/40 bg-primary/[0.01]" : "border-white/5",
+                  !isMatched && "opacity-80 grayscale-[0.5]"
                 )}
               >
                 <div className="p-8 border-b border-white/5 bg-white/[0.02] flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="flex items-center gap-6">
                     <button 
                       onClick={() => onToggleId(group.id)}
+                      disabled={!isMatched}
                       className={cn(
                         "h-14 w-14 rounded-2xl flex items-center justify-center transition-all border-2",
-                        isSelected ? "bg-primary border-primary text-black shadow-xl" : "bg-white/5 border-white/10 text-white/20"
+                        isSelected ? "bg-primary border-primary text-black shadow-xl" : "bg-white/5 border-white/10 text-white/20",
+                        !isMatched && "opacity-20 cursor-not-allowed border-dashed"
                       )}
                     >
-                      {isSelected ? <Check className="h-8 w-8 stroke-[3]" /> : <Activity className="h-6 w-6" />}
+                      {isSelected ? <Check className="h-8 w-8 stroke-[3]" /> : isMatched ? <Layers className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
                     </button>
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-3">
                         <h5 className={cn(
                           "text-xl font-black uppercase tracking-tight transition-colors leading-none",
-                          isSelected ? "text-white" : "text-white/40"
+                          isMatched ? "text-white" : "text-white/40"
                         )}>
                           {group.groupName}
                         </h5>
-                        {getSourceBadge(group.headerSource)}
+                        {isMatched ? (
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[8px] font-black uppercase"><FileCheck className="h-2.5 w-2.5 mr-1" /> Template Matched</Badge>
+                        ) : (
+                          <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[8px] font-black uppercase"><Wrench className="h-2.5 w-2.5 mr-1" /> Definition Required</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Rows {group.startRow + 1}-{group.endRow + 1}</span>
+                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Row 1 Title & Row 2 Headers</span>
                         <div className="h-1 w-1 rounded-full bg-white/10" />
-                        <span className="flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> {group.headerSetType.replace('_', ' ')}</span>
+                        <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5" /> {group.rowCount} DATA ROWS</span>
                       </div>
                     </div>
                   </div>
 
-                  <Badge variant="outline" className="h-8 px-5 rounded-full font-black uppercase text-[10px] tracking-[0.2em] border-primary/20 text-primary bg-primary/5">
-                    {group.rowCount} DATA ROWS
-                  </Badge>
+                  {!isMatched ? (
+                    <Button 
+                      onClick={() => onAction?.(group)}
+                      className="h-12 px-8 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-orange-600/20"
+                    >
+                      <PlusCircle className="h-4 w-4" /> Define as Template
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-green-500/10 rounded-xl"><CheckCircle2 className="h-5 w-5 text-green-500" /></div>
+                      <span className="text-[10px] font-black uppercase text-green-600/60 tracking-widest">READY FOR INGESTION</span>
+                    </div>
+                  )}
                 </div>
 
                 <CardContent className="p-0 bg-black">

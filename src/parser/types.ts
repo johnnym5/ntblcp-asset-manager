@@ -41,6 +41,7 @@ export interface DiscoveredGroup {
   templateId: string;
   sheetName: string;
   workbookName: string;
+  isTemplateMatched: boolean; // NEW: Track if this group exists in Settings
   notes?: string;
 }
 
@@ -57,8 +58,8 @@ export interface ValidationSummary {
   duplicateFlags: string[];
   needsReview: boolean;
   isRejected: boolean;
-  isUpdate: boolean; // Flag indicating the record already exists in the DB
-  existingAssetId?: string; // Reference to the existing record
+  isUpdate: boolean; 
+  existingAssetId?: string; 
   logs: ValidationLog[];
 }
 

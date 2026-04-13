@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview Multi-Sheet Structural Parser Engine.
- * Supports stacked hierarchical blocks: Title Row -> Header Row -> Data Rows.
- * Phase 1110: Implemented multi-block discovery per sheet.
+ * @fileOverview Integrated Structural Parser Engine.
+ * Enforces strict Row 1 (Name) / Row 2 (Header) discovery.
+ * Integrates Template Matching to prevent unmapped asset imports.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -16,92 +16,94 @@ import type {
   HeaderTemplate,
   DiscoveredGroup,
   GroupImportContainer,
-  HeaderSource,
   HeaderSetType
 } from './types';
-import type { Asset } from '@/types/domain';
+import type { Asset, SheetDefinition } from '@/types/domain';
 
 export class ParserEngine {
   private templates: Map<string, HeaderTemplate> = new Map();
   private workbookName: string;
   private existingAssets: Asset[];
+  private sheetDefinitions: Record<string, SheetDefinition>;
 
-  constructor(workbookName: string, existingAssets: Asset[] = []) {
+  constructor(workbookName: string, existingAssets: Asset[] = [], sheetDefinitions: Record<string, SheetDefinition> = {}) {
     this.workbookName = workbookName;
     this.existingAssets = existingAssets;
+    this.sheetDefinitions = sheetDefinitions;
   }
 
   /**
-   * Authoritative entry point for multi-sheet workbook parsing.
+   * Identifies structural blocks using Row 1 (Name) and Row 2 (Header) pattern.
    */
-  public parseWorkbook(sheetName: string, data: any[][]): GroupImportContainer {
-    const groups = this.discoverGroups(sheetName, data);
-    const containers = this.ingestGroups(sheetName, data, groups);
-    
-    // If multiple blocks found, merge them or return primary
-    return containers[0] || this.createEmptyContainer(sheetName);
-  }
-
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
-    if (!data || data.length === 0) return [];
+    if (!data || data.length < 2) return [];
 
     const discovered: DiscoveredGroup[] = [];
-    let pendingGroupName: string | null = null;
-    let activeGroup: DiscoveredGroup | null = null;
-
+    
+    // We strictly look for the Name -> Header -> Data pattern
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const type = classifyRow(row);
 
-      // 1. Detect Folder Title (Row 1 style)
+      // Rule: If we find a standalone title (Row 1), assume the next row is the Header (Row 2)
       if (type === 'GROUP_HEADER') {
-        pendingGroupName = String(row[0] || '').trim();
-        continue;
-      }
-
-      // 2. Detect Schema Header (Row 2 style)
-      if (type === 'SCHEMA_HEADER') {
-        const signature = this.registerTemplate(row, 'real_template');
-        const tpl = this.templates.get(signature)!;
+        const groupName = String(row[0] || '').trim();
+        const headerRow = data[i + 1];
         
-        // Finalize previous group if it exists
-        if (activeGroup) {
-          activeGroup.endRow = i - 1;
-        }
+        if (headerRow && classifyRow(headerRow) === 'SCHEMA_HEADER') {
+          const signature = this.registerTemplate(headerRow, 'real_template');
+          const tpl = this.templates.get(signature)!;
+          
+          // Check if this group already exists in our Template settings
+          const fuzzyName = getFuzzySignature(groupName);
+          const isMatched = Object.keys(this.sheetDefinitions).some(k => getFuzzySignature(k) === fuzzyName);
 
-        const name = pendingGroupName || sheetName;
-        activeGroup = {
-          id: uuidv4(),
-          groupName: name,
-          headerSet: tpl.rawHeaders,
-          headerSource: pendingGroupName ? 'explicit' : 'inferred',
-          headerSetType: 'real_template',
-          columnCount: tpl.columnCount,
-          rowCount: 0,
-          startRow: i + 1,
-          endRow: data.length - 1,
-          headerStart: i,
-          headerEnd: i,
-          rawText: name,
-          visibleHeaderRow: tpl.rawHeaders,
-          templateId: tpl.id,
-          sheetName: sheetName,
-          workbookName: this.workbookName
-        };
-        discovered.push(activeGroup);
-        pendingGroupName = null; // Reset for next block
+          const group: DiscoveredGroup = {
+            id: uuidv4(),
+            groupName: groupName,
+            headerSet: tpl.rawHeaders,
+            headerSource: 'explicit',
+            headerSetType: 'real_template',
+            columnCount: tpl.columnCount,
+            rowCount: 0,
+            startRow: i + 2, // Data starts after Header
+            endRow: data.length - 1,
+            headerStart: i + 1,
+            headerEnd: i + 1,
+            rawText: groupName,
+            visibleHeaderRow: tpl.rawHeaders,
+            templateId: tpl.id,
+            sheetName: sheetName,
+            workbookName: this.workbookName,
+            isTemplateMatched: isMatched
+          };
+
+          // Find end of this specific group by looking for the next TITLE row or empty row
+          for (let j = group.startRow; j < data.length; j++) {
+            const nextType = classifyRow(data[j]);
+            if (nextType === 'GROUP_HEADER' || nextType === 'EMPTY') {
+              group.endRow = j - 1;
+              break;
+            }
+          }
+
+          group.rowCount = data.slice(group.startRow, group.endRow + 1).filter(r => classifyRow(r) === 'DATA_ROW').length;
+          
+          if (group.rowCount > 0) {
+            discovered.push(group);
+          }
+          
+          i = group.endRow; // Skip to end of this group
+        }
       }
     }
-
-    // Finalize counts
-    discovered.forEach(g => {
-      const dataRows = data.slice(g.startRow, g.endRow + 1);
-      g.rowCount = dataRows.filter(r => classifyRow(r) === 'DATA_ROW').length;
-    });
 
     return discovered;
   }
 
+  /**
+   * Extracts data rows using the matched or generated templates.
+   */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     return selectedGroups.map(group => {
       const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
@@ -114,23 +116,17 @@ export class ParserEngine {
 
       for (let i = group.startRow; i <= group.endRow; i++) {
         const rowData = data[i];
-        if (!rowData) continue;
+        if (!rowData || classifyRow(rowData) !== 'DATA_ROW') continue;
         
-        const rowType = classifyRow(rowData);
-        if (rowType === 'DATA_ROW' || rowType === 'UNKNOWN') {
-          const asset = this.mapRowToTemplate(rowData, tpl, group, i);
-          const hasContent = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
-          
-          if (hasContent) {
-            container.assets.push(asset);
-            if (asset.validation.isRejected) {
-              container.metrics.invalid++;
-            } else {
-              container.metrics.valid++;
-              if (asset.validation.isUpdate) container.metrics.updates++;
-              else container.metrics.new++;
-            }
-          }
+        const asset = this.mapRowToTemplate(rowData, tpl, group, i);
+        container.assets.push(asset);
+        
+        if (asset.validation.isRejected) {
+          container.metrics.invalid++;
+        } else {
+          container.metrics.valid++;
+          if (asset.validation.isUpdate) container.metrics.updates++;
+          else container.metrics.new++;
         }
       }
       return container;
@@ -144,7 +140,7 @@ export class ParserEngine {
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Stacked Parser',
+      lastModifiedBy: 'Template Ingestion',
       importMetadata: { 
         sourceFile: this.workbookName, 
         sheetName: group.sheetName, 
@@ -177,12 +173,6 @@ export class ParserEngine {
         case 'engine_no': asset.engineNo = strVal; break;
         case 'location': asset.location = strVal; break;
         case 'assignee_location': asset.custodian = strVal; break;
-        case 'manufacturer': asset.manufacturer = strVal; break;
-        case 'model_number': asset.modelNumber = strVal; break;
-        case 'purchase_price_ngn': asset.value = parseFloat(strVal.replace(/[^0-9.]/g, '')) || 0; break;
-        case 'date_purchased_received': asset.purchaseDate = strVal; break;
-        case 'condition': asset.condition = strVal; break;
-        case 'remarks': asset.remarks = strVal; break;
         default: 
           const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]\n\r]/g, '_').trim();
           asset.metadata[safeKey] = val;
@@ -207,9 +197,12 @@ export class ParserEngine {
     if (!this.existingAssets || this.existingAssets.length === 0) return undefined;
     const parsedIdCode = getFuzzySignature(parsed.assetIdCode);
     const parsedSN = getFuzzySignature(parsed.serialNumber);
+    const parsedChassis = getFuzzySignature(parsed.chassisNo);
+
     return this.existingAssets.find(ex => {
       if (parsedIdCode && parsedIdCode !== 'na' && parsedIdCode === getFuzzySignature(ex.assetIdCode)) return true;
       if (parsedSN && parsedSN !== 'na' && parsedSN === getFuzzySignature(ex.serialNumber)) return true;
+      if (parsedChassis && parsedChassis !== 'na' && parsedChassis === getFuzzySignature(ex.chassisNo)) return true;
       return false;
     });
   }
@@ -228,28 +221,5 @@ export class ParserEngine {
       });
     }
     return signature;
-  }
-
-  private createEmptyContainer(name: string): GroupImportContainer {
-    return {
-      id: uuidv4(),
-      groupName: name,
-      headerSet: [],
-      headerSource: 'synthetic',
-      headerSetType: 'generated_template',
-      columnCount: 0,
-      rowCount: 0,
-      startRow: 0,
-      endRow: 0,
-      headerStart: null,
-      headerEnd: null,
-      rawText: name,
-      visibleHeaderRow: null,
-      templateId: '',
-      sheetName: name,
-      workbookName: this.workbookName,
-      assets: [],
-      metrics: { valid: 0, invalid: 0, updates: 0, new: 0 }
-    };
   }
 }
