@@ -81,6 +81,7 @@ import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
 import { InboxSheet } from '@/components/inbox-sheet';
 import { SyncStatusDialog } from '@/components/SyncStatusDialog';
+import { SyncConfirmationDialog } from '@/components/sync-confirmation-dialog';
 import { useLongPress } from '@/hooks/use-long-press';
 
 function BellNotificationToast({ notification }: { notification: Notification }) {
@@ -125,7 +126,11 @@ export default function SPAHub() {
     selectedCategories,
     setIsCommandPaletteOpen,
     refreshRegistry,
-    assets
+    assets,
+    syncSummary,
+    executeSync,
+    isSyncConfirmOpen,
+    setIsSyncConfirmOpen
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -188,6 +193,12 @@ export default function SPAHub() {
       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <SyncStatusDialog isOpen={isSyncStatusOpen} onOpenChange={setIsSyncStatusOpen} />
+      <SyncConfirmationDialog 
+        isOpen={isSyncConfirmOpen} 
+        onOpenChange={setIsSyncConfirmOpen}
+        summary={syncSummary}
+        onConfirm={executeSync}
+      />
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
       <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">

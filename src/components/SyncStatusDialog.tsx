@@ -3,6 +3,7 @@
 /**
  * @fileOverview SyncStatusDialog - High-Fidelity Sync Management Workstation.
  * Finalized for deployment with Bi-directional Sync (Push/Pull).
+ * Phase 1902: Integrated Scan-Before-Sync workflow.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -68,6 +69,16 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
 
   const isFullySynced = stats.pending === 0 && stats.errors === 0;
 
+  const handlePushPulse = async () => {
+    await manualUpload();
+    // confirmation dialog handles the rest
+  };
+
+  const handlePullPulse = async () => {
+    await manualDownload();
+    // confirmation dialog handles the rest
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-[2.5rem]">
@@ -94,7 +105,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                 {isOnline ? <Wifi className="h-10 w-10 animate-pulse" /> : <WifiOff className="h-10 w-10" />}
               </div>
               <div className="space-y-1">
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Registry Pulse</h3>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Registry Status</h3>
                 <p className={cn(
                   "text-[10px] font-black uppercase tracking-widest",
                   isOnline ? "text-green-500/60" : "text-red-500/60"
@@ -136,20 +147,20 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
               <div className="flex gap-3">
                 <Button 
                   variant="outline"
-                  onClick={manualDownload}
+                  onClick={handlePullPulse}
                   disabled={isSyncing || !isOnline}
                   className="h-16 px-8 rounded-2xl bg-white/[0.03] border-2 border-white/10 hover:border-primary/20 text-white font-black uppercase text-[10px] tracking-widest gap-3 transition-all"
                 >
                   {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
-                  Pull Cloud
+                  Pull Scan
                 </Button>
                 <Button 
-                  onClick={manualUpload}
+                  onClick={handlePushPulse}
                   disabled={isSyncing || !isOnline || stats.pending === 0}
                   className="h-16 px-10 rounded-2xl bg-primary text-black font-black uppercase text-xs tracking-widest gap-3 shadow-2xl transition-transform hover:scale-105 active:scale-95"
                 >
                   {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Push Changes
+                  Push Scan
                 </Button>
               </div>
             </div>
@@ -167,7 +178,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
               "text-[11px] font-black uppercase tracking-[0.4em] transition-all",
               isFullySynced ? "text-green-500/40" : "text-white/10"
             )}>
-              {isFullySynced ? 'High-Availability Parity Confirmed' : 'Sync Replay Required'}
+              {isFullySynced ? 'High-Availability Parity Confirmed' : 'Sync Scan Required'}
             </p>
           </div>
         </div>

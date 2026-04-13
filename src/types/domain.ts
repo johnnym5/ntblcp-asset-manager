@@ -14,6 +14,7 @@ export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 export type SyncStatus = 'synced' | 'local';
+export type SyncStrategy = 'UPDATE' | 'SKIP';
 
 export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
 export type LocationMatchStatus = 'MATCHED' | 'PARTIAL' | 'UNASSIGNED' | 'NEEDS_REVIEW' | 'INVALID';
@@ -208,6 +209,13 @@ export interface Grant {
   name: string;
   enabledSheets: string[];
   sheetDefinitions: Record<string, SheetDefinition>;
+}
+
+export interface SyncSummary {
+  type: 'DOWNLOAD' | 'UPLOAD';
+  newItems: Asset[];
+  existingItems: Asset[];
+  totalCount: number;
 }
 
 export interface AppSettings {

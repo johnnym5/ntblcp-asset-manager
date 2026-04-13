@@ -2,9 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Simplified for deployment with standard Asset Management language.
- * Phase 1801: Implemented logic for diagnostic token filtering (Summary Cards).
- * Phase 1802: Hardened diagnostic logic to inspect metadata for vehicles.
+ * Phase 1900: Implemented Auto-Sync on project/folder toggle.
+ * Phase 1901: Implemented Scan-Before-Sync conflict governance.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -24,7 +23,9 @@ import type {
   AuthorityNode, 
   WorkstationView, 
   OptionType, 
-  SortConfig 
+  SortConfig,
+  SyncSummary,
+  SyncStrategy
 } from '@/types/domain';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
@@ -49,8 +50,15 @@ interface AppStateContextType {
   activeView: WorkstationView;
   setActiveView: (view: WorkstationView) => void;
   refreshRegistry: () => Promise<void>;
+  
+  // Sync High-Fidelity Pulse
   manualDownload: () => Promise<void>;
   manualUpload: () => Promise<void>;
+  executeSync: (strategy: SyncStrategy) => Promise<void>;
+  syncSummary: SyncSummary | null;
+  isSyncConfirmOpen: boolean;
+  setIsSyncConfirmOpen: (open: boolean) => void;
+
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
   
   headers: RegistryHeader[];
@@ -129,6 +137,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
   const [groupsViewMode, setGroupsViewMode] = useState<'category' | 'condition'>('category');
   
+  // Sync Governance State
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
+
   const [headers, setHeaders] = useState<RegistryHeader[]>(
     DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[]
   );
@@ -175,6 +187,50 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       console.error("Registry Refresh Error:", e); 
     }
   }, []);
+
+  // --- Auto-Sync Lifecycle Pulse ---
+  useEffect(() => {
+    if (!isHydrated || !appSettings) return;
+
+    const handleAutoProvisioning = async () => {
+      const prevIdsStr = localStorage.getItem('assetain-prev-active-ids');
+      const prevIds: string[] = prevIdsStr ? JSON.parse(prevIdsStr) : [];
+      const currentIds = appSettings.activeGrantIds || [];
+
+      const removedIds = prevIds.filter(id => !currentIds.includes(id));
+      const addedIds = currentIds.filter(id => !prevIds.includes(id));
+
+      if (removedIds.length > 0) {
+        const local = await storage.getAssets();
+        const next = local.filter(a => !removedIds.includes(a.grantId));
+        await storage.saveAssets(next);
+        await refreshRegistry();
+        addNotification({ title: "Scope Purged", description: "Records from disabled projects removed locally.", variant: "default" });
+      }
+
+      if (addedIds.length > 0 && isOnline) {
+        setIsSyncing(true);
+        try {
+          let newlyFetched: Asset[] = [];
+          for (const gid of addedIds) {
+            const projectAssets = await FirestoreService.getProjectAssets(gid);
+            newlyFetched = [...newlyFetched, ...projectAssets];
+          }
+          const currentLocal = await storage.getAssets();
+          const merged = [...currentLocal, ...newlyFetched.map(a => ({ ...a, syncStatus: 'synced' as const }))];
+          await storage.saveAssets(merged);
+          await refreshRegistry();
+          addNotification({ title: "Scope Downloaded", description: `Added ${newlyFetched.length} records for new projects.`, variant: "success" });
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+
+      localStorage.setItem('assetain-prev-active-ids', JSON.stringify(currentIds));
+    };
+
+    handleAutoProvisioning();
+  }, [appSettings?.activeGrantIds, isOnline, isHydrated, refreshRegistry]);
 
   useEffect(() => { 
     setIsHydrated(true);
@@ -379,51 +435,110 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const manualDownload = useCallback(async () => {
     if (!isOnline) return;
-    const userSession = localStorage.getItem('assetain-user-session');
-    const profile = userSession ? JSON.parse(userSession) : null;
-    const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
     setIsSyncing(true);
+    addNotification({ title: "Scanning Cloud...", description: "Identifying new and existing records." });
+    
     try {
-      const remoteSettings = await FirestoreService.getSettings();
-      if (remoteSettings) {
-        setAppSettings(remoteSettings);
-        if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) setHeaders(remoteSettings.globalHeaders);
-        await storage.saveSettings(remoteSettings);
-        const currentGrantIds = remoteSettings.activeGrantIds || [];
-        let allRemoteAssets: Asset[] = [];
-        for (const gid of currentGrantIds) {
-          const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
-          allRemoteAssets = [...allRemoteAssets, ...projectAssets];
-        }
-        const localAssets = await storage.getAssets();
-        const taggedRemote = allRemoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-        const otherAssets = localAssets.filter(a => !currentGrantIds.includes(a.grantId));
-        await storage.saveAssets([...otherAssets, ...taggedRemote]);
-        addNotification({ title: "System Synchronized", variant: "success" });
+      const currentGrantIds = appSettings?.activeGrantIds || [];
+      let allRemoteAssets: Asset[] = [];
+      for (const gid of currentGrantIds) {
+        const projectAssets = await FirestoreService.getProjectAssets(gid);
+        allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
-      await refreshRegistry();
+
+      const localAssets = await storage.getAssets();
+      const localMap = new Map(localAssets.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
+
+      const newItems: Asset[] = [];
+      const existingItems: Asset[] = [];
+
+      allRemoteAssets.forEach(remote => {
+        const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
+        if (localMap.has(id)) existingItems.push(remote);
+        else newItems.push(remote);
+      });
+
+      setSyncSummary({ type: 'DOWNLOAD', newItems, existingItems, totalCount: allRemoteAssets.length });
+      setIsSyncConfirmOpen(true);
     } catch (e) {
-      addNotification({ title: "Sync Error", variant: "destructive" });
-    } finally { setIsSyncing(false); }
-  }, [isOnline, refreshRegistry]);
+      addNotification({ title: "Sync Scan Failed", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline, appSettings]);
 
   const manualUpload = useCallback(async () => {
     if (!isOnline) return;
     setIsSyncing(true);
     try {
-      await processSyncQueue();
+      const queue = await storage.getQueue();
+      const pending = queue.filter(q => q.status === 'PENDING');
+      
+      if (pending.length === 0) {
+        addNotification({ title: "Registry Up-to-Date", description: "Zero local changes pending upload." });
+        setIsSyncing(false);
+        return;
+      }
+
+      setSyncSummary({ 
+        type: 'UPLOAD', 
+        newItems: pending.map(q => q.payload as any), 
+        existingItems: [], // Push logic is simpler but follows same UI pulse
+        totalCount: pending.length 
+      });
+      setIsSyncConfirmOpen(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline]);
+
+  const executeSync = async (strategy: SyncStrategy) => {
+    if (!syncSummary) return;
+    setIsSyncing(true);
+    setIsSyncConfirmOpen(false);
+
+    try {
+      if (syncSummary.type === 'DOWNLOAD') {
+        const local = await storage.getAssets();
+        const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
+
+        let nextAssets = [...local];
+        
+        // 1. Process New Items
+        syncSummary.newItems.forEach(item => {
+          nextAssets.push({ ...item, syncStatus: 'synced' });
+        });
+
+        // 2. Process Existing Items based on strategy
+        if (strategy === 'UPDATE') {
+          syncSummary.existingItems.forEach(remote => {
+            const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
+            nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...remote, syncStatus: 'synced' } : a);
+          });
+        }
+
+        await storage.saveAssets(nextAssets);
+        addNotification({ title: "Download Complete", description: `Processed ${syncSummary.totalCount} records. Strategy: ${strategy}`, variant: "success" });
+      } else {
+        // EXECUTE UPLOAD
+        await processSyncQueue();
+      }
+      
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Upload Error", variant: "destructive" });
-    } finally { setIsSyncing(false); }
-  }, [isOnline, refreshRegistry]);
+      addNotification({ title: "Sync Execution Failure", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+      setSyncSummary(null);
+    }
+  };
 
   return (
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantIds, activeView, setActiveView: setActiveViewStatus,
-      refreshRegistry, manualDownload, manualUpload,
+      refreshRegistry, manualDownload, manualUpload, executeSync, syncSummary, isSyncConfirmOpen, setIsSyncConfirmOpen,
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions, categoryOptions,
