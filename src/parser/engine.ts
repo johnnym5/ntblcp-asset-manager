@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Multi-Sheet Structural Parser Engine.
- * Reverted to "One Sheet = One Folder" paradigm with independent header discovery.
- * Phase 1100: Implemented parseWorkbook for full-file traversal.
+ * Supports stacked hierarchical blocks: Title Row -> Header Row -> Data Rows.
+ * Phase 1110: Implemented multi-block discovery per sheet.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -35,68 +35,70 @@ export class ParserEngine {
    * Authoritative entry point for multi-sheet workbook parsing.
    */
   public parseWorkbook(sheetName: string, data: any[][]): GroupImportContainer {
-    // 1. Discover the primary group for this sheet
     const groups = this.discoverGroups(sheetName, data);
-    
-    // 2. Ingest the data into a container
     const containers = this.ingestGroups(sheetName, data, groups);
     
-    // Return the primary container for this sheet
-    return containers[0] || {
-      id: uuidv4(),
-      groupName: sheetName,
-      headerSet: [],
-      headerSource: 'synthetic',
-      headerSetType: 'generated_template',
-      columnCount: 0,
-      rowCount: 0,
-      startRow: 0,
-      endRow: 0,
-      headerStart: null,
-      headerEnd: null,
-      rawText: sheetName,
-      visibleHeaderRow: null,
-      templateId: '',
-      sheetName,
-      workbookName: this.workbookName,
-      assets: [],
-      metrics: { valid: 0, invalid: 0, updates: 0, new: 0 }
-    };
+    // If multiple blocks found, merge them or return primary
+    return containers[0] || this.createEmptyContainer(sheetName);
   }
 
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
-    const discovered: DiscoveredGroup[] = [];
-    let activeGroup: DiscoveredGroup | null = null;
-    
     if (!data || data.length === 0) return [];
 
-    // Find the first header row in the sheet
-    let headerRowIndex = -1;
-    for (let i = 0; i < Math.min(data.length, 20); i++) {
-      if (classifyRow(data[i]) === 'SCHEMA_HEADER') {
-        headerRowIndex = i;
-        break;
+    const discovered: DiscoveredGroup[] = [];
+    let pendingGroupName: string | null = null;
+    let activeGroup: DiscoveredGroup | null = null;
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const type = classifyRow(row);
+
+      // 1. Detect Folder Title (Row 1 style)
+      if (type === 'GROUP_HEADER') {
+        pendingGroupName = String(row[0] || '').trim();
+        continue;
+      }
+
+      // 2. Detect Schema Header (Row 2 style)
+      if (type === 'SCHEMA_HEADER') {
+        const signature = this.registerTemplate(row, 'real_template');
+        const tpl = this.templates.get(signature)!;
+        
+        // Finalize previous group if it exists
+        if (activeGroup) {
+          activeGroup.endRow = i - 1;
+        }
+
+        const name = pendingGroupName || sheetName;
+        activeGroup = {
+          id: uuidv4(),
+          groupName: name,
+          headerSet: tpl.rawHeaders,
+          headerSource: pendingGroupName ? 'explicit' : 'inferred',
+          headerSetType: 'real_template',
+          columnCount: tpl.columnCount,
+          rowCount: 0,
+          startRow: i + 1,
+          endRow: data.length - 1,
+          headerStart: i,
+          headerEnd: i,
+          rawText: name,
+          visibleHeaderRow: tpl.rawHeaders,
+          templateId: tpl.id,
+          sheetName: sheetName,
+          workbookName: this.workbookName
+        };
+        discovered.push(activeGroup);
+        pendingGroupName = null; // Reset for next block
       }
     }
 
-    // If no header found, assume row 0 is a synthetic header or needs review
-    const effectiveHeaderIndex = headerRowIndex === -1 ? 0 : headerRowIndex;
-    const headerRow = data[effectiveHeaderIndex];
-    
-    const signature = this.registerTemplate(headerRow, headerRowIndex === -1 ? 'inferred_template' : 'real_template');
-    const tpl = this.templates.get(signature)!;
-    
-    activeGroup = this.createNewGroup(sheetName, tpl, headerRowIndex === -1 ? 'inferred' : 'explicit', effectiveHeaderIndex, sheetName);
-    activeGroup.startRow = effectiveHeaderIndex + 1;
-    activeGroup.endRow = data.length - 1;
-    
-    // Calculate actual data rows
-    activeGroup.rowCount = data.slice(activeGroup.startRow).filter(r => {
-      const type = classifyRow(r);
-      return type === 'DATA_ROW';
-    }).length;
+    // Finalize counts
+    discovered.forEach(g => {
+      const dataRows = data.slice(g.startRow, g.endRow + 1);
+      g.rowCount = dataRows.filter(r => classifyRow(r) === 'DATA_ROW').length;
+    });
 
-    discovered.push(activeGroup);
     return discovered;
   }
 
@@ -117,8 +119,6 @@ export class ParserEngine {
         const rowType = classifyRow(rowData);
         if (rowType === 'DATA_ROW' || rowType === 'UNKNOWN') {
           const asset = this.mapRowToTemplate(rowData, tpl, group, i);
-          
-          // Check for minimal data presence to prevent empty row ghosting
           const hasContent = !!asset.description || !!asset.assetIdCode || !!asset.serialNumber || !!asset.chassisNo;
           
           if (hasContent) {
@@ -144,7 +144,7 @@ export class ParserEngine {
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Multi-Sheet Parser',
+      lastModifiedBy: 'Stacked Parser',
       importMetadata: { 
         sourceFile: this.workbookName, 
         sheetName: group.sheetName, 
@@ -205,44 +205,17 @@ export class ParserEngine {
 
   private findExistingAsset(parsed: Partial<Asset>): Asset | undefined {
     if (!this.existingAssets || this.existingAssets.length === 0) return undefined;
-
     const parsedIdCode = getFuzzySignature(parsed.assetIdCode);
     const parsedSN = getFuzzySignature(parsed.serialNumber);
-    const parsedChassis = getFuzzySignature(parsed.chassisNo);
-    const parsedDesc = getFuzzySignature(parsed.description);
-
     return this.existingAssets.find(ex => {
       if (parsedIdCode && parsedIdCode !== 'na' && parsedIdCode === getFuzzySignature(ex.assetIdCode)) return true;
-      if (parsedChassis && parsedChassis !== 'na' && parsedChassis === getFuzzySignature(ex.chassisNo)) return true;
       if (parsedSN && parsedSN !== 'na' && parsedSN === getFuzzySignature(ex.serialNumber)) return true;
-      if (parsedDesc && parsedDesc === getFuzzySignature(ex.description)) return true;
       return false;
     });
   }
 
-  private createNewGroup(name: string, tpl: HeaderTemplate, source: HeaderSource, start: number, sheet: string): DiscoveredGroup {
-    return {
-      id: uuidv4(),
-      groupName: name,
-      headerSet: tpl.rawHeaders,
-      headerSource: source,
-      headerSetType: tpl.type,
-      columnCount: tpl.columnCount,
-      rowCount: 0,
-      startRow: start,
-      endRow: 0,
-      headerStart: null,
-      headerEnd: null,
-      rawText: name,
-      visibleHeaderRow: tpl.rawHeaders,
-      templateId: tpl.id,
-      sheetName: sheet,
-      workbookName: this.workbookName
-    };
-  }
-
   private registerTemplate(row: any[], type: HeaderSetType): string {
-    const rawHeaders = row.filter(c => c !== null).map(c => String(c).trim());
+    const rawHeaders = row.map(c => c === null ? '' : String(c).trim());
     const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
     if (!this.templates.has(signature)) {
       this.templates.set(signature, {
@@ -257,28 +230,26 @@ export class ParserEngine {
     return signature;
   }
 
-  private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
-    for (const tpl of this.templates.values()) {
-      if (Math.abs(tpl.columnCount - row.length) <= 1) return tpl;
-    }
-
-    const signature = `SYNTH_${row.length}`;
-    if (!this.templates.has(signature)) {
-      const headers = this.getSyntheticHeaders(row.length);
-      this.templates.set(signature, {
-        id: `SYNTH_${this.templates.size + 1}`,
-        rawHeaders: headers,
-        normalizedHeaders: headers.map(normalizeHeaderName),
-        columnCount: row.length,
-        signature,
-        type: 'inferred_template'
-      });
-    }
-    return this.templates.get(signature)!;
-  }
-
-  private getSyntheticHeaders(count: number): string[] {
-    const canonical = ['S/N', 'Location', 'Assignee (Location)', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Received', 'Purchase price (Naira)'];
-    return Array.from({ length: count }, (_, i) => i < canonical.length ? canonical[i] : `Column ${i + 1}`);
+  private createEmptyContainer(name: string): GroupImportContainer {
+    return {
+      id: uuidv4(),
+      groupName: name,
+      headerSet: [],
+      headerSource: 'synthetic',
+      headerSetType: 'generated_template',
+      columnCount: 0,
+      rowCount: 0,
+      startRow: 0,
+      endRow: 0,
+      headerStart: null,
+      headerEnd: null,
+      rawText: name,
+      visibleHeaderRow: null,
+      templateId: '',
+      sheetName: name,
+      workbookName: this.workbookName,
+      assets: [],
+      metrics: { valid: 0, invalid: 0, updates: 0, new: 0 }
+    };
   }
 }
