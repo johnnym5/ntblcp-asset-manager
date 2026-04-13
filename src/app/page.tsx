@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -120,7 +119,7 @@ export default function SPAHub() {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
@@ -136,6 +135,9 @@ export default function SPAHub() {
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       case 'SYNC_QUEUE': return <SyncQueueWorkstation isEmbedded={false} />;
+      case 'USERS' as any: return <RegistryWorkstation />; // Redirect or specific component
+      case 'INFRASTRUCTURE' as any: return <DashboardWorkstation />; // Needs dedicated component
+      case 'DATABASE' as any: return <DashboardWorkstation />; // Needs dedicated component
       default: return <DashboardWorkstation />;
     }
   }, [activeView]);

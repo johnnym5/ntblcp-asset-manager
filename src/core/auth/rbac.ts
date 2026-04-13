@@ -1,6 +1,7 @@
 /**
  * @fileOverview RBAC (Role-Based Access Control) Engine.
  * Phase 181: Implemented Deterministic Fuzzy Matching for scope enforcement.
+ * Phase 182: Unrestricted access for Administrative tiers.
  */
 
 import type { AuthorizedUser, Asset, UserRole } from '@/types/domain';
@@ -13,21 +14,17 @@ import { getFuzzySignature } from '@/lib/utils';
 export function hasPermission(user: AuthorizedUser, action: string): boolean {
   const role = user.role as UserRole;
 
+  // Global Administrative Bypass: Admins and SuperAdmins have full functional access
+  if (role === 'SUPERADMIN' || role === 'ADMIN' || user.isAdmin) {
+    return true;
+  }
+
   switch (action) {
-    case 'DATABASE_ADMIN_TOOLS':
-      return role === 'SUPERADMIN';
-
-    case 'MANAGE_SYSTEM':
-    case 'MANAGE_USERS':
-    case 'EDIT_GLOBAL_CONFIG':
-    case 'GLOBAL_WIPE':
-      return role === 'ADMIN' || role === 'SUPERADMIN';
-
     case 'IMPORT_RECORDS':
     case 'BATCH_EDIT':
     case 'REVERT_CHANGES':
     case 'ADJUDICATE_REQUESTS':
-      return role === 'ADMIN' || role === 'SUPERADMIN' || !!user.isZonalAdmin;
+      return role === 'MANAGER' || !!user.isZonalAdmin;
 
     case 'VIEW_REGISTRY':
     case 'VERIFY_ASSET':
@@ -44,8 +41,8 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
  * Uses normalized fuzzy matching to handle naming variations.
  */
 export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
-  // 1. SuperAdmins and Admins bypass regional checks
-  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All')) {
+  // 1. SuperAdmins and Global Admins bypass regional checks entirely
+  if (user.role === 'SUPERADMIN' || user.states.includes('All')) {
     return true;
   }
 

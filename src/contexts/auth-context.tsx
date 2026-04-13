@@ -71,6 +71,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
+          const isUserAdmin = authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN';
+          
           const mergedProfile: LocalUserProfile = {
             ...profile,
             displayName: authorizedUser.displayName,
@@ -79,9 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             assignedZone: authorizedUser.assignedZone,
             role: authorizedUser.role,
             // Hardened Admin Derivation
-            isAdmin: authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
-            canAddAssets: authorizedUser.canAddAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
-            canEditAssets: authorizedUser.canEditAssets || authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN',
+            isAdmin: isUserAdmin,
+            canAddAssets: authorizedUser.canAddAssets || isUserAdmin,
+            canEditAssets: authorizedUser.canEditAssets || isUserAdmin,
           };
           setUserProfile(mergedProfile);
           setProfileSetupComplete(true);
@@ -110,6 +112,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await FirebaseAuthService.ensureSession();
 
+      const isUserAdmin = user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN';
+
       const newProfile: LocalUserProfile = {
         id: uuidv4(),
         loginName: user.loginName,
@@ -119,10 +123,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         states: user.states,
         isZonalAdmin: user.isZonalAdmin,
         assignedZone: user.assignedZone,
-        isAdmin: user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
+        isAdmin: isUserAdmin,
         role: user.role,
-        canAddAssets: user.canAddAssets || user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
-        canEditAssets: user.canEditAssets || user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
+        canAddAssets: user.canAddAssets || isUserAdmin,
+        canEditAssets: user.canEditAssets || isUserAdmin,
       };
       
       sessionStorage.setItem('assetain-fresh-login', 'true');

@@ -90,7 +90,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         isGuest: false, 
         password: '', 
         confirmPassword: '', 
-        canAddAssets: false,
+        canAddAssets: false, 
         canEditAssets: false,
         role: 'VERIFIER'
     },
@@ -122,8 +122,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             isGuest: false, 
             password: '', 
             confirmPassword: '', 
-            canAddAssets: false, 
-            canEditAssets: false,
+            canAddAssets: true, 
+            canEditAssets: true,
             role: 'VERIFIER'
         });
       }
@@ -142,10 +142,13 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     setIsSaving(true);
     const { confirmPassword, ...userToSave } = data;
     
-    // Explicitly derive role if not manually set correctly via switches
+    // Deterministic Role Derivation from Switches
     let derivedRole = data.role;
-    if (data.isAdmin) derivedRole = 'ADMIN';
-    else if (data.isZonalAdmin) derivedRole = 'MANAGER';
+    if (data.isAdmin) {
+      derivedRole = 'SUPERADMIN'; // "Super Administrator" toggle grants global unrestricted access
+    } else if (data.isZonalAdmin) {
+      derivedRole = 'ADMIN'; // "Zonal Administrator" toggle grants administrative access scoped to a zone
+    }
 
     await onSave({ ...userToSave, role: derivedRole } as AuthorizedUser, user?.loginName);
     setIsSaving(false);
