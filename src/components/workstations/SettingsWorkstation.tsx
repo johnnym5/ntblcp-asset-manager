@@ -3,7 +3,6 @@
 /**
  * @fileOverview Settings - Main Operational Control Center.
  * Simplified for deployment with standard Asset Management language.
- * Phase 1801: Added Rename and Delete functionality for Asset Groups.
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -24,7 +23,6 @@ import {
   Moon,
   LayoutGrid,
   FileUp,
-  ScanSearch,
   ChevronsUpDown,
   Smartphone,
   KeyRound,
@@ -33,7 +31,6 @@ import {
   RefreshCw,
   HeartPulse,
   Trash2,
-  Eye,
   Check,
   History,
   Edit3
@@ -78,13 +75,11 @@ export function SettingsWorkstation() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectValue, setEditProjectValue] = useState('');
   
-  // Group Management State
   const [editingSheetKey, setEditingSheetKey] = useState<{grantId: string, name: string} | null>(null);
   const [editSheetValue, setEditSheetValue] = useState('');
 
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   
-  // Passcode Manager State
   const [newPasscode, setNewPasscode] = useState('');
   const [confirmPasscode, setConfirmPasscode] = useState('');
   const [isUpdatingPasscode, setIsUpdatingPasscode] = useState(false);
@@ -96,7 +91,6 @@ export function SettingsWorkstation() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // RBAC Gating
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const isAdmin = userProfile?.role === 'ADMIN' || isSuperAdmin;
 
@@ -125,7 +119,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      addNotification({ title: `Settings Saved Successfully`, variant: "success" });
+      addNotification({ title: `Settings Saved`, variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -133,11 +127,11 @@ export function SettingsWorkstation() {
 
   const handleUpdatePasscode = async () => {
     if (newPasscode !== confirmPasscode) {
-      toast({ variant: "destructive", title: "Passcodes Match Failure", description: "The new passcodes do not match." });
+      toast({ variant: "destructive", title: "Update Failed", description: "The new passcodes do not match." });
       return;
     }
     if (newPasscode.length < 4) {
-      toast({ variant: "destructive", title: "Passcode Too Short", description: "Minimum 4 characters required." });
+      toast({ variant: "destructive", title: "Invalid Passcode", description: "Passcode must be at least 4 characters." });
       return;
     }
 
@@ -156,11 +150,11 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       
-      toast({ title: "Passcode Updated", description: "Your system access credentials have been changed." });
+      toast({ title: "Passcode Updated", description: "Your system access passcode has been changed." });
       setNewPasscode('');
       setConfirmPasscode('');
     } catch (e) {
-      toast({ variant: "destructive", title: "Update Failed" });
+      toast({ variant: "destructive", title: "Service Error" });
     } finally {
       setIsUpdatingPasscode(false);
     }
@@ -181,17 +175,13 @@ export function SettingsWorkstation() {
   const toggleProject = (id: string, enabled: boolean) => {
     if (!draftSettings) return;
     const current = draftSettings.activeGrantIds || [];
-    const next = enabled 
-      ? [...current, id]
-      : current.filter(cid => cid !== id);
+    const next = enabled ? [...current, id] : current.filter(cid => cid !== id);
     handleSettingChange('activeGrantIds', next);
   };
 
   const commitProjectRename = () => {
     if (!editingProjectId || !draftSettings) return;
-    const nextGrants = draftSettings.grants.map(g => 
-      g.id === editingProjectId ? { ...g, name: editProjectValue } : g
-    );
+    const nextGrants = draftSettings.grants.map(g => g.id === editingProjectId ? { ...g, name: editProjectValue } : g);
     handleSettingChange('grants', nextGrants);
     setEditingProjectId(null);
   };
@@ -229,9 +219,7 @@ export function SettingsWorkstation() {
     handleSettingChange('grants', nextGrants);
   };
 
-  const handleImportTemplate = () => {
-    fileInputRef.current?.click();
-  };
+  const handleImportTemplate = () => fileInputRef.current?.click();
 
   const handleFileImportTemplate = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!draftSettings) return;
@@ -253,9 +241,9 @@ export function SettingsWorkstation() {
       });
       
       handleSettingChange('grants', nextGrants);
-      toast({ title: 'Templates Imported', description: `${templates.length} group definitions identified.` });
+      toast({ title: 'Template Loaded', description: `${templates.length} asset groups identified.` });
     } catch (error) {
-      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
+      toast({ title: 'Load Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -279,11 +267,7 @@ export function SettingsWorkstation() {
   );
 
   if (!settingsLoaded || !draftSettings) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -296,7 +280,7 @@ export function SettingsWorkstation() {
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="projects" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
-                <LayoutGrid className="h-3.5 w-3.5" /> Project Scope
+                <LayoutGrid className="h-3.5 w-3.5" /> Projects
               </TabsTrigger>
             )}
             {isAdmin && (
@@ -318,7 +302,7 @@ export function SettingsWorkstation() {
         <ScrollArea className="flex-1 px-1">
           <div className="pb-40">
             <TabsContent value="general" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Visual Identity" description="Appearance settings" icon={Palette}>
+              <SettingSection title="Visual Identity" description="Display preferences" icon={Palette}>
                 <div className="grid grid-cols-2 gap-3">
                   <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
                     <Sun className="h-4 w-4" /> Light Mode
@@ -333,38 +317,27 @@ export function SettingsWorkstation() {
                 <div className="space-y-4 max-w-md">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">New System Passcode</Label>
-                    <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Minimum 4 characters" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
+                    <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Min. 4 characters" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm Passcode</Label>
-                    <Input type="password" value={confirmPasscode} onChange={(e) => setConfirmPasscode(e.target.value)} placeholder="Repeat new passcode" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
+                    <Input type="password" value={confirmPasscode} onChange={(e) => setConfirmPasscode(e.target.value)} placeholder="Repeat passcode" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
-                  <Button 
-                    onClick={handleUpdatePasscode} 
-                    disabled={isUpdatingPasscode || !newPasscode} 
-                    className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
-                  >
+                  <Button onClick={handleUpdatePasscode} disabled={isUpdatingPasscode || !newPasscode} className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl">
                     {isUpdatingPasscode ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldIcon className="h-4 w-4 mr-2" />}
-                    Change My Passcode
+                    Update Passcode
                   </Button>
                 </div>
               </SettingSection>
 
               {isAdmin && (
-                <SettingSection title="System Mode" description="Operational logic" icon={Smartphone}>
+                <SettingSection title="Operational Mode" description="System behavior" icon={Smartphone}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'management', label: 'Registry Admin', desc: 'Full governance and data engineering system.' },
+                      { id: 'management', label: 'Registry Admin', desc: 'Full access to system logic and data engineering.' },
                       { id: 'verification', label: 'Field Assessment', desc: 'Optimized for mobile auditors and reporting.' }
                     ].map(m => (
-                      <button 
-                        key={m.id}
-                        onClick={() => handleSettingChange('appMode', m.id)}
-                        className={cn(
-                          "p-6 rounded-2xl border-2 text-left transition-all relative group",
-                          draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20"
-                        )}
-                      >
+                      <button key={m.id} onClick={() => handleSettingChange('appMode', m.id)} className={cn("p-6 rounded-2xl border-2 text-left transition-all relative group", draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20")}>
                         {draftSettings.appMode === m.id && <CheckCircle2 className="absolute top-4 right-4 h-4 w-4 text-primary" />}
                         <h4 className="text-sm font-black uppercase text-foreground mb-1 group-hover:text-primary transition-colors">{m.label}</h4>
                         <p className="text-[10px] font-medium text-muted-foreground italic">{m.desc}</p>
@@ -376,18 +349,16 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="projects" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Project Scope" description="Multi-Project enablement" icon={LayoutGrid}>
+              <SettingSection title="Project Scope" description="Concurrent Project View" icon={LayoutGrid}>
                 <div className="space-y-8">
                   <div className="flex gap-3">
-                    <Input placeholder="New project label..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
-                    <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Create Project</Button>
+                    <Input placeholder="Project Name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
+                    <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">Add Project</Button>
                   </div>
-
                   <div className="space-y-4">
                     {draftSettings.grants.map((grant) => {
                       const isActive = draftSettings.activeGrantIds?.includes(grant.id);
                       const isEditing = editingProjectId === grant.id;
-
                       return (
                         <Card key={grant.id} className={cn("border-2 rounded-2xl overflow-hidden transition-all", isActive ? "border-primary bg-primary/[0.02] shadow-xl" : "border-border bg-muted/10")}>
                           <div className="p-6 flex items-center justify-between group">
@@ -395,26 +366,15 @@ export function SettingsWorkstation() {
                               <div className={cn("p-2 rounded-lg", isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}><FolderOpen className="h-5 w-5" /></div>
                               <div className="flex flex-col min-w-0">
                                 {isEditing ? (
-                                  <div className="flex items-center gap-2">
-                                    <Input 
-                                      value={editProjectValue} 
-                                      onChange={(e) => setEditProjectValue(e.target.value)}
-                                      onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()}
-                                      className="h-8 w-48 text-sm font-black uppercase"
-                                    />
-                                    <Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8"><Check className="h-4 w-4" /></Button>
-                                  </div>
+                                  <div className="flex items-center gap-2"><Input value={editProjectValue} onChange={(e) => setEditProjectValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitProjectRename()} className="h-8 w-48 text-sm font-black uppercase" /><Button size="icon" variant="ghost" onClick={commitProjectRename} className="h-8 w-8"><Check className="h-4 w-4" /></Button></div>
                                 ) : (
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4>
-                                    <button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all"><Edit3 className="h-3.5 w-3.5" /></button>
-                                  </div>
+                                  <div className="flex items-center gap-2"><h4 className="text-base font-black uppercase text-foreground truncate">{grant.name}</h4><button onClick={() => { setEditingProjectId(grant.id); setEditProjectValue(grant.name); }} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all"><Edit3 className="h-3.5 w-3.5" /></button></div>
                                 )}
-                                <span className="text-[8px] font-mono opacity-40 uppercase mt-1">ID: {grant.id.split('-')[0]}</span>
+                                <span className="text-[8px] font-mono opacity-40 uppercase">ID: {grant.id.split('-')[0]}</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-3 pr-6 border-r border-border/40">
-                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enabled</span>
+                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable</span>
                               <Checkbox checked={isActive} onCheckedChange={(checked) => toggleProject(grant.id, !!checked)} className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
                             </div>
                           </div>
@@ -422,9 +382,7 @@ export function SettingsWorkstation() {
                             <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
                               <div className="flex items-center justify-between px-1">
                                 <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Asset Groups</h4>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Import Definition</Button>
-                                </div>
+                                <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3 w-3" /> Import Definition</Button>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {Object.entries(grant.sheetDefinitions || {}).map(([name, def]) => {
@@ -432,22 +390,12 @@ export function SettingsWorkstation() {
                                   return (
                                     <div key={name} className="flex items-center justify-between p-4 bg-background border border-border rounded-xl group/folder hover:border-primary/20 transition-all">
                                       {isSheetEditing ? (
-                                        <div className="flex items-center gap-2 flex-1 mr-4">
-                                          <Input 
-                                            value={editSheetValue} 
-                                            onChange={(e) => setEditSheetValue(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)}
-                                            className="h-8 text-[10px] font-black uppercase"
-                                          />
-                                          <Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button>
-                                        </div>
+                                        <div className="flex items-center gap-2 flex-1 mr-4"><Input value={editSheetValue} onChange={(e) => setEditSheetValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commitSheetRename(grant.id, name)} className="h-8 text-[10px] font-black uppercase" /><Button size="icon" variant="ghost" onClick={() => commitSheetRename(grant.id, name)} className="h-8 w-8 text-primary"><Check className="h-4 w-4" /></Button></div>
                                       ) : (
                                         <span className="text-[11px] font-black uppercase text-foreground/80 truncate pr-4">{name}</span>
                                       )}
                                       <div className="flex items-center gap-2 text-white/20 shrink-0">
-                                        {!isSheetEditing && (
-                                          <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>
-                                        )}
+                                        {!isSheetEditing && <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>}
                                         <button className="p-1.5 hover:text-primary transition-colors" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>
                                         <button className="p-1.5 hover:text-destructive transition-colors" onClick={() => handleDeleteSheet(grant.id, name)}><Trash2 className="h-3.5 w-3.5" /></button>
                                       </div>
@@ -466,28 +414,21 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="users" className="m-0 outline-none">
-              <SettingSection title="Personnel directory" description="System access management" icon={Users}>
+              <SettingSection title="Personnel" description="Identity management" icon={Users}>
                 <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
               </SettingSection>
             </TabsContent>
 
-            <TabsContent value="history" className="m-0 outline-none">
-              <AuditLogWorkstation isEmbedded={true} />
-            </TabsContent>
-
-            <TabsContent value="health" className="m-0 outline-none space-y-10">
-              <DatabaseWorkstation isEmbedded={true} />
-              <ErrorAuditWorkstation isEmbedded={true} />
-            </TabsContent>
+            <TabsContent value="history" className="m-0 outline-none"><AuditLogWorkstation isEmbedded={true} /></TabsContent>
+            {isSuperAdmin && <TabsContent value="health" className="m-0 outline-none space-y-10"><DatabaseWorkstation isEmbedded={true} /><ErrorAuditWorkstation isEmbedded={true} /></TabsContent>}
           </div>
         </ScrollArea>
       </Tabs>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0 z-50">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Exit Settings</Button>
-        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3 transition-transform active:scale-95">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />}
-          Save System Settings
+        <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl gap-3">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldIcon className="h-4 w-4" />} Save All Settings
         </Button>
       </div>
 

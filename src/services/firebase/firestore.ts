@@ -1,6 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
- * Forensic update: Captures diffs automatically for the activity log.
+ * Forensic update: Captures diffs and previous state automatically for the audit trail.
  */
 
 import { 
@@ -25,7 +25,6 @@ import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
 import { batchSetAssets as mirrorToRtdb, clearAssets as clearRtdb } from '@/lib/database';
-import { isWithinScope } from '@/core/auth/rbac';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
 export const FirestoreService = {
@@ -77,17 +76,18 @@ export const FirestoreService = {
     }
   },
 
-  async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', userProfile?: any): Promise<void> {
+  async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE'): Promise<void> {
     if (!db) return;
 
     const assetRef = doc(db, 'assets', asset.id);
     
-    // Fetch current state for forensic diff
+    // Fetch current state for forensic diff and reversion buffer
+    let oldData: any = null;
     let changes: Record<string, { old: any; new: any }> = {};
     try {
       const currentSnap = await getDoc(assetRef);
       if (currentSnap.exists()) {
-        const oldData = currentSnap.data() as Asset;
+        oldData = currentSnap.data();
         const keys = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks'];
         keys.forEach(k => {
           const oldVal = (oldData as any)[k];
@@ -102,7 +102,14 @@ export const FirestoreService = {
     const validation = AssetSchema.safeParse(asset);
     if (!validation.success) return;
 
-    const sanitized = sanitizeForFirestore(validation.data);
+    // Inject historical buffer into the asset record
+    const dataToSave = {
+      ...validation.data,
+      previousState: oldData || null,
+      lastModified: new Date().toISOString()
+    };
+
+    const sanitized = sanitizeForFirestore(dataToSave);
     try {
       await setDoc(assetRef, sanitized, { merge: true });
       mirrorToRtdb([sanitized as Asset]).catch(() => {});
