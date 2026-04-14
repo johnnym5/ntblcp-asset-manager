@@ -5,6 +5,7 @@
  * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
  * Phase 1911: Added Deep Equality parity check to skip redundant updates.
  * Phase 1912: Implementation of Location-Scoped Cloud Pull.
+ * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -52,9 +53,9 @@ interface AppStateContextType {
   refreshRegistry: () => Promise<void>;
   
   // Sync High-Fidelity Pulse
-  manualDownload: (stateScopes?: string[]) => Promise<void>;
+  manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
   manualUpload: () => Promise<void>;
-  executeSync: (strategy: SyncStrategy) => Promise<void>;
+  executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
   syncSummary: SyncSummary | null;
   isSyncConfirmOpen: boolean;
   setIsSyncConfirmOpen: (open: boolean) => void;
@@ -178,13 +179,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
       
-      const currentGrantIds = localSettings?.activeGrantIds || [];
+      // Hardened fallback for active grants during fresh initialization
+      const currentGrantIds = (localSettings?.activeGrantIds && localSettings.activeGrantIds.length > 0)
+        ? localSettings.activeGrantIds 
+        : (localSettings?.grants.map(g => g.id) || []);
+
       const filtered = (localAssets || []).filter(a => {
-        if (currentGrantIds.length === 0) return false;
+        if (currentGrantIds.length === 0) return true; // Show everything if no grants defined yet
         if (!currentGrantIds.includes(a.grantId)) return false;
         
         const grant = localSettings?.grants.find(g => g.id === a.grantId);
-        return grant?.enabledSheets.includes(a.category);
+        // If sheet list is empty, default to true to avoid hiding newly synced data
+        if (!grant || grant.enabledSheets.length === 0) return true;
+        return grant.enabledSheets.includes(a.category);
       });
         
       setAssets(DiscrepancyEngine.scan(filtered));
@@ -388,23 +395,32 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
-  const manualDownload = useCallback(async (stateScopes?: string[]) => {
-    if (!isOnline) return;
+  const manualDownload = useCallback(async (stateScopes?: string[]): Promise<SyncSummary | null> => {
+    if (!isOnline) return null;
     setIsSyncing(true);
     addNotification({ title: "Scanning Cloud Authority...", description: "Reconciling timestamps for global parity." });
     
     try {
-      const currentGrantIds = appSettings?.activeGrantIds || [];
+      const currentGrantIds = (appSettings?.activeGrantIds && appSettings.activeGrantIds.length > 0)
+        ? appSettings.activeGrantIds 
+        : (appSettings?.grants.map(g => g.id) || []);
+      
+      if (currentGrantIds.length === 0) {
+        setIsSyncing(false);
+        return null;
+      }
+
       let allRemoteAssets: Asset[] = [];
       for (const gid of currentGrantIds) {
-        // High-Fidelity Scoped Fetch: Pass stateScopes to limit data transfer
         const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
 
       const filteredRemote = allRemoteAssets.filter(a => {
         const grant = appSettings?.grants.find(g => g.id === a.grantId);
-        return grant?.enabledSheets.includes(a.category);
+        // Fallback: If onboarding, assume all sheets enabled
+        if (!grant || grant.enabledSheets.length === 0) return true;
+        return grant.enabledSheets.includes(a.category);
       });
 
       const localAssets = await storage.getAssets();
@@ -434,21 +450,26 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       });
 
-      if (newItems.length === 0 && autoUpdateItems.length === 0 && existingItems.length === 0) {
+      const totalCount = newItems.length + autoUpdateItems.length + existingItems.length;
+      if (totalCount === 0) {
         addNotification({ title: "Parity Confirmed", description: "Your regional registry is in sync with the cloud." });
         setIsSyncing(false);
-        return;
+        return null;
       }
 
-      setSyncSummary({ 
+      const summary: SyncSummary = { 
         type: 'DOWNLOAD', 
         newItems: [...newItems, ...autoUpdateItems], 
         existingItems, 
-        totalCount: newItems.length + autoUpdateItems.length + existingItems.length 
-      });
+        totalCount 
+      };
+      
+      setSyncSummary(summary);
       setIsSyncConfirmOpen(true);
+      return summary;
     } catch (e) {
       addNotification({ title: "Sync Scan Failed", variant: "destructive" });
+      return null;
     } finally {
       setIsSyncing(false);
     }
@@ -479,19 +500,21 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isOnline]);
 
-  const executeSync = async (strategy: SyncStrategy) => {
-    if (!syncSummary) return;
+  const executeSync = async (strategy: SyncStrategy, overrideSummary?: SyncSummary) => {
+    const activeSummary = overrideSummary || syncSummary;
+    if (!activeSummary) return;
+    
     setIsSyncing(true);
     setIsSyncConfirmOpen(false);
 
     try {
-      if (syncSummary.type === 'DOWNLOAD') {
+      if (activeSummary.type === 'DOWNLOAD') {
         const local = await storage.getAssets();
         const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
 
         let nextAssets = [...local];
         
-        syncSummary.newItems.forEach(item => {
+        activeSummary.newItems.forEach(item => {
           const id = getFuzzySignature(item.assetIdCode || item.serialNumber || item.id);
           const existing = localMap.get(id);
           if (existing) {
@@ -501,15 +524,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           }
         });
 
-        if (strategy === 'UPDATE' && syncSummary.existingItems.length > 0) {
-          syncSummary.existingItems.forEach(remote => {
+        if (strategy === 'UPDATE' && activeSummary.existingItems.length > 0) {
+          activeSummary.existingItems.forEach(remote => {
             const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
             nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...remote, syncStatus: 'synced' } : a);
           });
         }
 
         await storage.saveAssets(nextAssets);
-        addNotification({ title: "Registry Parity Established", description: `Processed ${syncSummary.totalCount} record pulses.`, variant: "success" });
+        addNotification({ title: "Registry Parity Established", description: `Processed ${activeSummary.totalCount} record pulses.`, variant: "success" });
       } else {
         await processSyncQueue();
       }

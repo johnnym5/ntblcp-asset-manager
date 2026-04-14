@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview WelcomeExperience - Simplified Onboarding & Location-Scoped Download.
+ * Phase 1930: Automated sync execution to prevent 0-count display on loaded badges.
  */
 
 import React, { useState } from 'react';
@@ -92,7 +93,7 @@ interface WelcomeExperienceProps {
 }
 
 export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps) {
-  const { manualDownload, isSyncing, assets } = useAppState();
+  const { manualDownload, executeSync, refreshRegistry, isSyncing, assets } = useAppState();
   const { userProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [hasDownloaded, setHasDownloaded] = useState(false);
@@ -100,8 +101,16 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
   const handleNext = async () => {
     const step = STEPS[currentStep];
     if (step.isSyncStep && !hasDownloaded) {
-      // Scoped download based on user location
-      await manualDownload(userProfile?.states || []);
+      // 1. Trigger Scoped Download Scan
+      const summary = await manualDownload(userProfile?.states || []);
+      
+      if (summary) {
+        // 2. Automated Onboarding Execution: Auto-Sync changes to local DB
+        await executeSync('UPDATE', summary);
+        // 3. Final Refresh to synchronize state counts
+        await refreshRegistry();
+      }
+      
       setHasDownloaded(true);
       return;
     }
@@ -114,6 +123,8 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
   };
 
   const step = STEPS[currentStep];
+  const scopeDisplay = userProfile?.state === 'All' ? 'Global Scope' : userProfile?.state;
+  
   const swipeConfidenceThreshold = 10000;
   const swipePower = (offset: number, velocity: number) => Math.abs(offset) * velocity;
 
@@ -174,7 +185,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                       <div className="p-3 bg-green-500 rounded-2xl shadow-lg shadow-green-500/20"><CheckCircle2 className="h-8 w-8 text-black" /></div>
                       <div className="text-center">
                         <p className="text-sm font-black uppercase text-green-600">Assets Loaded</p>
-                        <p className="text-[10px] font-bold text-green-600/60 uppercase mt-1">{assets.length} Records found for {userProfile?.state}</p>
+                        <p className="text-[10px] font-bold text-green-600/60 uppercase mt-1">{assets.length} Records found for {scopeDisplay}</p>
                       </div>
                     </div>
                   ) : (
