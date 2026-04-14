@@ -4,6 +4,7 @@
  * @fileOverview Root Shell - Dashboard Command Hub.
  * Phase 1913: Updated with simplified terminology (Hub, Assets, History).
  * Phase 1915: Integrated System-Wide Tactile Menus for Logo, Sync, and Bell.
+ * Phase 1918: Global TooltipProvider integration to prevent redundant state updates.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -47,7 +48,7 @@ import {
   ArrowRight,
   X,
   Terminal,
-  Filter // Resolved ReferenceError: Filter icon added
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -67,7 +68,7 @@ import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstati
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useNotifications, type Notification, clearAll } from '@/hooks/use-notifications'; // Resolved clearAll import
+import { useNotifications, clearAll } from '@/hooks/use-notifications';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -113,7 +114,7 @@ export default function SPAHub() {
   } = useAppState();
   
   const isMobile = useIsMobile();
-  const { unreadCount, notifications, lastAddedId } = useNotifications();
+  const { unreadCount } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
@@ -123,7 +124,6 @@ export default function SPAHub() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
-  const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
   const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const CurrentWorkstation = useMemo(() => {
@@ -162,7 +162,6 @@ export default function SPAHub() {
     ];
 
     if (isAdmin) {
-      // Admins now have full access to all workstations as requested
       base.push(
         { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
         { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS') },
@@ -197,99 +196,99 @@ export default function SPAHub() {
   const modeClass = appSettings?.appMode === 'verification' ? 'mode-verification' : appSettings?.appMode === 'reporting' ? 'mode-reporting' : '';
 
   return (
-    <div className={cn("app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden", modeClass)}>
-      <CommandPalette />
-      <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
-      <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
-      <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
-      <SyncStatusDialog isOpen={isSyncStatusOpen} onOpenChange={setIsSyncStatusOpen} />
-      <SyncConfirmationDialog 
-        isOpen={isSyncConfirmOpen} 
-        onOpenChange={setIsSyncConfirmOpen}
-        summary={syncSummary}
-        onConfirm={executeSync}
-      />
-      <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
-      
-      <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
-        <div className="flex items-center gap-2 sm:gap-8">
-          <AnimatePresence>
-            {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
-              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-                <button onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse shadow-sm">
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <TactileMenu 
-            title="Switch Hub"
-            options={jumpOptions}
-          >
-            <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
-              <Boxes className="h-5 w-5" />
-              {!isMobile && (
-                <div className="flex flex-col text-left">
-                  <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'FIELD AUDIT' : 'ADMIN HUB'}</span>
-                </div>
+    <TooltipProvider>
+      <div className={cn("app-container bg-background font-sans text-foreground h-screen flex flex-col overflow-hidden", modeClass)}>
+        <CommandPalette />
+        <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
+        <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
+        <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
+        <SyncStatusDialog isOpen={isSyncStatusOpen} onOpenChange={setIsSyncStatusOpen} />
+        <SyncConfirmationDialog 
+          isOpen={isSyncConfirmOpen} 
+          onOpenChange={setIsSyncConfirmOpen}
+          summary={syncSummary}
+          onConfirm={executeSync}
+        />
+        <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
+        
+        <header className="h-14 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
+          <div className="flex items-center gap-2 sm:gap-8">
+            <AnimatePresence mode="wait">
+              {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
+                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
+                  <button onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse shadow-sm">
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                </motion.div>
               )}
-            </button>
-          </TactileMenu>
-        </div>
+            </AnimatePresence>
 
-        <div className="flex-1 flex items-center justify-center mx-4">
-          <AnimatePresence mode="wait">
-            {isMobile && !isMobileSearchOpen ? (
-              <motion.button 
-                key="search-trigger"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={() => setIsMobileSearchOpen(true)}
-                className="h-10 w-10 flex items-center justify-center bg-muted/30 border border-border rounded-xl text-primary hover:bg-primary/10 transition-all"
-              >
-                <Search className="h-4 w-4" />
-              </motion.button>
-            ) : isMobile && isMobileSearchOpen ? (
-              <motion.div 
-                key="mobile-search"
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl px-3 h-10 w-full"
-              >
-                <Search className="h-3.5 w-3.5 text-primary" />
-                <input 
-                  autoFocus
-                  placeholder="Search assets..."
-                  className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
-                  onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
-                />
-                <button onClick={() => { setIsMobileSearchOpen(false); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
-              </motion.div>
-            ) : (
-              <TactileMenu
-                title="Search Controls"
-                options={[
-                  { label: 'Open Palette', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
-                  { label: 'Filter Search', icon: Filter, onClick: () => setActiveView('REGISTRY') }
-                ]}
-              >
-                <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
+            <TactileMenu 
+              title="Switch Hub"
+              options={jumpOptions}
+            >
+              <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
+                <Boxes className="h-5 w-5" />
+                {!isMobile && (
+                  <div className="flex flex-col text-left">
+                    <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
+                    <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'FIELD AUDIT' : 'ADMIN HUB'}</span>
+                  </div>
+                )}
+              </button>
+            </TactileMenu>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center mx-4">
+            <AnimatePresence mode="wait">
+              {isMobile && !isMobileSearchOpen ? (
+                <motion.button 
+                  key="search-trigger"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => setIsMobileSearchOpen(true)}
+                  className="h-10 w-10 flex items-center justify-center bg-muted/30 border border-border rounded-xl text-primary hover:bg-primary/10 transition-all"
+                >
                   <Search className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
-                  <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
-                </button>
-              </TactileMenu>
-            )}
-          </AnimatePresence>
-        </div>
+                </motion.button>
+              ) : isMobile && isMobileSearchOpen ? (
+                <motion.div 
+                  key="mobile-search"
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "100%", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl px-3 h-10 w-full"
+                >
+                  <Search className="h-3.5 w-3.5 text-primary" />
+                  <input 
+                    autoFocus
+                    placeholder="Search assets..."
+                    className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
+                    onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
+                  />
+                  <button onClick={() => { setIsMobileSearchOpen(false); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                </motion.div>
+              ) : (
+                <TactileMenu
+                  title="Search Controls"
+                  options={[
+                    { label: 'Open Palette', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
+                    { label: 'Filter Search', icon: Filter, onClick: () => setActiveView('REGISTRY') }
+                  ]}
+                >
+                  <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
+                    <Search className="h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
+                    <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
+                  </button>
+                </TactileMenu>
+              )}
+            </AnimatePresence>
+          </div>
 
-        <div className="flex items-center gap-2 sm:gap-5">
-          {isAdmin && (
-            <TooltipProvider>
+          <div className="flex items-center gap-2 sm:gap-5">
+            {isAdmin && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -308,99 +307,99 @@ export default function SPAHub() {
                 </TooltipTrigger>
                 <TooltipContent className="text-[8px] font-black uppercase">Review Requests</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-          )}
+            )}
 
-          <TactileMenu
-            title="Sync Protocol"
-            options={[
-              { label: 'Sync Workspace', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
-              { label: 'Download Update', icon: Download, onClick: handleManualDownloadWithFeedback, disabled: !isOnline },
-              { label: 'Upload Changes', icon: Upload, onClick: handleManualUploadWithFeedback, disabled: !isOnline },
-              ...(isAdmin ? [{ label: 'Force Reconcile', icon: RefreshCw, onClick: refreshRegistry }] : [])
-            ]}
-          >
-            <div 
-              className={cn(
-                "flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer transition-all",
-                isSyncing && "bg-primary/10 border-primary/30 px-3"
-              )}
+            <TactileMenu
+              title="Sync Protocol"
+              options={[
+                { label: 'Sync Workspace', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
+                { label: 'Download Update', icon: Download, onClick: handleManualDownloadWithFeedback, disabled: !isOnline },
+                { label: 'Upload Changes', icon: Upload, onClick: handleManualUploadWithFeedback, disabled: !isOnline },
+                ...(isAdmin ? [{ label: 'Force Reconcile', icon: RefreshCw, onClick: refreshRegistry }] : [])
+              ]}
             >
-              {isSyncing ? (
-                <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                  <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
-                </div>
-              ) : (
-                <>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get from Cloud</TooltipContent></Tooltip></TooltipProvider>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
-                </>
-              )}
-            </div>
-          </TactileMenu>
-
-          <TactileMenu
-            title="Alert History"
-            options={[
-              { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Full Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
-              { label: 'Clear Alert Ledger', icon: Trash2, onClick: clearAll, destructive: true }
-            ]}
-          >
-            <button 
-              onClick={() => setIsNotificationsOpen(true)} 
-              className="p-2 sm:p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
-            >
-              <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-              {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
-            </button>
-          </TactileMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="h-9 w-9 rounded-full border-2 border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[11px] hover:border-primary/40 transition-all shrink-0 shadow-lg tactile-pulse">
-                {userProfile?.displayName?.[0] || 'U'}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card border-border rounded-2xl shadow-3xl p-1.5">
-              <DropdownMenuLabel className="p-3">
-                <p className="text-[11px] font-black uppercase">{userProfile?.displayName}</p>
-                <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Log Out</span></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
-
-      <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background">
-        <div className="flex-1 flex flex-col border border-border rounded-[2.5rem] bg-card/30 overflow-hidden relative shadow-inner">
-          <ErrorBoundary module={activeView}>
-            <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
-              <div className="min-h-full flex flex-col relative">
-                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
-                  <AnimatePresence mode="wait">
-                    <motion.div 
-                      key={activeView} 
-                      initial={{ opacity: 0, scale: 0.99, y: 10 }} 
-                      animate={{ opacity: 1, scale: 1, y: 0 }} 
-                      exit={{ opacity: 0, scale: 0.99, y: -10 }} 
-                      transition={{ duration: 0.2, ease: "easeOut" }} 
-                      className="h-full w-full"
-                    >
-                      {CurrentWorkstation}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
+              <div 
+                className={cn(
+                  "flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer transition-all",
+                  isSyncing && "bg-primary/10 border-primary/30 px-3"
+                )}
+              >
+                {isSyncing ? (
+                  <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get from Cloud</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip>
+                  </>
+                )}
               </div>
-            </ScrollArea>
-          </ErrorBoundary>
+            </TactileMenu>
+
+            <TactileMenu
+              title="Alert History"
+              options={[
+                { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+                { label: 'Full Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+                { label: 'Clear Alert Ledger', icon: Trash2, onClick: clearAll, destructive: true }
+              ]}
+            >
+              <button 
+                onClick={() => setIsNotificationsOpen(true)} 
+                className="p-2 sm:p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
+              >
+                <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
+              </button>
+            </TactileMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-9 w-9 rounded-full border-2 border-primary/20 bg-primary/10 text-primary flex items-center justify-center font-black text-[11px] hover:border-primary/40 transition-all shrink-0 shadow-lg tactile-pulse">
+                  {userProfile?.displayName?.[0] || 'U'}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-card border-border rounded-2xl shadow-3xl p-1.5">
+                <DropdownMenuLabel className="p-3">
+                  <p className="text-[11px] font-black uppercase">{userProfile?.displayName}</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Log Out</span></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+
+        <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background">
+          <div className="flex-1 flex flex-col border border-border rounded-[2.5rem] bg-card/30 overflow-hidden relative shadow-inner">
+            <ErrorBoundary module={activeView}>
+              <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
+                <div className="min-h-full flex flex-col relative">
+                  <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
+                    <AnimatePresence mode="wait">
+                      <motion.div 
+                        key={activeView} 
+                        initial={{ opacity: 0, scale: 0.99, y: 10 }} 
+                        animate={{ opacity: 1, scale: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.99, y: -10 }} 
+                        transition={{ duration: 0.2, ease: "easeOut" }} 
+                        className="h-full w-full"
+                      >
+                        {CurrentWorkstation}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </ScrollArea>
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

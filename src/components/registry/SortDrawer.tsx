@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
 /**
  * @fileOverview High-Fidelity Sort Sequence Engine.
  * Phase 102: Redesigned to match the dark high-fidelity workstation theme.
  * Phase 103: Converted to centered Dialog pop-up window.
+ * Phase 104: Optimized to use dynamic folder headers for sorting precision.
  */
 
 import React from 'react';

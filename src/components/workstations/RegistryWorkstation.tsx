@@ -6,6 +6,7 @@
  * Phase 1915: Integrated Tactile Menus for Folder Cards.
  * Phase 1916: Limited grid to 5 columns max for improved card detail visibility.
  * Phase 1917: Hardened transformation pulse to reflect Folder Setup changes instantly.
+ * Phase 1918: Resolved infinite render loop by removing redundant state synchronization.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -144,7 +145,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
   
-  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<any>(null);
   const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
@@ -168,7 +168,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return defs;
   }, [appSettings?.grants, activeGrantIds]);
 
-  // DERIVE HEADERS FOR TRANSFORMATION - Bypasses stale context state for instant setup reflection
+  // DERIVE HEADERS FOR TRANSFORMATION - Optimized to avoid state loops
   const activeFolderHeaders = useMemo(() => {
     if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
@@ -193,12 +193,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
     return workstationHeaders;
   }, [selectedCategories, mergedSheetDefinitions, workstationHeaders]);
-
-  useEffect(() => {
-    if (selectedCategories.length === 1) {
-      setWorkstationHeaders(activeFolderHeaders);
-    }
-  }, [selectedCategories, activeFolderHeaders, setWorkstationHeaders]);
 
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
@@ -234,7 +228,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
     
     if (sortKey) {
-      const sortHeader = workstationHeaders.find(h => h.id === sortKey);
+      const sortHeader = activeFolderHeaders.find(h => h.id === sortKey);
       results.sort((a, b) => {
         const getVal = (item: Asset) => {
           if (sortKey === 'sn') return item.sn || "";
@@ -255,11 +249,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
     }
     return results;
-  }, [filteredAssets, sortKey, sortDir, selectedCategories, workstationHeaders]);
+  }, [filteredAssets, sortKey, sortDir, selectedCategories, activeFolderHeaders]);
 
   const optionsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
-    workstationHeaders.forEach(header => {
+    activeFolderHeaders.forEach(header => {
       const values = new Set<string>();
       assets.filter(a => activeGrantIds.includes(a.grantId)).forEach(asset => {
         let val = "";
@@ -275,7 +269,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       map[header.id] = Array.from(values).sort();
     });
     return map;
-  }, [workstationHeaders, assets, activeGrantIds]);
+  }, [activeFolderHeaders, assets, activeGrantIds]);
 
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / (itemsPerPage as number)), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * (itemsPerPage as number), currentPage * (itemsPerPage as number)), [processedAssets, currentPage, itemsPerPage]);
@@ -329,7 +323,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!isAdmin || !appSettings) return;
     setIsProcessing(true);
     try {
-      const updatedSettings = { ...appSettings, globalHeaders: workstationHeaders };
+      const updatedSettings = { ...appSettings, globalHeaders: activeFolderHeaders };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
@@ -447,7 +441,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     const selectedAssets = filteredAssets.filter(a => selectedAssetIds.has(a.id));
     if (selectedAssets.length === 0) return;
     try {
-      await ExcelService.exportRegistry(selectedAssets, workstationHeaders);
+      await ExcelService.exportRegistry(selectedAssets, activeFolderHeaders);
       addNotification({ title: "Export Ready", variant: "success" });
     } catch (e) {
       addNotification({ title: "Export Failed", variant: "destructive" });
@@ -537,42 +531,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setIsSortOpen(true)}
-                        className={cn("h-10 w-10 rounded-lg transition-all", isSortOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
-                      >
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Sort Records</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setIsSortOpen(true)}
+                  className={cn("h-10 w-10 rounded-lg transition-all", isSortOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
 
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setIsFilterOpen(true)}
-                        className={cn("h-10 w-10 rounded-lg transition-all relative", isFilterOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
-                      >
-                        <Filter className="h-4 w-4" />
-                        {activeFilterCount > 0 && (
-                          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg">
-                            {activeFilterCount}
-                          </span>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="text-[8px] font-black uppercase">Filter List</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setIsFilterOpen(true)}
+                  className={cn("h-10 w-10 rounded-lg transition-all relative", isFilterOpen ? "bg-primary text-black" : "bg-muted/50 hover:bg-primary/10 hover:text-primary")}
+                >
+                  <Filter className="h-4 w-4" />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
               </div>
 
               <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0 hidden sm:flex">
@@ -753,21 +733,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     </Button>
                   )}
                   {isAdmin && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
-                            className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
-                          >
-                            <Columns className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="text-[8px] font-black uppercase">Edit Field Labels</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
+                      className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
+                    >
+                      <Columns className="h-5 w-5" />
+                    </Button>
                   )}
                   <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10 transition-colors shadow-sm"><X className="h-5 w-5" /></button>
                 </div>
@@ -845,19 +818,18 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <SortDrawer 
         isOpen={isSortOpen} 
         onOpenChange={setIsSortOpen} 
-        headers={workstationHeaders} 
-        sortBy={sortKey} 
-        sortDirection={sortDir} 
-        onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
+        headers={activeFolderHeaders} 
+        sortKey={sortKey} 
+        sortDir={sortDir} 
+        onSortChange={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
       />
 
       <FilterDrawer 
         isOpen={isFilterOpen}
         onOpenChange={setIsFilterOpen}
-        headers={workstationHeaders}
-        activeFilters={filters}
-        onUpdateFilters={setFilters}
-        optionsMap={optionsMap}
+        headers={activeFolderHeaders}
+        filters={filters}
+        onFiltersChange={setFilters}
       />
 
       <ImportScannerDialog 
@@ -899,20 +871,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          originalSheetName={originalSheetName}
-          onSave={(orig, newDef, all) => {
-            const grant = appSettings?.grants.find(g => g.sheetDefinitions[orig || ''] || g.sheetDefinitions[newDef.name]);
+          onSave={(newDef) => {
+            const grant = appSettings?.grants.find(g => g.sheetDefinitions[originalSheetName || ''] || g.sheetDefinitions[newDef.name]);
             if (!grant) return;
 
             const updatedGrants = appSettings?.grants.map(g => {
               if (g.id === grant.id) {
-                const newSheetDefs = { ...g.sheetDefinitions };
-                if (all) {
-                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
-                } else {
-                  newSheetDefs[newDef.name] = newDef;
-                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
-                }
+                const newSheetDefs = { ...g.sheetDefinitions, [newDef.name]: newDef };
+                if (originalSheetName && originalSheetName !== newDef.name) delete newSheetDefs[originalSheetName];
                 return { ...grant, sheetDefinitions: newSheetDefs };
               }
               return g;
