@@ -165,8 +165,8 @@ export function DashboardWorkstation() {
 
   const modeInfo = useMemo(() => {
     switch(mode) {
-      case 'verification': return { icon: ClipboardCheck, label: 'Auditor Mode', desc: 'Verify assets and record field observations.' };
-      default: return { icon: ShieldCheck, label: 'Manager Hub', desc: 'Oversee projects, users, and asset lists.' };
+      case 'verification': return { icon: ClipboardCheck, label: 'Verification Mode', desc: 'Verify assets and record field observations.' };
+      default: return { icon: ShieldCheck, label: 'Manager Mode', desc: 'Oversee projects, users, and asset lists.' };
     }
   }, [mode]);
 
@@ -196,7 +196,7 @@ export function DashboardWorkstation() {
               onClick={() => setActiveView('REGISTRY')}
               className="cursor-pointer bg-primary text-black font-black uppercase text-[9px] tracking-widest px-5 h-9 rounded-full shadow-lg border-2 border-black hover:scale-105 transition-transform"
             >
-              GO TO ASSET LIST
+              OPEN ASSET LIST
             </Badge>
           </div>
         </motion.div>
@@ -227,9 +227,9 @@ export function DashboardWorkstation() {
                   <TactileMenu
                     title="Quick Action"
                     options={[
-                      { label: 'Inspect Profile', icon: Eye, onClick: () => handleInspect(glanceAssets[glanceIndex].id) },
-                      { label: 'Edit Record', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
-                      { label: 'Refresh Sample', icon: RefreshCw, onClick: handleRefreshRandom }
+                      { label: 'View Profile', icon: Eye, onClick: () => handleInspect(glanceAssets[glanceIndex].id) },
+                      { label: 'Edit Asset', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
+                      { label: 'Refresh Samples', icon: RefreshCw, onClick: handleRefreshRandom }
                     ]}
                   >
                     <Card 
@@ -245,7 +245,7 @@ export function DashboardWorkstation() {
                         <div className="p-5 bg-muted/30 rounded-2xl border-2 border-border/40 shrink-0 shadow-inner"><LayoutGrid className="h-10 w-10 text-primary/40" /></div>
                         <div className="space-y-3 flex-1 min-w-0">
                           <div className="space-y-0.5">
-                            <span className="text-[8px] font-black uppercase text-primary tracking-widest">Sample View</span>
+                            <span className="text-[8px] font-black uppercase text-primary tracking-widest">Asset Profile</span>
                             <h4 className="text-lg font-black uppercase text-foreground truncate">{glanceAssets[glanceIndex].description}</h4>
                           </div>
                           <div className="flex items-center gap-3">
@@ -287,11 +287,11 @@ export function DashboardWorkstation() {
                   }}
                 >
                   <TactileMenu
-                    title="Audit Action"
+                    title="Review Action"
                     options={[
-                      { label: 'Review Issue', icon: FileWarning, onClick: () => handleInspect(issueAssets[issueIndex].id) },
-                      { label: 'Fix Record', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
-                      { label: 'Clear Flag', icon: ShieldCheck, onClick: () => {} }
+                      { label: 'Check Issue', icon: FileWarning, onClick: () => handleInspect(issueAssets[issueIndex].id) },
+                      { label: 'Fix Profile', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
+                      { label: 'Clear Mark', icon: ShieldCheck, onClick: () => {} }
                     ]}
                   >
                     <Card 
@@ -330,12 +330,12 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 3. Asset Summary Analytics */}
+      {/* 3. Asset Analytics */}
       <div className="px-1">
         <AssetSummaryDashboard />
       </div>
 
-      {/* 4. Activity History Ledger */}
+      {/* 4. Activity History */}
       <div className="px-1">
         <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 overflow-hidden shadow-2xl">
           <CardHeader className="p-6 border-b bg-muted/20 flex flex-row items-center justify-between">
@@ -347,7 +347,7 @@ export function DashboardWorkstation() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{pendingSync.length} PENDING</Badge>
+              <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{pendingSync.length} WAITING</Badge>
               <Badge variant="outline" className="text-[7px] font-black h-5 px-2">{recentActivity.length} SAVED</Badge>
             </div>
           </CardHeader>
@@ -364,15 +364,15 @@ export function DashboardWorkstation() {
                   <div className="space-y-2 mb-4">
                     {pendingSync.slice(0, 3).map(q => (
                       <div key={q.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
-                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Record change'}</span>
+                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Profile Update'}</span>
                         <Badge variant="outline" className="text-[7px] font-mono">{q.operation}</Badge>
                       </div>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="flex-1 h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Changes</Button>
+                    <Button variant="outline" onClick={() => setActiveView('SYNC_QUEUE')} className="flex-1 h-10 rounded-xl font-black uppercase text-[9px] border-2">Manage Updates</Button>
                     <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline || pendingSync.length === 0} className="flex-1 h-10 rounded-xl font-black uppercase text-[9px] border-2 gap-2 text-primary border-primary/20">
-                      <Upload className="h-3 w-3" /> Save to Cloud
+                      <Upload className="h-3 w-3" /> Save Changes
                     </Button>
                   </div>
                 </AccordionContent>
@@ -406,7 +406,7 @@ export function DashboardWorkstation() {
         </Card>
       </div>
 
-      {/* 5. Detail Overlay */}
+      {/* 5. Details Sheet */}
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 

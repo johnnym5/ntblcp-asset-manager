@@ -215,7 +215,7 @@ export default function HomeHub() {
               {!isMobile && (
                 <div className="flex flex-col text-left">
                   <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'FIELD AUDIT' : 'HOME HUB'}</span>
+                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'VERIFICATION' : 'HOME HUB'}</span>
                 </div>
               )}
             </button>
