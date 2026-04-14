@@ -3,7 +3,6 @@
 /**
  * @fileOverview Application Shell - Home Hub.
  * Optimized for Production Deployment & Simplified Terminology.
- * Phase 1920: Safe area insets and tactile feedback hardening.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -175,6 +174,11 @@ export default function HomeHub() {
 
   const modeClass = appSettings?.appMode === 'verification' ? 'mode-verification' : '';
 
+  const handleDownloadPulse = () => {
+    // PASS USER STATES FOR SCOPED FETCH
+    manualDownload(userProfile?.states || []);
+  };
+
   return (
     <div className={cn("flex flex-col h-screen overflow-hidden bg-background selection:bg-primary/20", modeClass)}>
       <CommandPalette />
@@ -294,8 +298,8 @@ export default function HomeHub() {
             title="Sync Control"
             options={[
               { label: 'Sync Hub', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
-              { label: 'Fetch Data', icon: Download, onClick: manualDownload, disabled: !isOnline },
-              { label: 'Save Changes', icon: Upload, onClick: manualUpload, disabled: !isOnline },
+              { label: 'Fetch Data', icon: Download, onClick: handleDownloadPulse, disabled: !isOnline },
+              { label: 'Save Changes', icon: manualUpload, disabled: !isOnline },
               ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onClick: refreshRegistry }] : [])
             ]}
           >
@@ -312,7 +316,7 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
                   <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip></TooltipProvider>
                 </>
               )}

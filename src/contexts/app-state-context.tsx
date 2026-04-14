@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
  * Phase 1911: Added Deep Equality parity check to skip redundant updates.
+ * Phase 1912: Implementation of Location-Scoped Cloud Pull.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -51,7 +52,7 @@ interface AppStateContextType {
   refreshRegistry: () => Promise<void>;
   
   // Sync High-Fidelity Pulse
-  manualDownload: () => Promise<void>;
+  manualDownload: (stateScopes?: string[]) => Promise<void>;
   manualUpload: () => Promise<void>;
   executeSync: (strategy: SyncStrategy) => Promise<void>;
   syncSummary: SyncSummary | null;
@@ -371,7 +372,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   /**
    * Deep Parity Check Logic.
-   * Identifies if two asset objects are functionally identical, ignoring audit metadata.
    */
   const areAssetsIdentical = useCallback((local: Asset, remote: Asset): boolean => {
     const keysToIgnore = ['syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'updateCount', 'unseenUpdateFields', 'importMetadata'];
@@ -388,7 +388,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
-  const manualDownload = useCallback(async () => {
+  const manualDownload = useCallback(async (stateScopes?: string[]) => {
     if (!isOnline) return;
     setIsSyncing(true);
     addNotification({ title: "Scanning Cloud Authority...", description: "Reconciling timestamps for global parity." });
@@ -397,7 +397,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       const currentGrantIds = appSettings?.activeGrantIds || [];
       let allRemoteAssets: Asset[] = [];
       for (const gid of currentGrantIds) {
-        const projectAssets = await FirestoreService.getProjectAssets(gid);
+        // High-Fidelity Scoped Fetch: Pass stateScopes to limit data transfer
+        const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
 
@@ -420,16 +421,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (!local) {
           newItems.push(remote);
         } else {
-          // Optimization: Only act if there is a functional data drift
           if (!areAssetsIdentical(local, remote)) {
             const remoteTime = new Date(remote.lastModified).getTime();
             const localTime = new Date(local.lastModified).getTime();
             
             if (remoteTime > localTime) {
-              // Cloud is newer -> mark for update. 
               autoUpdateItems.push(remote);
             } else if (localTime > remoteTime && local.syncStatus === 'local') {
-              // Local is newer AND has pending changes -> True Conflict.
               existingItems.push(remote);
             }
           }
@@ -437,7 +435,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       });
 
       if (newItems.length === 0 && autoUpdateItems.length === 0 && existingItems.length === 0) {
-        addNotification({ title: "Parity Confirmed", description: "Your local registry is in absolute sync with the cloud." });
+        addNotification({ title: "Parity Confirmed", description: "Your regional registry is in sync with the cloud." });
         setIsSyncing(false);
         return;
       }
@@ -493,7 +491,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
         let nextAssets = [...local];
         
-        // Apply New and Remote-Newer items automatically
         syncSummary.newItems.forEach(item => {
           const id = getFuzzySignature(item.assetIdCode || item.serialNumber || item.id);
           const existing = localMap.get(id);
@@ -504,7 +501,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           }
         });
 
-        // Resolve True Conflicts based on user strategy
         if (strategy === 'UPDATE' && syncSummary.existingItems.length > 0) {
           syncSummary.existingItems.forEach(remote => {
             const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview WelcomeExperience - Plain English Onboarding.
+ * @fileOverview WelcomeExperience - Simplified Onboarding & Location-Scoped Download.
  */
 
 import React, { useState } from 'react';
@@ -40,48 +40,48 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: "Home Hub v5",
-    description: "Welcome. Assetain is your central hub for managing Nigerian asset registers.",
+    title: "Welcome to Assetain",
+    description: "Assetain is a professional asset intelligence platform designed for high-integrity field management. It provides a secure workspace for tracking and verifying critical infrastructure across Nigeria.",
     icon: Zap,
     benefits: [
-      "Custom Folder Setup",
-      "Activity History (Hold bell icon)",
-      "Simple Mobile Layout",
-      "High-Density Desktop View"
+      "Local-First Data Resilience",
+      "Professional Field Reports",
+      "Forensic Audit Traceability",
+      "Offline-Ready Workstation"
     ]
   },
   {
-    title: "Works Offline",
-    description: "Your work is saved locally even without internet. Updates are saved to your device first.",
-    icon: Cloud,
+    title: "Regional Scope",
+    description: "Your session is automatically locked to your assigned regional jurisdiction. This ensures you only see and manage assets relevant to your specific state or zone.",
+    icon: ShieldCheck,
     benefits: [
-      "Smart Sync Control",
-      "Manual Save (Hold sync icon)",
-      "Zero Data Loss",
-      "Assigned State View"
+      "Assigned State View",
+      "Location-Scoped Sync",
+      "Zonal Store Integration",
+      "Geographical Data Security"
     ]
   },
   {
-    title: "Get Your List",
-    description: "While we download your asset list, review the new tools available for this project.",
+    title: "Initialize Your List",
+    description: "While we download your regional asset register, review the professional tools available for this project pulse.",
     icon: Database,
     isSyncStep: true,
     benefits: [
-      "Approval Workflow",
-      "Automatic Header Setup",
-      "Error Detection",
-      "Location Mapping"
+      "One-Tap Verification",
+      "Dynamic Folder Setup",
+      "Data Quality Scanning",
+      "Automatic Sync Heartbeat"
     ]
   },
   {
-    title: "Ready To Start",
-    description: "Your session is ready. Access extra tools by holding the 'Update Status' badge on the dashboard.",
-    icon: ShieldCheck,
+    title: "Ready to Start",
+    description: "Your workstation is now prepared. Access management tools by holding any asset card or using the navigation hub.",
+    icon: Activity,
     benefits: [
-      "Edit Field Labels",
-      "Manage Local Stores",
-      "Automatic Word Reports",
-      "Data Quality Checks"
+      "Real-Time Sync Control",
+      "Activity History Logging",
+      "Batch Edit Capability",
+      "Multi-Project Support"
     ]
   }
 ];
@@ -100,7 +100,8 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
   const handleNext = async () => {
     const step = STEPS[currentStep];
     if (step.isSyncStep && !hasDownloaded) {
-      await manualDownload();
+      // Scoped download based on user location
+      await manualDownload(userProfile?.states || []);
       setHasDownloaded(true);
       return;
     }
@@ -127,7 +128,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                 <Zap className="h-6 w-6 text-black fill-current" />
               </div>
               <div className="flex flex-col">
-                <DialogTitle className="text-xl font-black tracking-tighter uppercase leading-none">Initialize Hub</DialogTitle>
+                <DialogTitle className="text-xl font-black tracking-tighter uppercase leading-none text-foreground">Assetain Hub</DialogTitle>
                 <DialogDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1.5">Step {currentStep + 1} of {STEPS.length}</DialogDescription>
               </div>
             </div>
@@ -180,7 +181,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                     step.benefits.map((benefit, i) => (
                       <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors">
                         <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-tight opacity-70 leading-tight">{benefit}</span>
+                        <span className="text-[10px] font-black uppercase tracking-tight text-foreground/70 leading-tight">{benefit}</span>
                       </div>
                     ))
                   )}
@@ -191,11 +192,11 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
 
           {/* Footer */}
           <div className="p-10 pt-0 flex items-center justify-between">
-            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100 h-12 rounded-xl">Skip</Button>
+            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100 h-12 rounded-xl text-foreground">Skip</Button>
             <div className="flex items-center gap-3">
-              {currentStep > 0 && <Button variant="outline" onClick={handlePrev} disabled={isSyncing} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2">Back</Button>}
-              <Button onClick={handleNext} disabled={isSyncing} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3">
-                {isSyncing ? <><Loader2 className="h-4 w-4 animate-spin" /> Fetching Data...</> : step.isSyncStep && !hasDownloaded ? <><Database className="h-4 w-4" /> Download Records</> : currentStep === STEPS.length - 1 ? 'Start Using App' : <>Next Step <ArrowRight className="h-4 w-4" /></>}
+              {currentStep > 0 && <Button variant="outline" onClick={handlePrev} disabled={isSyncing} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2 text-foreground">Back</Button>}
+              <Button onClick={handleNext} disabled={isSyncing} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3 bg-primary text-black">
+                {isSyncing ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing...</> : step.isSyncStep && !hasDownloaded ? <><Database className="h-4 w-4" /> Download Scope</> : currentStep === STEPS.length - 1 ? 'Start Work' : <>Next <ArrowRight className="h-4 w-4" /></>}
               </Button>
             </div>
           </div>

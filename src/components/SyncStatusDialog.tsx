@@ -27,6 +27,7 @@ import {
   X
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
 import type { OfflineQueueEntry } from '@/types/domain';
@@ -46,6 +47,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
     assets 
   } = useAppState();
   
+  const { userProfile } = useAuth();
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
 
   useEffect(() => {
@@ -73,7 +75,8 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
   };
 
   const handlePullPulse = async () => {
-    await manualDownload();
+    // SCOPED DOWNLOAD
+    await manualDownload(userProfile?.states || []);
   };
 
   return (
