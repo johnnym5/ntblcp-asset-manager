@@ -5,6 +5,7 @@
  * Phase 1600: Zonal Admin scoping. Filters users by zonal states.
  * Phase 1610: Integrated Tactile Menu for User Rows.
  * Phase 1620: Simplified Role Labels (Admin, Zonal Admin, User, Super Admin).
+ * Phase 1630: Zonal badge display for Regional Scope column.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -168,14 +169,20 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
                   </Badge>
                 </TableCell>
                 <TableCell className="py-4">
-                  <div className="flex flex-wrap gap-1.5 max-w-[200px]">
-                    {user.states?.slice(0, 2).map(s => (
-                      <Badge key={s} variant="secondary" className="text-[7px] font-black uppercase px-2 h-5 bg-muted/50 border border-border/40">
-                        {s}
-                      </Badge>
-                    ))}
-                    {user.states?.length > 2 && <span className="text-[8px] font-bold text-muted-foreground">+{user.states.length - 2}</span>}
-                  </div>
+                  {user.isZonalAdmin && user.assignedZone ? (
+                    <Badge className="bg-teal-500/10 text-teal-600 border-teal-500/20 text-[8px] font-black uppercase h-6 px-3">
+                      {user.assignedZone} Zone
+                    </Badge>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                      {user.states?.slice(0, 2).map(s => (
+                        <Badge key={s} variant="secondary" className="text-[7px] font-black uppercase px-2 h-5 bg-muted/50 border border-border/40">
+                          {s}
+                        </Badge>
+                      ))}
+                      {user.states?.length > 2 && <span className="text-[8px] font-bold text-muted-foreground">+{user.states.length - 2}</span>}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="py-4 text-right pr-6">
                    <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">

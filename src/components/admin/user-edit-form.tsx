@@ -5,6 +5,7 @@
  * Terminology: Passcode.
  * Phase 1800: Integrated Granular Access Control Hub (Permissions).
  * Phase 1810: Hidden Super-Admin Tier via Tactile Interaction.
+ * Phase 1820: Enhanced Zonal Admin regional scope (Zone selection).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -41,7 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { AuthorizedUser, UserPermissions } from '@/types/domain';
-import { NIGERIAN_STATES } from '@/lib/constants';
+import { NIGERIAN_STATES, NIGERIAN_ZONES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { 
   ChevronsUpDown, 
@@ -66,7 +67,9 @@ import {
   RotateCcw,
   Settings as SettingsIcon,
   History,
-  FileUp
+  FileUp,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -190,6 +193,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
   
   const currentRole = form.watch('role');
   const isZonalAdmin = form.watch('isZonalAdmin');
+  const assignedZone = form.watch('assignedZone');
 
   useEffect(() => {
     if (isOpen) {
@@ -293,12 +297,75 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
 
                 <div className="space-y-4">
                     <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Regional Scope</Label>
-                    {currentRole !== 'SUPERADMIN' && !isZonalAdmin ? (
+                    
+                    {currentRole === 'SUPERADMIN' ? (
+                        <div className="p-5 rounded-2xl bg-muted/10 border-2 border-dashed border-border/40 text-center">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Global Administrative Clearance: Unrestricted Scope.</span>
+                        </div>
+                    ) : isZonalAdmin ? (
+                        <div className="space-y-4 animate-in slide-in-from-top-2 duration-500">
+                            <FormField 
+                                control={form.control} 
+                                name="assignedZone" 
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Authorized Zonal Region</FormLabel>
+                                        <Select 
+                                            onValueChange={(val) => {
+                                                field.onChange(val);
+                                                // Deterministically populate states pulse for this zone
+                                                const zoneStates = NIGERIAN_ZONES[val as keyof typeof NIGERIAN_ZONES] || [];
+                                                form.setValue('states', zoneStates);
+                                            }} 
+                                            value={field.value || ''}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger className="h-12 rounded-xl bg-muted/10 border-border font-black text-xs uppercase tracking-tight">
+                                                    <SelectValue placeholder="CHOOSE ZONE..." />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl border-border bg-card shadow-3xl">
+                                                {Object.keys(NIGERIAN_ZONES).map(zone => (
+                                                    <SelectItem key={zone} value={zone} className="text-[10px] font-black uppercase py-2.5">{zone}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            
+                            <AnimatePresence>
+                                {assignedZone && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.98 }} 
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.98 }}
+                                        className="p-5 rounded-[1.5rem] bg-primary/[0.03] border-2 border-dashed border-primary/20 space-y-3 shadow-inner"
+                                    >
+                                        <div className="flex items-center gap-2 text-primary">
+                                            <ShieldCheck className="h-3 w-3" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest">Restricting Scope to States in {assignedZone}:</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES]?.map(s => (
+                                                <Badge key={s} variant="secondary" className="text-[7px] font-black uppercase px-2 h-5 bg-background border border-border/40 text-foreground/60">
+                                                    {s}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <p className="text-[8px] font-medium italic text-muted-foreground">System will lock this user to all {NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES]?.length} administrative states.</p>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    ) : (
                         <FormField control={form.control} name="states" render={({ field }) => (
                             <FormItem className="flex flex-col">
+                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Individual State Selection</FormLabel>
                                 <Popover>
                                     <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-full h-14 justify-between rounded-xl border-2 border-border/40 bg-muted/10">
+                                        <Button variant="outline" className="w-full h-14 justify-between rounded-xl border-2 border-border/40 bg-muted/10 hover:border-primary/20 transition-all shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 {field.value?.length > 0 ? (
                                                     <Badge className="bg-primary text-black font-black text-[9px] h-6 px-3">{field.value.length} STATES</Badge>
@@ -328,10 +395,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                                 </Popover>
                             </FormItem>
                         )}/>
-                    ) : (
-                        <div className="p-5 rounded-2xl bg-muted/10 border-2 border-dashed border-border/40 text-center">
-                            <span className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Scope automatically locked based on Admin tier.</span>
-                        </div>
                     )}
                 </div>
 
@@ -441,9 +504,13 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                                                 form.setValue('role', 'MANAGER');
                                                 form.setValue('isAdmin', false);
                                                 form.setValue('permissions', adminPermissions);
+                                                // Reset scope selection
+                                                form.setValue('states', []);
+                                                form.setValue('assignedZone', '');
                                             } else {
                                                 form.setValue('role', 'VERIFIER');
                                                 form.setValue('permissions', defaultPermissions);
+                                                form.setValue('assignedZone', '');
                                             }
                                         }}
                                     />
