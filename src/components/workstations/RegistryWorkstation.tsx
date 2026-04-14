@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Center - Primary Management Workspace.
  * Phase 1914: Updated with simple terminology (List, Folders, Setup).
+ * Phase 1930: Swapped Folder Import for direct Add Asset pulse.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -495,12 +496,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      setTargetFolderForImport(selectedCategories[0]);
-                      setIsImportScannerOpen(true);
+                      setSelectedAssetIdForEdit(null);
+                      setIsFormOpen(true);
                     }}
                     className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
                   >
-                    <FileUp className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Import Into Folder</span>
+                    <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Asset</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -812,7 +813,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsFormOpen} 
         asset={processedAssets.find(a => a.id === selectedAssetIdForEdit)} 
         isReadOnly={false} 
-        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
+        onSave={async (a) => { 
+          const op = selectedAssetIdForEdit ? 'UPDATE' : 'CREATE';
+          await enqueueMutation(op, 'assets', a); 
+          await refreshRegistry(); 
+          setIsFormOpen(false); 
+        }} 
       />
       
       <CategoryBatchEditForm 
