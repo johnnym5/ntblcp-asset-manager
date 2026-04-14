@@ -5,6 +5,7 @@
  * Phase 1914: Updated with simple terminology (List, Folders, Setup).
  * Phase 1915: Integrated Tactile Menus for Folder Cards.
  * Phase 1916: Limited grid to 5 columns max for improved card detail visibility.
+ * Phase 1917: Hardened transformation pulse to reflect Folder Setup changes instantly.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -147,9 +148,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [projectToDelete, setProjectToDelete] = useState<any>(null);
   const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
-  // Single Sheet Import State
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
@@ -166,16 +168,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return defs;
   }, [appSettings?.grants, activeGrantIds]);
 
-  useEffect(() => {
+  // DERIVE HEADERS FOR TRANSFORMATION - Bypasses stale context state for instant setup reflection
+  const activeFolderHeaders = useMemo(() => {
     if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
       const def = mergedSheetDefinitions[cat];
       if (def && def.displayFields) {
-        const folderHeaders: RegistryHeader[] = def.displayFields.map((f, i) => ({
+        return def.displayFields.map((f, i) => ({
           id: `h-${f.key}-${i}`,
           rawName: f.label,
           displayName: f.label,
-          normalizedName: normalizeHeaderName(f.label),
+          normalizedName: f.key,
           visible: true,
           table: f.table,
           quickView: f.quickView,
@@ -183,13 +186,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           editable: true,
           filterable: true,
           sortEnabled: true,
-          dataType: 'text',
+          dataType: 'text' as const,
           orderIndex: i
         }));
-        setWorkstationHeaders(folderHeaders);
       }
     }
-  }, [selectedCategories, mergedSheetDefinitions, setWorkstationHeaders]);
+    return workstationHeaders;
+  }, [selectedCategories, mergedSheetDefinitions, workstationHeaders]);
+
+  useEffect(() => {
+    if (selectedCategories.length === 1) {
+      setWorkstationHeaders(activeFolderHeaders);
+    }
+  }, [selectedCategories, activeFolderHeaders, setWorkstationHeaders]);
 
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
@@ -697,7 +706,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <RegistryCard 
-                        record={transformAssetToRecord(asset, workstationHeaders, appSettings?.sourceBranding)} 
+                        record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} 
                         onInspect={handleEditAsset} 
                         selected={selectedAssetIds.has(asset.id)} 
                         onToggleSelect={handleToggleSelect} 
@@ -707,7 +716,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     </motion.div>
                   )) : (
                     <RegistryTable 
-                      records={paginatedAssets.map(a => transformAssetToRecord(a, workstationHeaders, appSettings?.sourceBranding))} 
+                      records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} 
                       onInspect={handleEditAsset} 
                       selectedIds={selectedAssetIds} 
                       onToggleSelect={handleToggleSelect} 
@@ -767,7 +776,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <div className="p-4 sm:p-8">
                   {processedAssets.find(a => a.id === expandedAssetId) && (
                     <AssetDossier 
-                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, workstationHeaders, appSettings?.sourceBranding)} 
+                      record={transformAssetToRecord(processedAssets.find(a => a.id === expandedAssetId)!, activeFolderHeaders, appSettings?.sourceBranding)} 
                       onEdit={handleEditAsset}
                       onQuickUpdate={handleQuickUpdate}
                       isHeaderEditingMode={isHeaderEditingMode}

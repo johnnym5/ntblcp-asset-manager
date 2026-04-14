@@ -5,6 +5,7 @@
  * Phase 811: Optimized transformAssetToRecord to handle Chassis/Engine for vehicles.
  * Phase 812: Added Guidance Dictionary for field explanations.
  * Phase 813: Added LGA to default headers and ensured core property resolution.
+ * Phase 814: Implemented resilient property resolver for snake_case/camelCase parity.
  */
 
 import type { Asset } from "@/types/domain";
@@ -136,29 +137,37 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
 /**
  * Transforms a Domain Asset to an AssetRecord for the high-density grid.
  * Dynamically resolves values based on the PROVIDED headers (the folder's template).
+ * Uses a resilient key resolver to handle snake_case and camelCase variants.
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = undefined;
     
-    // 1. Resolve from Core Domain Properties using camelCase keys
-    switch(header.normalizedName) {
+    // Normalize key for switch resolution (e.g., asset_id_code -> assetidcode)
+    const norm = header.normalizedName.toLowerCase().replace(/_/g, '');
+
+    // 1. Resolve from Core Domain Properties using resilient matching
+    switch(norm) {
       case "sn": rawValue = asset.sn; break;
       case "location": rawValue = asset.location; break;
+      case "state": rawValue = asset.location; break;
       case "custodian": rawValue = asset.custodian; break;
+      case "assignee": rawValue = asset.custodian; break;
       case "description": rawValue = asset.description || asset.name; break;
-      case "assetIdCode": rawValue = asset.assetIdCode; break;
-      case "serialNumber": rawValue = asset.serialNumber; break;
-      case "chassisNo": rawValue = asset.chassisNo; break;
-      case "engineNo": rawValue = asset.engineNo; break;
+      case "assetdescription": rawValue = asset.description || asset.name; break;
+      case "assetidcode": rawValue = asset.assetIdCode; break;
+      case "serialnumber": rawValue = asset.serialNumber; break;
+      case "chassisno": rawValue = asset.chassisNo; break;
+      case "engineno": rawValue = asset.engineNo; break;
       case "lga": rawValue = asset.lga; break;
       case "category": rawValue = asset.category; break;
+      case "assetclass": rawValue = asset.category; break;
       case "condition": rawValue = asset.condition; break;
       case "manufacturer": rawValue = asset.manufacturer; break;
-      case "modelNumber": rawValue = asset.modelNumber; break;
+      case "modelnumber": rawValue = asset.modelNumber; break;
       case "remarks": rawValue = asset.remarks; break;
       case "value": rawValue = asset.value; break;
-      case "purchaseDate": rawValue = asset.purchaseDate; break;
+      case "purchasedate": rawValue = asset.purchaseDate; break;
       case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
     }

@@ -2,6 +2,7 @@
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Phase 1500: Reformatted to support 7 headers with prioritized S/N and ID.
  * Phase 1501: Added inline editing for Name, Location, and LGA with explicit save buttons.
+ * Phase 1505: Upgraded to use record-specific headers for accurate setup reflection.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -88,7 +89,7 @@ export function RegistryCard({
   onQuickUpdate,
   densityMode = 'comfortable'
 }: RegistryCardProps) {
-  const { appSettings, headers: globalHeaders } = useAppState();
+  const { appSettings } = useAppState();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
   useEffect(() => {
@@ -99,18 +100,31 @@ export function RegistryCard({
   const isAdmin = appSettings?.appMode === 'management';
   const canEditBase = isAdmin || isVerificationMode;
 
-  const forcedFieldNames = ['condition', 'remarks', 'status'];
-  
-  // Deterministic 7-header slice with priority
+  // Deterministic 7-header slice derived from the record's source headers
   const activeHeaders = useMemo(() => {
-    const priority = ['sn', 'assetIdCode'];
-    const core = globalHeaders.filter(h => priority.includes(h.normalizedName));
-    const others = globalHeaders.filter(h => h.quickView && !priority.includes(h.normalizedName) && h.normalizedName !== 'description');
+    const folderHeaders = record.headers || [];
+    
+    // Core Identity Filters
+    const core = folderHeaders.filter(h => {
+      const n = h.normalizedName.toLowerCase().replace(/_/g, '');
+      return n === 'sn' || n === 'assetidcode';
+    });
+    
+    // Secondary Technical Fields (filtered by quickView setup)
+    const others = folderHeaders.filter(h => {
+      if (!h.quickView) return false;
+      const n = h.normalizedName.toLowerCase().replace(/_/g, '');
+      // Description and ID are handled specially in the card header/core
+      if (n === 'sn' || n === 'assetidcode' || n === 'description' || n === 'assetdescription') return false;
+      return true;
+    });
+    
     return [...core, ...others].slice(0, 7);
-  }, [globalHeaders]);
+  }, [record.headers]);
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
+  const isVerified = status === 'VERIFIED';
   const grantId = (record.rawRow as any).grantId;
   const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
@@ -200,10 +214,10 @@ export function RegistryCard({
             />
           </div>
 
-          {/* Technical Data Grid (Remaining 7-slice) */}
+          {/* Technical Data Grid (Configurable 7-slice) */}
           <div className="divide-y divide-border/20 bg-muted/5 flex-1">
             {activeHeaders
-              .filter(h => !['description', 'location', 'lga'].includes(h.normalizedName))
+              .filter(h => !['description', 'location', 'lga'].includes(h.normalizedName.toLowerCase().replace(/_/g, '')))
               .map((header) => {
                 const field = record.fields.find(f => f.headerId === header.id);
                 return (
