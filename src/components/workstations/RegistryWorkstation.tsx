@@ -1,13 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Asset List Hub - Main Management Page.
+ * @fileOverview Asset Center - Primary Management Workspace.
  * Phase 1914: Updated with simple terminology (List, Folders, Setup).
- * Phase 1915: Integrated Tactile Menus for Folder Cards.
- * Phase 1916: Limited grid to 5 columns max for improved card detail visibility.
- * Phase 1917: Hardened transformation pulse to reflect Folder Setup changes instantly.
- * Phase 1918: Resolved infinite render loop by removing redundant state synchronization.
- * Phase 1919: Fixed Filter Hub property mismatch and missing options map.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -154,7 +149,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin || userProfile?.isAdmin;
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
@@ -169,7 +164,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return defs;
   }, [appSettings?.grants, activeGrantIds]);
 
-  // DERIVE HEADERS FOR TRANSFORMATION - Optimized to avoid state loops
   const activeFolderHeaders = useMemo(() => {
     if (selectedCategories.length === 1) {
       const cat = selectedCategories[0];
@@ -316,7 +310,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveAssets(currentLocal.map(a => a.id === id ? updatedAsset : a));
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Sync Interrupted", variant: "destructive" });
+      addNotification({ title: "Update Saved Locally", variant: "success" });
     }
   };
 
@@ -329,9 +323,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       setIsHeaderEditingMode(false);
-      addNotification({ title: "Layout Saved", variant: "success" });
+      addNotification({ title: "Folder Setup Updated", variant: "success" });
     } catch (e) {
-      addNotification({ title: "Save Failed", variant: "destructive" });
+      addNotification({ title: "Update Failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -352,9 +346,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsAssetDeleteOpen(false);
-      addNotification({ title: "Records Deleted", description: `${idsToDelete.length} records removed locally. Sync to save to cloud.`, variant: "success" });
+      addNotification({ title: "Records Removed", description: `${idsToDelete.length} records deleted.`, variant: "success" });
     } catch (e) {
-      addNotification({ title: "Delete Failed", variant: "destructive" });
+      addNotification({ title: "Removal Failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -378,7 +372,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedCategories([]);
       setIsPurgeDialogOpen(false);
-      addNotification({ title: "Folders Cleared", description: `${foldersToPurge.length} folders emptied. Sync to save changes.`, variant: "success" });
+      addNotification({ title: "Folders Cleared", description: `${foldersToPurge.length} folders emptied.`, variant: "success" });
     } catch (e) {
       addNotification({ title: "Clear Failed", variant: "destructive" });
     } finally {
@@ -403,7 +397,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      addNotification({ title: "Batch Update Applied", variant: "success" });
+      addNotification({ title: "Batch Update Successful", variant: "success" });
     } finally {
       setIsProcessing(false);
       setIsAssetBatchEditOpen(false);
@@ -443,7 +437,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (selectedAssets.length === 0) return;
     try {
       await ExcelService.exportRegistry(selectedAssets, activeFolderHeaders);
-      addNotification({ title: "Export Ready", variant: "success" });
+      addNotification({ title: "Report Ready", variant: "success" });
     } catch (e) {
       addNotification({ title: "Export Failed", variant: "destructive" });
     }
@@ -456,7 +450,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col relative pb-safe">
-      {/* 1. Header Pulse */}
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start min-w-0">
@@ -480,10 +473,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </AnimatePresence>
             <div className="space-y-0.5 min-w-0">
               <h2 className="text-lg font-black uppercase text-foreground tracking-tight leading-none truncate max-w-[300px]">
-                {showList ? (selectedCategories[0] || 'Asset List') : 'Asset List'}
+                {showList ? (selectedCategories[0] || 'Asset List') : 'Asset Hub'}
               </h2>
               <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                {showList ? `${processedAssets.length} Records Found` : `${filteredAssets.length} Total Records`}
+                {showList ? `${processedAssets.length} Records Found` : `${filteredAssets.length} Total Assets`}
               </p>
             </div>
           </div>
@@ -577,7 +570,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
-      {/* 2. Main Workstation Surface */}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence>
           {expandedAssetId && (
@@ -608,7 +600,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="text-3xl font-black text-foreground tracking-tighter">{totalCoverage}%</span>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40 whitespace-nowrap">Total List</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40 whitespace-nowrap">Total Hub</span>
                   </div>
                 </div>
               </div>
@@ -622,20 +614,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               {categories.map(cat => (
                 <TactileMenu
                   key={cat}
-                  title="Folder Menu"
+                  title="Folder Actions"
                   options={[
-                    { label: 'View Records', icon: FolderOpen, onClick: () => handleExploreFolder(cat) },
+                    { label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) },
                     { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) },
                     ...(isAdmin ? [
                       { label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); } },
-                      { label: 'Setup Folder', icon: Wrench, onClick: () => {
+                      { label: 'Folder Setup', icon: Wrench, onClick: () => {
                         if (mergedSheetDefinitions[cat]) {
                           setSelectedSheetDef(mergedSheetDefinitions[cat]);
                           setOriginalSheetName(cat);
                           setIsColumnSheetOpen(true);
                         }
                       }},
-                      { label: 'Delete Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true }
+                      { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true }
                     ] : [])
                   ]}
                 >
@@ -660,13 +652,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     <div className="space-y-4">
                       <div className="flex items-baseline gap-2">
                         <p className="text-3xl font-black tracking-tighter text-foreground leading-none">{groupStats[cat]?.total || 0}</p>
-                        <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">ITEMS</p>
+                        <p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p>
                       </div>
 
                       {isVerificationMode && (
                         <div className="space-y-2 pt-4 border-t border-dashed border-border/40">
                           <div className="flex justify-between items-center text-[9px] font-black uppercase">
-                            <span className="text-muted-foreground opacity-60">Status</span>
+                            <span className="text-muted-foreground opacity-60">Audit Progress</span>
                             <span className="text-primary font-bold">{groupStats[cat]?.verified || 0} / {groupStats[cat]?.total || 0}</span>
                           </div>
                           <Progress 
@@ -713,7 +705,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           )}
         </ScrollArea>
 
-        {/* 3. Record Overlay (Expanded) */}
         <AnimatePresence>
           {expandedAssetId && (
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="fixed top-[5vh] left-[2.5vw] right-[2.5vw] bottom-[5vh] lg:top-[15vh] lg:left-[5vw] lg:right-[5vw] lg:bottom-[10vh] z-50 bg-background border-2 border-primary/20 rounded-[2.5rem] shadow-3xl overflow-hidden flex flex-col">
@@ -763,13 +754,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* 4. Selection Hub */}
       <AnimatePresence>
         {isSelectionBarVisible && (
           <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0">
               <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
-              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Items Selected</span>
+              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Records Selected</span>
             </div>
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
@@ -779,7 +769,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   )
                 ) : (
                   canEdit && (
-                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Change</Button>
+                    <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Update</Button>
                   )
                 )}
                 
@@ -844,8 +834,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
           <AlertDialogHeader>
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected Records?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will permanently remove {selectedAssetIds.size} items from your list. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will permanently remove {selectedAssetIds.size} records. This action cannot be reversed.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 flex gap-3">
             <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
@@ -859,7 +849,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <AlertDialogHeader>
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div>
             <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Clear Selected Folders?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will delete all records within the {selectedCategories.length} selected folders. This action is permanent.</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will delete all records within the {selectedCategories.length} selected folders.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 flex gap-3">
             <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
@@ -892,7 +882,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               setAppSettings(nextSettings);
               storage.saveSettings(nextSettings);
               if (isOnline) FirestoreService.updateSettings(nextSettings);
-              addNotification({ title: "Folder Setup Saved", variant: "success" });
+              addNotification({ title: "Setup Updated", variant: "success" });
             }
           }}
         />

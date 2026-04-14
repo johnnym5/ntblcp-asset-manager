@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Settings Hub - Control Center.
+ * @fileOverview Settings Center - Central Control Hub.
  * Phase 1914: Updated with simple terminology (Home, Scope, Users).
  */
 
@@ -116,14 +116,13 @@ export function SettingsWorkstation() {
   const [projectToDelete, setProjectToDelete] = useState<Grant | null>(null);
   const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
-  // Single Sheet Import State
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
-  const isAdmin = userProfile?.role === 'ADMIN' || isSuperAdmin;
+  const isAdmin = userProfile?.role === 'ADMIN' || isSuperAdmin || userProfile?.isAdmin;
 
   useEffect(() => {
     if (appSettings) {
@@ -150,7 +149,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      toast({ title: `Settings Updated`, description: "System configuration has been saved." });
+      toast({ title: `Settings Saved`, description: "System configuration has been updated." });
     } finally {
       setIsSaving(false);
     }
@@ -181,7 +180,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       
-      toast({ title: "Passcode Changed", description: "Your system access passcode has been updated." });
+      toast({ title: "Passcode Updated", description: "Your system access passcode has been changed." });
       setNewPasscode('');
       setConfirmPasscode('');
     } catch (e) {
@@ -212,8 +211,8 @@ export function SettingsWorkstation() {
     handleSettingChange('activeGrantIds', nextActiveGrantIds);
     
     toast({ 
-      title: "Project Removed", 
-      description: `"${projectToDelete.name}" has been removed from your scope.` 
+      title: "Project Deleted", 
+      description: `"${projectToDelete.name}" removed from scope.` 
     });
     setProjectToDelete(null);
     setIsProjectDeleteOpen(false);
@@ -306,7 +305,7 @@ export function SettingsWorkstation() {
       });
       
       handleSettingChange('grants', nextGrants);
-      toast({ title: 'Template Loaded', description: `${templates.length} folders recognized.` });
+      toast({ title: 'Folders Loaded', description: `${templates.length} category templates recognized.` });
     } catch (error) {
       toast({ title: 'Load Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -350,7 +349,7 @@ export function SettingsWorkstation() {
             )}
             {isAdmin && (
               <TabsTrigger value="users" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
-                <Users className="h-3.5 w-3.5" /> Users
+                <Users className="h-3.5 w-3.5" /> Personnel
               </TabsTrigger>
             )}
             <TabsTrigger value="history" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
@@ -367,40 +366,40 @@ export function SettingsWorkstation() {
         <ScrollArea className="flex-1 px-1">
           <div className="pb-40">
             <TabsContent value="general" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Visual Appearance" description="Display style" icon={Palette}>
+              <SettingSection title="Visual Style" description="Display preferences" icon={Palette}>
                 <div className="grid grid-cols-2 gap-3">
                   <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                    <Sun className="h-4 w-4" /> Light Mode
+                    <Sun className="h-4 w-4" /> Light Theme
                   </Button>
                   <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
-                    <Moon className="h-4 w-4" /> Dark Mode
+                    <Moon className="h-4 w-4" /> Dark Theme
                   </Button>
                 </div>
               </SettingSection>
 
-              <SettingSection title="My Security" description="Passcode update" icon={KeyRound}>
+              <SettingSection title="Account Security" description="Change your access code" icon={KeyRound}>
                 <div className="space-y-4 max-w-md">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">New System Passcode</Label>
-                    <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Min. 4 characters" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">New Access Passcode</Label>
+                    <Input type="password" value={newPasscode} onChange={(e) => setNewPasscode(e.target.value)} placeholder="Minimum 4 digits" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm New Passcode</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Confirm Passcode</Label>
                     <Input type="password" value={confirmPasscode} onChange={(e) => setConfirmPasscode(e.target.value)} placeholder="Repeat passcode" className="h-12 bg-muted/20 border-border rounded-xl font-bold" />
                   </div>
                   <Button onClick={handleUpdatePasscode} disabled={isUpdatingPasscode || !newPasscode} className="w-full h-14 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl">
                     {isUpdatingPasscode ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldIcon className="h-4 w-4 mr-2" />}
-                    Save New Passcode
+                    Update Passcode
                   </Button>
                 </div>
               </SettingSection>
 
               {isAdmin && (
-                <SettingSection title="Operational Mode" description="App behavior" icon={Smartphone}>
+                <SettingSection title="App Mode" description="Operational behavior" icon={Smartphone}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'management', label: 'Admin Hub', desc: 'Full control over project settings and record labels.' },
-                      { id: 'verification', label: 'Field Audit', desc: 'Optimized for mobile verification and reporting.' }
+                      { id: 'management', label: 'Management Center', desc: 'Full control over project settings and record labels.' },
+                      { id: 'verification', label: 'Audit Center', desc: 'Optimized for mobile verification and field reporting.' }
                     ].map(m => (
                       <button key={m.id} onClick={() => handleSettingChange('appMode', m.id)} className={cn("p-6 rounded-2xl border-2 text-left transition-all relative group", draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20")}>
                         {draftSettings.appMode === m.id && <CheckCircle2 className="absolute top-4 right-4 h-4 w-4 text-primary" />}
@@ -414,12 +413,12 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="projects" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Project Management" description="Assign and manage project visibility" icon={LayoutGrid}>
+              <SettingSection title="Project Management" description="Configure active project scopes" icon={LayoutGrid}>
                 <div className="space-y-8">
                   <div className="flex gap-3">
-                    <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
+                    <Input placeholder="Enter new project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
                     <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">
-                      <PlusCircle className="h-4 w-4 mr-2" /> Add Project
+                      <PlusCircle className="h-4 w-4 mr-2" /> Create Project
                     </Button>
                   </div>
                   <div className="space-y-4">
@@ -461,7 +460,7 @@ export function SettingsWorkstation() {
                                   onClick={(e) => { e.stopPropagation(); setActiveView('IMPORT'); }}
                                   className="h-9 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest gap-2 shadow-sm"
                                 >
-                                  <FileUp className="h-3.5 w-3.5" /> Import Records
+                                  <FileUp className="h-3.5 w-3.5" /> Import Data
                                 </Button>
                             </div>
 
@@ -476,10 +475,10 @@ export function SettingsWorkstation() {
                               <div className="flex items-center justify-between px-1">
                                 <div className="space-y-1">
                                   <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 leading-none">Asset Folders</h4>
-                                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide specific categories</p>
+                                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide folders in this project</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3.5 w-3.5" /> Get Template</Button>
+                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3.5 w-3.5" /> Import Template</Button>
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -506,7 +505,7 @@ export function SettingsWorkstation() {
                                         ) : (
                                           <div className="flex flex-col min-w-0">
                                             <span className={cn("text-[11px] font-black uppercase truncate leading-none", isSheetEnabled ? "text-foreground" : "text-muted-foreground")}>{name}</span>
-                                            <span className="text-[7px] font-bold uppercase text-muted-foreground mt-1">{isSheetEnabled ? 'Showing in List' : 'Hidden'}</span>
+                                            <span className="text-[7px] font-bold uppercase text-muted-foreground mt-1">{isSheetEnabled ? 'Active' : 'Hidden'}</span>
                                           </div>
                                         )}
                                       </div>
@@ -531,21 +530,26 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="users" className="m-0 outline-none">
-              <SettingSection title="Personnel" description="User accounts and access" icon={Users}>
+              <SettingSection title="Personnel Center" description="Manage user accounts and scopes" icon={Users}>
                 <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
               </SettingSection>
             </TabsContent>
 
             <TabsContent value="history" className="m-0 outline-none"><AuditLogWorkstation isEmbedded={true} /></TabsContent>
-            {isSuperAdmin && <TabsContent value="health" className="m-0 outline-none space-y-10"><DatabaseWorkstation isEmbedded={true} /><ErrorAuditWorkstation isEmbedded={true} /></TabsContent>}
+            {isSuperAdmin && (
+              <TabsContent value="health" className="m-0 outline-none space-y-10">
+                <DatabaseWorkstation isEmbedded={true} />
+                <ErrorAuditWorkstation isEmbedded={true} />
+              </TabsContent>
+            )}
           </div>
         </ScrollArea>
       </Tabs>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0 z-50">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Cancel Changes</Button>
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Discard Changes</Button>
         <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl gap-3">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Settings
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Commit Changes
         </Button>
       </div>
 
@@ -555,14 +559,14 @@ export function SettingsWorkstation() {
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
           <AlertDialogHeader>
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Bomb className="h-8 w-8 text-destructive" /></div>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Confirm Project Deletion?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Project?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
-              This will permanently delete <strong>{projectToDelete?.name}</strong> and all associated local records. This action cannot be reversed.
+              This will permanently remove <strong>{projectToDelete?.name}</strong> and all associated local records.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 flex gap-3">
             <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Delete Project</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteProject} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Confirm Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,20 +1,16 @@
 'use client';
 
 /**
- * @fileOverview DatabaseWorkstation - Granular Registry Orchestration.
- * Overhauled from raw JSON editing to a structured Management Workstation.
- * Phase 300: Implemented Properties/Logic view modes and high-density explorer UI.
- * Phase 305: Implemented maintenance protocol logic (Purge/Wipe/Reset) with feedback pulses.
- * Phase 306: Grouped maintenance protocols into a collapsible Accordion panel.
+ * @fileOverview Database Center - Granular Data Management.
+ * Overhauled for simple terminology and high-density explorer UI.
+ * Phase 1914: Simplified terminology (Database Center, Records, Clear Data).
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Database, 
-  CheckCircle2, 
   RefreshCw, 
   Trash2, 
-  AlertTriangle, 
   Loader2, 
   Monitor,
   Terminal,
@@ -26,7 +22,6 @@ import {
   ChevronRight,
   Plus,
   Edit3,
-  FileJson,
   Layers,
   Cloud,
   Check,
@@ -89,7 +84,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -168,12 +162,12 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
       const path = editingNode ? editingNode.path : `${activeCollection}/${parsedData.id || crypto.randomUUID()}`;
       
       await VirtualDBService.updateNode(activeLayer, path, parsedData);
-      toast({ title: "Node Synchronized", description: "Storage state updated successfully." });
+      toast({ title: "Update Saved", description: "Record state updated successfully." });
       setEditingNode(null);
       setIsCreating(false);
       await refreshRegistry();
     } catch (e) {
-      toast({ variant: "destructive", title: "Logic Pulse Failed", description: "The JSON structure is invalid." });
+      toast({ variant: "destructive", title: "Update Failed", description: "The data structure is invalid." });
     } finally {
       setIsProcessing(false);
     }
@@ -191,7 +185,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await VirtualDBService.deleteNode(activeLayer, node.path);
-      toast({ title: "Node Purged", description: "Record destroyed deterministically." });
+      toast({ title: "Record Deleted", description: "The item has been removed." });
       setNodeToDelete(null);
       await refreshRegistry();
     } finally {
@@ -206,7 +200,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         const node = nodes.find(n => n.id === id);
         if (node) await VirtualDBService.deleteNode(activeLayer, node.path);
       }
-      toast({ title: "Batch Purge Complete", description: `Destroyed ${selectedIds.size} records.` });
+      toast({ title: "Batch Delete Complete", description: `Removed ${selectedIds.size} records.` });
       setSelectedIds(new Set());
       await refreshRegistry();
     } finally {
@@ -219,7 +213,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeLayer('LOCAL');
-      toast({ title: "Local Registry Purged", description: "Device cache and staging queues destroyed." });
+      toast({ title: "Local Data Cleared", description: "Device cache and staging queues deleted." });
       await refreshRegistry();
       setIsPurgeLocalOpen(false);
     } finally {
@@ -231,7 +225,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeLayer('RTDB');
-      toast({ title: "Mirror Standby Wiped", description: "Realtime Database shadow shadow purged." });
+      toast({ title: "Standby Mirror Cleared", description: "The backup shadow data was purged." });
       await refreshRegistry();
       setIsWipeMirrorOpen(false);
     } finally {
@@ -243,7 +237,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeLayer('FIRESTORE');
-      toast({ title: "Cloud Authority Reset", description: "All Firestore registry records destroyed." });
+      toast({ title: "Cloud Data Reset", description: "All online records were deleted." });
       await refreshRegistry();
       setIsResetCloudOpen(false);
     } finally {
@@ -255,7 +249,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Reset Complete", description: "Registry destroyed across all storage tiers." });
+      toast({ title: "System Reset Complete", description: "All data cleared from all storage layers." });
       await refreshRegistry();
       setIsNuclearOpen(false);
     } finally {
@@ -286,7 +280,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
   return (
     <div className={cn("space-y-10 animate-in fade-in duration-700", !isEmbedded && "max-w-7xl mx-auto pb-40")}>
       
-      {/* 1. Controller Pulse */}
+      {/* 1. Header Control */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1">
         {!isEmbedded && (
           <div className="space-y-1">
@@ -295,8 +289,8 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                 <Terminal className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h2 className="text-3xl font-black uppercase text-foreground tracking-tight leading-none">Database Explorer</h2>
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mt-1.5 opacity-60">Granular Cross-Layer Management</p>
+                <h2 className="text-3xl font-black uppercase text-foreground tracking-tight leading-none">Database Hub</h2>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] mt-1.5 opacity-60">Advanced Record Management</p>
               </div>
             </div>
           </div>
@@ -318,7 +312,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         </div>
       </div>
 
-      {/* 2. Main Workstation Surface */}
+      {/* 2. Main Center Surface */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start px-1">
         
         {/* Collection Sidebar */}
@@ -329,10 +323,10 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
           </div>
           <div className="space-y-2">
             {[
-              { id: 'assets', label: 'Asset Registry', icon: Database },
-              { id: 'audit_logs', label: 'Activity Ledger', icon: Activity },
-              { id: 'error_logs', label: 'Resilience Audit', icon: ShieldAlert },
-              { id: 'config/settings', label: 'Governance Settings', icon: Settings }
+              { id: 'assets', label: 'Asset List', icon: Database },
+              { id: 'audit_logs', label: 'Activity History', icon: Activity },
+              { id: 'error_logs', label: 'System Health', icon: ShieldAlert },
+              { id: 'config/settings', label: 'App Settings', icon: Settings }
             ].map(col => (
               <button 
                 key={col.id}
@@ -356,28 +350,28 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
           <Card className="rounded-[2rem] border-2 border-dashed border-border bg-muted/10 p-6 text-center space-y-4">
             <div className="p-4 bg-primary/10 rounded-full w-fit mx-auto"><Cpu className="h-6 w-6 text-primary" /></div>
             <div className="space-y-1">
-              <h5 className="text-[10px] font-black uppercase tracking-widest text-foreground">Node Monitoring</h5>
-              <p className="text-[9px] font-medium text-muted-foreground italic leading-relaxed">System observing {activeLayer} layer logic pulse.</p>
+              <h5 className="text-[10px] font-black uppercase tracking-widest text-foreground">Monitoring Active</h5>
+              <p className="text-[9px] font-medium text-muted-foreground italic leading-relaxed">System observing {activeLayer} storage node.</p>
             </div>
           </Card>
         </aside>
 
-        {/* Document Explorer */}
+        {/* Explorer Hub */}
         <Card className="lg:col-span-9 bg-card border-2 border-border shadow-3xl rounded-[2.5rem] overflow-hidden flex flex-col h-[750px]">
           <div className="p-8 border-b bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="relative flex-1 group">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
               <Input 
-                placeholder="Scan identities or data contents..." 
+                placeholder="Search record IDs or data..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                 className="h-14 pl-14 bg-background border-none rounded-2xl text-sm font-medium shadow-inner placeholder:text-muted-foreground/30"
               />
             </div>
             <div className="flex items-center gap-3">
-              <Badge className="bg-muted text-foreground h-8 px-4 rounded-xl font-mono text-[10px] border-border">{filteredNodes.length} NODES</Badge>
+              <Badge className="bg-muted text-foreground h-8 px-4 rounded-xl font-mono text-[10px] border-border">{filteredNodes.length} RECORDS</Badge>
               <Button onClick={handleCreate} className="h-14 px-8 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2.5 shadow-xl shadow-primary/20 transition-transform active:scale-95">
-                <Plus className="h-4 w-4" /> Create Node
+                <Plus className="h-4 w-4" /> New Record
               </Button>
             </div>
           </div>
@@ -394,14 +388,14 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                         className="h-5 w-5 rounded-lg border-2 border-border"
                       />
                     </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Technical Identification</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Logical State</TableHead>
-                    <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Pulse Controls</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Record Identity</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Current State</TableHead>
+                    <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest text-muted-foreground py-5 px-6">Controls</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={4} className="h-[500px] text-center"><div className="flex flex-col items-center gap-4 opacity-40"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-[10px] font-black uppercase tracking-widest">Replaying Cluster Pulse...</p></div></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="h-[500px] text-center"><div className="flex flex-col items-center gap-4 opacity-40"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-[10px] font-black uppercase tracking-widest">Scanning Storage...</p></div></TableCell></TableRow>
                   ) : filteredNodes.length > 0 ? (
                     filteredNodes.map(node => (
                       <TableRow key={node.id} className="group hover:bg-primary/[0.02] border-b last:border-0 transition-colors">
@@ -439,7 +433,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" onClick={() => handleEdit(node)} className="h-10 w-10 rounded-xl bg-muted/50 text-primary opacity-40 hover:opacity-100 hover:bg-primary/10 transition-all"><Edit3 className="h-4 w-4" /></Button>
                                 </TooltipTrigger>
-                                <TooltipContent className="text-[8px] font-black uppercase">Edit Node</TooltipContent>
+                                <TooltipContent className="text-[8px] font-black uppercase">Edit Data</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
                             <Button variant="ghost" size="icon" onClick={() => setNodeToDelete(node)} className="h-10 w-10 rounded-xl bg-muted/50 text-destructive/40 hover:opacity-100 hover:bg-destructive/10 transition-all"><Trash2 className="h-4 w-4" /></Button>
@@ -448,24 +442,24 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow><TableCell colSpan={4} className="h-[500px] text-center opacity-20"><Database className="h-20 w-16 mx-auto mb-6 text-muted-foreground" /><h3 className="text-2xl font-black uppercase tracking-widest">Cluster Silent</h3><p className="text-xs font-medium italic">No nodes matching current criteria.</p></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="h-[500px] text-center opacity-20"><Database className="h-20 w-16 mx-auto mb-6 text-muted-foreground" /><h3 className="text-2xl font-black uppercase tracking-widest">Empty</h3><p className="text-xs font-medium italic">No records found matching your search.</p></TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
           </ScrollArea>
 
-          {/* Table Footer Actions */}
+          {/* Footer Actions */}
           {selectedIds.size > 0 && (
             <div className="p-6 bg-primary/[0.02] border-t border-primary/20 flex items-center justify-between animate-in slide-in-from-bottom-2">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center text-black font-black text-xs shadow-lg">{selectedIds.size}</div>
-                <span className="text-xs font-black uppercase tracking-widest text-primary">Documents Selected for Batch Pulse</span>
+                <span className="text-xs font-black uppercase tracking-widest text-primary">Selected for Batch Deletion</span>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setSelectedIds(new Set())} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2">Deselect All</Button>
+                <Button variant="outline" onClick={() => setSelectedIds(new Set())} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2">Clear Selection</Button>
                 <Button onClick={handleBatchDelete} className="h-12 px-10 rounded-xl bg-destructive text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 gap-3">
-                  <Trash2 className="h-4 w-4" /> Purge Selection
+                  <Trash2 className="h-4 w-4" /> Delete Permanently
                 </Button>
               </div>
             </div>
@@ -473,7 +467,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         </Card>
       </div>
 
-      {/* Global Maintenance Protocol */}
+      {/* Global Maintenance Zone */}
       <div className="px-1 mt-12 border-t pt-12 border-dashed">
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="maintenance" className="border-none">
@@ -483,8 +477,8 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                   <ShieldAlert className="h-6 w-6 text-destructive" />
                 </div>
                 <div className="text-left">
-                  <h3 className="text-xl font-black uppercase tracking-[0.2em] text-foreground leading-none">Security & Infrastructure Pulses</h3>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1.5 opacity-60">Destructive Maintenance Protocols</p>
+                  <h3 className="text-xl font-black uppercase tracking-[0.2em] text-foreground leading-none">Maintenance Center</h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1.5 opacity-60">System Cleaning Protocols</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -493,33 +487,33 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                 <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
                   <div className="p-3 bg-muted rounded-xl w-fit"><Smartphone className="h-6 w-6 text-muted-foreground" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase">Local Registry</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Clear all asset records and staging queues on this device only.</p>
+                    <h4 className="text-sm font-black uppercase">Local Data</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Clear all records saved on this device only.</p>
                   </div>
                   <Button variant="outline" onClick={() => setIsPurgeLocalOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-                    Execute Local Purge
+                    Clear Local Data
                   </Button>
                 </Card>
 
                 <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
                   <div className="p-3 bg-muted rounded-xl w-fit"><Activity className="h-6 w-6 text-muted-foreground" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase">Mirror Standby</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Destroy all hot-standby records in the Realtime Database shadow.</p>
+                    <h4 className="text-sm font-black uppercase">Standby Mirror</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Wipe the backup shadow database (RTDB).</p>
                   </div>
                   <Button variant="outline" onClick={() => setIsWipeMirrorOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-                    Execute Mirror Wipe
+                    Clear Mirror
                   </Button>
                 </Card>
 
                 <Card className="bg-card border-2 border-border p-6 space-y-6 group hover:border-primary/20 transition-all">
                   <div className="p-3 bg-muted rounded-xl w-fit"><Cloud className="h-6 w-6 text-muted-foreground" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase">Cloud Authority</h4>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Permanently clear the authoritative assets collection in Firestore.</p>
+                    <h4 className="text-sm font-black uppercase">Online Storage</h4>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Permanently clear all online records from Firestore.</p>
                   </div>
                   <Button variant="outline" onClick={() => setIsResetCloudOpen(true)} className="w-full h-12 rounded-xl text-destructive hover:bg-destructive/5 font-black uppercase text-[9px] tracking-widest border-2 border-destructive/10">
-                    Execute Cloud Reset
+                    Clear Online Data
                   </Button>
                 </Card>
 
@@ -527,11 +521,11 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                   <div className="absolute top-0 right-0 p-4 opacity-5"><Bomb className="h-20 w-20 text-destructive" /></div>
                   <div className="p-3 bg-destructive/10 rounded-xl w-fit"><Hammer className="h-6 w-6 text-destructive" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-black uppercase text-destructive">Global Pulse</h4>
-                    <p className="text-[10px] font-medium text-destructive/60 italic leading-relaxed">Destroy all data across Cloud, Mirror, and Local storage tiers instantly.</p>
+                    <h4 className="text-sm font-black uppercase text-destructive">Global Reset</h4>
+                    <p className="text-[10px] font-medium text-destructive/60 italic leading-relaxed">Clear ALL data everywhere instantly.</p>
                   </div>
                   <Button onClick={() => setIsNuclearOpen(true)} className="w-full h-12 rounded-xl bg-destructive text-white font-black uppercase text-[9px] tracking-widest shadow-2xl transition-transform active:scale-95">
-                    Execute Global Reset
+                    Execute Full Reset
                   </Button>
                 </Card>
               </div>
@@ -540,20 +534,19 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         </Accordion>
       </div>
 
-      {/* High-Fidelity Editor Dialog */}
+      {/* Record Editor Dialog */}
       <Dialog open={!!editingNode || isCreating} onOpenChange={(open) => { if (!open) { setEditingNode(null); setIsCreating(false); } }}>
         <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-background border-none rounded-[2.5rem] shadow-3xl flex flex-col">
           
-          {/* Editor Header */}
           <div className="p-8 border-b bg-muted/20 shrink-0">
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   <div className="p-3 bg-primary/10 rounded-2xl shadow-inner"><Monitor className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-1">
-                    <DialogTitle className="text-2xl font-black uppercase tracking-tight text-foreground">{isCreating ? 'Initialize Document' : 'Registry Synchronizer'}</DialogTitle>
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tight text-foreground">{isCreating ? 'New Record' : 'Record Synchronizer'}</DialogTitle>
                     <DialogDescription className="text-[10px] font-black uppercase text-muted-foreground tracking-widest opacity-60">
-                      Technical Data Pulse Editor & Parity Bridge
+                      Edit data directly in the {activeLayer} cluster.
                     </DialogDescription>
                   </div>
                 </div>
@@ -565,7 +558,6 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </DialogHeader>
           </div>
 
-          {/* Interaction Mode Selection */}
           <div className="px-8 py-4 bg-muted/5 border-b border-dashed border-border shrink-0">
             <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border w-fit">
               <button 
@@ -589,7 +581,6 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </div>
           </div>
 
-          {/* Scrollable Content Pane */}
           <ScrollArea className="flex-1 bg-background">
             <div className="p-8 pb-32">
               <AnimatePresence mode="wait">
@@ -604,7 +595,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                     <div className="space-y-6">
                       <div className="flex items-center gap-3 px-1">
                         <Zap className="h-4 w-4 text-primary" />
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-foreground">Data pulse attributes</h4>
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-foreground">Record Attributes</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
                         {Object.entries(nodeData).map(([key, value]) => {
@@ -613,7 +604,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                             <div key={key} className="space-y-2 group/prop">
                               <div className="flex items-center justify-between">
                                 <Label className="text-[10px] font-black uppercase text-muted-foreground group-hover/prop:text-primary transition-colors tracking-widest">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                                {isObject && <Badge variant="outline" className="text-[7px] font-mono opacity-40">NESTED_SCHEMA</Badge>}
+                                {isObject && <Badge variant="outline" className="text-[7px] font-mono opacity-40">NESTED_DATA</Badge>}
                               </div>
                               {isObject ? (
                                 <div className="p-4 rounded-xl bg-muted/20 border-2 border-dashed border-border/40 font-mono text-[9px] text-muted-foreground break-all leading-relaxed">
@@ -641,7 +632,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                     className="space-y-6 h-full"
                   >
                     <div className="flex items-center justify-between px-1">
-                      <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary">Raw logic schema</h4>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary">Raw Data (JSON)</h4>
                       <Badge variant="outline" className="bg-black text-primary border-primary/20 text-[8px] font-mono uppercase tracking-widest">application/json</Badge>
                     </div>
                     <div className="relative group">
@@ -660,108 +651,107 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </div>
           </ScrollArea>
 
-          {/* Editor Footer Controls */}
           <div className="p-8 border-t bg-muted/20 shrink-0 flex flex-row items-center justify-between gap-4 pb-safe shadow-3xl">
             <div className="flex items-start gap-4 max-w-md">
               <div className="p-2.5 bg-blue-500/10 rounded-xl shrink-0"><Info className="h-5 w-5 text-blue-600" /></div>
               <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                Modifications are atomic. Committed changes are broadcast immediately to the {activeLayer} cluster.
+                Updates are immediate. Committed changes will be broadcast to the {activeLayer} cluster.
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => { setEditingNode(null); setIsCreating(false); }} className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest text-muted-foreground hover:text-foreground">Abort Protocol</Button>
+              <Button variant="ghost" onClick={() => { setEditingNode(null); setIsCreating(false); }} className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest text-muted-foreground hover:text-foreground">Discard</Button>
               <Button 
                 onClick={handleSaveNode} 
                 disabled={isProcessing}
                 className="h-16 px-12 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black transition-all hover:scale-105 active:scale-95 min-w-[260px] gap-3"
               >
                 {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
-                Commit Storage Pulse
+                Commit Record Update
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Destructive Confirmation Dialogs */}
+      {/* Confirmation Dialogs */}
       
-      {/* 1. Local Purge */}
+      {/* Local Purge */}
       <AlertDialog open={isPurgeLocalOpen} onOpenChange={setIsPurgeLocalOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Smartphone className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Purge Local Registry?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Clear Local Data?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action will destroy all asset records, staging sandboxes, and pending sync queues <strong>on this device only</strong>. Cloud data is preserved.
+              This will delete all asset records and staging data <strong>on this device only</strong>. Online storage is not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleLocalPurge} 
               disabled={isProcessing}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
             >
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Purge
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Confirm Clear
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 2. Mirror Wipe */}
+      {/* Mirror Wipe */}
       <AlertDialog open={isWipeMirrorOpen} onOpenChange={setIsWipeMirrorOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Activity className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Mirror Standby?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Standby Mirror?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This will destroy all records in the hot-standby shadow (RTDB). Local and Cloud tiers will remain intact.
+              This will clear all records in the backup shadow database (RTDB). Standard online and local data will remain.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleMirrorWipe} 
               disabled={isProcessing}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
             >
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Wipe
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Confirm Wipe
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 3. Cloud Reset */}
+      {/* Cloud Reset */}
       <AlertDialog open={isResetCloudOpen} onOpenChange={setIsResetCloudOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Cloud className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Reset Cloud Authority?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Reset Online Storage?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              Permanently clear the entire assets collection from Firestore. <strong>This action is irreversible and affects all users globally.</strong>
+              This will permanently delete all asset records from the online storage. <strong>This affects all users globally and cannot be undone.</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleCloudReset} 
               disabled={isProcessing}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl bg-destructive text-white m-0"
             >
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Execute Reset
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Confirm Reset
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 4. Nuclear Reset */}
+      {/* Nuclear Reset */}
       <AlertDialog open={isNuclearOpen} onOpenChange={setIsNuclearOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-black text-white">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-12 w-12 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Global Registry Purge?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
-              You are about to permanently destroy EVERY record in the global registry pulse. This includes Cloud (Firestore), Mirror (RTDB), and all Local device caches. This action is immutable.
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight text-center">FULL SYSTEM RESET</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60 text-center">
+              You are about to delete EVERY record in the entire system (Online, Backup, and Local). This action is permanent.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-10 gap-3">
@@ -771,31 +761,31 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
               disabled={isProcessing}
               className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0"
             >
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Commit Global Purge
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Confirm Full Reset
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Node Purge Confirmation */}
+      {/* Node Delete Confirmation */}
       <AlertDialog open={!!nodeToDelete} onOpenChange={setNodeToDelete}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Trash2 className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive leading-none">Purge Node Permanently?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive leading-none">Delete Record Permanently?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action will destroy the record <strong>{nodeToDelete?.displayName}</strong> in the {activeLayer} storage cluster. This pulse is irreversible and cannot be recovered.
+              This will delete <strong>{nodeToDelete?.displayName}</strong> from the {activeLayer} storage cluster. This action cannot be reversed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-10 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted transition-all">Cancel Purge</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted transition-all">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => nodeToDelete && handleDelete(nodeToDelete)} 
               disabled={isProcessing}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0 transition-transform active:scale-95"
             >
               {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />}
-              Execute Deletion
+              Confirm Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Application Shell - Home Hub.
- * Optimized for Production Deployment & Cross-Device Parity.
+ * Optimized for Production Deployment & Simplified Terminology.
  * Phase 1920: Safe area insets and tactile feedback hardening.
  */
 
@@ -114,7 +114,7 @@ export default function HomeHub() {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const CurrentWorkstation = useMemo(() => {
@@ -145,25 +145,30 @@ export default function HomeHub() {
       { label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
       { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
       { label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
-      { label: 'Report Hub', icon: FileText, onClick: () => setActiveView('REPORTS') },
+      { label: 'Report Center', icon: FileText, onClick: () => setActiveView('REPORTS') },
       { label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-      { label: 'Error Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+      { label: 'Problem Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
       { label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
       { label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') },
     ];
 
     if (isAdmin) {
       base.push(
-        { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-        { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS') },
-        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') },
+        { label: 'Import Data', icon: FileUp, onClick: () => setActiveView('IMPORT') },
+        { label: 'Personnel List', icon: UserIcon, onClick: () => setActiveView('USERS') },
+        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
+      );
+    }
+
+    if (userProfile?.role === 'SUPERADMIN') {
+      base.push(
         { label: 'System Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') },
-        { label: 'Database Explorer', icon: Terminal, onClick: () => setActiveView('DATABASE') }
+        { label: 'Database Center', icon: Terminal, onClick: () => setActiveView('DATABASE') }
       );
     }
 
     return base;
-  }, [isAdmin, setActiveView]);
+  }, [isAdmin, userProfile?.role, setActiveView]);
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
@@ -185,7 +190,6 @@ export default function HomeHub() {
       />
       <WelcomeExperience isOpen={isWelcomeOpen} onComplete={() => { setIsWelcomeOpen(false); sessionStorage.removeItem('assetain-fresh-login'); if (appSettings) { const ns = { ...appSettings, onboardingComplete: true }; setAppSettings(ns); storage.saveSettings(ns); } }} />
       
-      {/* Notch-Safe Header */}
       <header className="h-14 pt-safe border-b border-border flex items-center justify-between px-4 sm:px-8 bg-background/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-8">
           <AnimatePresence mode="wait">
@@ -199,7 +203,7 @@ export default function HomeHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="Switch Hub"
+            title="Switch Workspace"
             options={jumpOptions}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -246,15 +250,15 @@ export default function HomeHub() {
               </motion.div>
             ) : (
               <TactileMenu
-                title="Search Controls"
+                title="Search Hub"
                 options={[
-                  { label: 'Open Palette', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
-                  { label: 'Filter List', icon: Filter, onClick: () => setActiveView('REGISTRY') }
+                  { label: 'Open Search', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
+                  { label: 'Quick Filters', icon: Filter, onClick: () => setActiveView('REGISTRY') }
                 ]}
               >
                 <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
                   <Search className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Find assets...</span>
                   <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
                 </button>
               </TactileMenu>
@@ -264,33 +268,35 @@ export default function HomeHub() {
 
         <div className="flex items-center gap-2 sm:gap-5">
           {isAdmin && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setIsInboxOpen(true)} 
-                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
-                >
-                  <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                  {pendingApprovalsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
-                      {pendingApprovalsCount}
-                    </span>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="text-[8px] font-black uppercase">Approve Changes</TooltipContent>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsInboxOpen(true)} 
+                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                  >
+                    <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                    {pendingApprovalsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           <TactileMenu
-            title="Sync Protocol"
+            title="Sync Control"
             options={[
               { label: 'Sync Hub', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
-              { label: 'Fetch Updates', icon: Download, onClick: manualDownload, disabled: !isOnline },
+              { label: 'Fetch Data', icon: Download, onClick: manualDownload, disabled: !isOnline },
               { label: 'Save Changes', icon: Upload, onClick: manualUpload, disabled: !isOnline },
-              ...(isAdmin ? [{ label: 'Force Parity', icon: RefreshCw, onClick: refreshRegistry }] : [])
+              ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onClick: refreshRegistry }] : [])
             ]}
           >
             <div 
@@ -306,8 +312,8 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Download</TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Upload</TooltipContent></Tooltip>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip></TooltipProvider>
                 </>
               )}
             </div>
@@ -316,8 +322,8 @@ export default function HomeHub() {
           <TactileMenu
             title="Update History"
             options={[
-              { label: 'View All Alerts', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Detailed History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+              { label: 'All Alerts', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Full History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
               { label: 'Clear Alerts', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
@@ -344,13 +350,12 @@ export default function HomeHub() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Log Out</span></DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      {/* Main Workspace Surface */}
       <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background">
         <div className="flex-1 flex flex-col border border-border rounded-[2.5rem] bg-card/30 overflow-hidden relative shadow-inner">
           <ErrorBoundary module={activeView}>
