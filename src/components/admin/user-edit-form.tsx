@@ -41,9 +41,33 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { AuthorizedUser, UserPermissions } from '@/types/domain';
-import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
+import { NIGERIAN_STATES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail, PlusCircle, FileEdit, KeyRound, Lock, ShieldAlert, LayoutGrid, Activity, Terminal } from 'lucide-react';
+import { 
+  ChevronsUpDown, 
+  Check, 
+  MapPin, 
+  ShieldCheck, 
+  User, 
+  Mail, 
+  PlusCircle, 
+  FileEdit, 
+  KeyRound, 
+  Lock, 
+  ShieldAlert, 
+  LayoutGrid, 
+  Activity, 
+  Terminal,
+  Database,
+  RefreshCw,
+  Monitor,
+  Trash2,
+  Wrench,
+  RotateCcw,
+  Settings as SettingsIcon,
+  History,
+  FileUp
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -166,7 +190,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
   
   const currentRole = form.watch('role');
   const isZonalAdmin = form.watch('isZonalAdmin');
-  const assignedZone = form.watch('assignedZone');
 
   useEffect(() => {
     if (isOpen) {
@@ -232,10 +255,10 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
       <DialogContent className="sm:max-w-2xl rounded-[2.5rem] overflow-hidden p-0 border-primary/10 shadow-3xl bg-background">
         <DialogHeader className="p-8 bg-muted/20 border-b">
           <DialogTitle className="flex items-center gap-3 text-2xl font-black uppercase tracking-tight leading-none text-foreground">
-            <User className="h-6 w-6 text-primary"/> {user ? 'Edit Identity' : 'New Personnel'}
+            <User className="h-6 w-6 text-primary"/> {user ? 'Edit User' : 'New User'}
           </DialogTitle>
           <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-70 mt-1">
-            Define system roles and authorized access pulses.
+            Manage user roles and regional permissions.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">
@@ -321,7 +344,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                                     <div className="p-2 bg-primary/10 rounded-lg group-hover:scale-110 transition-transform"><Lock className="h-4 w-4 text-primary" /></div>
                                     <div className="text-left">
                                         <span className="text-sm font-black uppercase tracking-tight">Capabilities</span>
-                                        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Granular Page & Action Pulse</p>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Granular Page & Function Access</p>
                                     </div>
                                 </div>
                             </AccordionTrigger>
@@ -344,7 +367,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><Lock className="h-3 w-3" /> Functional Pulse</h5>
+                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><Lock className="h-3 w-3" /> Functional Access</h5>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
                                         <PermissionRow label="Create Assets" pKey="func_add_asset" icon={PlusCircle} />
                                         <PermissionRow label="Edit Assets" pKey="func_edit_asset" icon={FileEdit} />
@@ -468,7 +491,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
         <DialogFooter className="p-8 bg-muted/20 border-t gap-3 shrink-0">
             <DialogClose asChild><Button variant="ghost" className="font-black uppercase text-[10px] px-8 rounded-xl">Discard</Button></DialogClose>
             <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 px-10 rounded-[1.5rem] bg-primary text-black transition-transform active:scale-95">
-                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>} Commit Identity Pulse
+                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>} Save User Profile
             </Button>
         </DialogFooter>
       </DialogContent>
