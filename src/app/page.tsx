@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Dashboard Command Hub.
- * Standardized terminology for professional asset management.
- * Phase 1912: Optimized Header Sync Status UI for deterministic feedback.
- * Phase 1913: Added smart parity check to manual sync triggers.
+ * Phase 1913: Updated with simplified terminology (Hub, Assets, History).
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -153,13 +151,13 @@ export default function SPAHub() {
 
   const jumpOptions = useMemo(() => {
     const base = [
-      { label: 'Intelligence Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-      { label: 'Asset Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+      { label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
+      { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
       { label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
-      { label: 'Reporting Hub', icon: FileText, onClick: () => setActiveView('REPORTS') },
-      { label: 'Critical Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-      { label: 'Anomaly Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
-      { label: 'Activity Ledger', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+      { label: 'Report Hub', icon: FileText, onClick: () => setActiveView('REPORTS') },
+      { label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
+      { label: 'Error Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
+      { label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
       { label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') },
     ];
 
@@ -183,7 +181,7 @@ export default function SPAHub() {
 
   const handleManualUploadWithFeedback = async () => {
     if (!isOnline) {
-      addNotification({ title: "Offline Scope", description: "Connect to the cloud to synchronize modifications.", variant: "destructive" });
+      addNotification({ title: "Offline", description: "Connect to save changes.", variant: "destructive" });
       return;
     }
     await manualUpload();
@@ -191,7 +189,7 @@ export default function SPAHub() {
 
   const handleManualDownloadWithFeedback = async () => {
     if (!isOnline) {
-      addNotification({ title: "Offline Scope", description: "Connect to the cloud to fetch latest registry pulses.", variant: "destructive" });
+      addNotification({ title: "Offline", description: "Connect to fetch latest records.", variant: "destructive" });
       return;
     }
     await manualDownload();
@@ -223,12 +221,12 @@ export default function SPAHub() {
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
                 <TactileMenu 
-                  title="System Navigation"
+                  title="Main Menu"
                   options={[
                     { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-                    { label: 'Registry', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
+                    { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
                     { label: 'Folders', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
-                    { label: 'Reporting', icon: FileText, onClick: () => setActiveView('REPORTS') },
+                    { label: 'Reports', icon: FileText, onClick: () => setActiveView('REPORTS') },
                     { label: 'Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
                     { label: 'History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
                     ...(isAdmin ? [
@@ -245,7 +243,7 @@ export default function SPAHub() {
           </AnimatePresence>
 
           <TactileMenu 
-            title="System Jump Pulse"
+            title="Switch View"
             options={jumpOptions}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -253,7 +251,7 @@ export default function SPAHub() {
               {!isMobile && (
                 <div className="flex flex-col text-left">
                   <h1 className="text-xs font-black uppercase text-foreground tracking-tight leading-none">Assetain</h1>
-                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'ASSESSMENT' : 'MANAGEMENT'}</span>
+                  <span className="text-[7px] font-black uppercase text-primary tracking-[0.25em] mt-1 opacity-60">{appSettings?.appMode === 'verification' ? 'FIELD AUDIT' : 'ADMIN HUB'}</span>
                 </div>
               )}
             </button>
@@ -284,7 +282,7 @@ export default function SPAHub() {
                 <Search className="h-3.5 w-3.5 text-primary" />
                 <input 
                   autoFocus
-                  placeholder="Search..."
+                  placeholder="Search assets..."
                   className="bg-transparent border-none outline-none text-xs flex-1 text-foreground"
                   onKeyDown={(e) => e.key === 'Enter' && setIsMobileSearchOpen(false)}
                 />
@@ -293,7 +291,7 @@ export default function SPAHub() {
             ) : (
               <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
                 <Search className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Global Registry Search...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
                 <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
               </button>
             )}
@@ -335,11 +333,11 @@ export default function SPAHub() {
             {isSyncing ? (
               <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Asset Syncing...</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
               </div>
             ) : (
               <>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Update from Cloud</TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get from Cloud</TooltipContent></Tooltip></TooltipProvider>
                 <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
               </>
             )}
@@ -371,7 +369,7 @@ export default function SPAHub() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Log Out</span></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

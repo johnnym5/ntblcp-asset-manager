@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Verify Assets - Field Verification Hub.
- * Phase 40: Integrated Fuzzy Location Scope check for RBAC-aware filtering.
+ * @fileOverview Verify Records - Field Audit Center.
+ * Phase 1914: Updated with simple terminology (Verify, Records, Audit).
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -63,7 +63,6 @@ export function VerifyWorkstation() {
   const unverified = useMemo(() => {
     let list = assets.filter(a => a.status === 'UNVERIFIED');
     
-    // Deterministic RBAC Scope Pulse (Fuzzy)
     if (!userProfile?.isAdmin && userProfile?.state) {
       const userStateFuzzy = getFuzzySignature(userProfile.state);
       list = list.filter(a => getFuzzySignature(a.location) === userStateFuzzy);
@@ -86,7 +85,7 @@ export function VerifyWorkstation() {
     const current = await storage.getAssets();
     await storage.saveAssets(current.map(a => a.id === asset.id ? updated : a));
     await refreshRegistry();
-    toast({ title: "Asset Updated", description: `Marked as ${newStatus}.` });
+    toast({ title: "Verification Saved", description: `Record marked as ${newStatus}.` });
   };
 
   const handleSearchChange = (val: string) => {
@@ -106,10 +105,10 @@ export function VerifyWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <ClipboardCheck className="h-8 w-8 text-primary" />
             </div>
-            {isAdvanced ? 'Verify Assets' : 'Verification Tasks'}
+            Verify Records
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Confirm physical assets match the records.
+            Confirm physical assets match the digital records.
           </p>
         </div>
         
@@ -146,7 +145,7 @@ export function VerifyWorkstation() {
           </AnimatePresence>
 
           <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-            <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items Awaiting Verification
+            {unverified.length} Items To Verify
           </Badge>
         </div>
       </div>
@@ -177,7 +176,7 @@ export function VerifyWorkstation() {
                             <XCircle className="h-5 w-5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Report Issue</TooltipContent>
+                        <TooltipContent>Report Problem</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
@@ -187,7 +186,7 @@ export function VerifyWorkstation() {
           ) : (
             <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
               <CheckCircle2 className="h-32 w-32 mx-auto mb-4 text-green-600" />
-              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Verification Complete</h3>
+              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">All Records Verified</h3>
             </div>
           )}
         </AnimatePresence>

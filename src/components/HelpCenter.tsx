@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * @fileOverview HelpCenter - High-Fidelity Pop-up Guidance.
- * Added Field Dictionary section to explain Asset ID, Chassis vs Serial, etc.
+ * @fileOverview HelpCenter - Simplified Guidance.
  */
 
 import React, { useState } from 'react';
@@ -51,61 +50,61 @@ interface HelpTopic {
 const DICTIONARY = [
   { 
     term: "Asset ID Tag", 
-    definition: "The unique alphanumeric code assigned by the program (NTBLCP) and printed on the physical sticker.", 
+    definition: "The unique code assigned by NTBLCP and printed on the physical sticker.", 
     example: "NTBLCP/TB/LAG/001",
-    why: "It differs from Description (e.g., 'Toyota Hilux') because the Tag is unique to that specific physical unit, whereas Description describes the type of item."
+    why: "This is unique to the physical unit and helps in tracking specific items."
   },
   { 
     term: "Serial Number", 
-    definition: "The manufacturer's unique hardware identifier, usually for electronics.", 
+    definition: "The unique manufacturer ID found on the item (e.g. back of a laptop).", 
     example: "ABC123456789",
-    why: "Consumer electronics (Laptops, UPS) rely on serials. Vehicles do not use this; they use Chassis/Engine numbers instead."
+    why: "Used primarily for electronics. Vehicles use Chassis numbers instead."
   },
   { 
-    term: "Chassis Number (VIN)", 
-    definition: "The Vehicle Identification Number stamped onto the car or motorbike frame.", 
+    term: "Chassis Number", 
+    definition: "The ID number found on a vehicle or motorcycle frame.", 
     example: "VIN-XXXX-XXXX",
-    why: "For vehicles, the Chassis is the primary legal identity. A vehicle record often leaves Serial/Model blank in favor of Chassis/Engine."
+    why: "For vehicles, the Chassis is the main identity."
   },
   { 
     term: "Engine Number", 
-    definition: "The unique identifier stamped on the physical engine block.", 
+    definition: "The unique ID found on the vehicle motor block.", 
     example: "E-12345-6789",
-    why: "Unlike a Model Number (which describes the product line), the Engine Number is specific to that vehicle's motor."
+    why: "Specific to the vehicle's engine."
   }
 ];
 
 const TOPICS: HelpTopic[] = [
   {
     id: 'registry',
-    title: 'Asset Hub',
+    title: 'Asset List',
     icon: Database,
-    whatItDoes: "View and manage all your asset folders in one centralized location.",
-    whenToUse: "Use the hub to scan your inventory, search for specific items, or check regional coverage.",
+    whatItDoes: "View and manage all your assets in one place.",
+    whenToUse: "Use this to search for items, check counts, or verify assets.",
     howToUse: [
-      "Search by ID, S/N, or description using the search bar.",
-      "Switch between Folders and List views for better scanning.",
-      "Tap any record to see its full profile and history."
+      "Search by ID, SN, or name using the search bar.",
+      "Switch between Folders and List views.",
+      "Tap any item to see full details."
     ],
     tips: [
-      "Custom display names can be set in the 'Field Setup' pop-up.",
-      "Hidden fields are always accessible in the detail profile."
+      "Change visible columns in Folder Setup.",
+      "Hidden info is always in the Profile view."
     ]
   },
   {
     id: 'upload',
     title: 'Import Assets',
     icon: FileUp,
-    whatItDoes: "Upload Excel workbooks and turn them into structured records.",
-    whenToUse: "Use this when you have new spreadsheets to ingest or legacy registers to migrate.",
+    whatItDoes: "Upload Excel files to add multiple records at once.",
+    whenToUse: "Use this when you have new spreadsheets to add to the system.",
     howToUse: [
-      "Choose an Excel file from your computer.",
-      "Review the detected blocks and folders in the Scanner.",
-      "Click 'Add to Registry' to finalize the ingestion."
+      "Select an Excel file from your device.",
+      "Review the folders found by the scanner.",
+      "Click 'Load Data' to finish."
     ],
     tips: [
-      "The system detects document structure automatically using Column A.",
-      "Imports are isolated first for safety."
+      "The system reads Row 1 for Folder Names automatically.",
+      "Always review changes in the review area first."
     ]
   }
 ];
@@ -136,14 +135,14 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <BookOpen className="text-primary h-6 w-6" />
                 </div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Support Hub</DialogTitle>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Help Center</DialogTitle>
               </div>
               <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl text-white/40"><X className="h-5 w-5" /></Button>
             </div>
             <div className="flex gap-4 mt-2">
               <button onClick={() => setShowDictionary(false)} className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", !showDictionary ? "text-primary" : "text-white/20 hover:text-white")}>Tutorials</button>
               <div className="w-px h-3 bg-white/10" />
-              <button onClick={() => setShowDictionary(true)} className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", showDictionary ? "text-primary" : "text-white/20 hover:text-white")}>Field Dictionary</button>
+              <button onClick={() => setShowDictionary(true)} className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", showDictionary ? "text-primary" : "text-white/20 hover:text-white")}>Field Meanings</button>
             </div>
           </DialogHeader>
         </div>
@@ -152,7 +151,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder={showDictionary ? "Search terminology..." : "Search topics..."} 
+              placeholder={showDictionary ? "Search meanings..." : "Search topics..."} 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-12 rounded-2xl bg-background border-none shadow-inner text-sm font-medium"
@@ -173,11 +172,11 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                     <div className="space-y-3 pl-1">
                       <p className="text-sm font-medium text-foreground italic leading-relaxed">"{item.definition}"</p>
                       <div className="flex items-center gap-2 text-[9px] font-black uppercase text-primary bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/10 w-fit">
-                        <Zap className="h-3 w-3 fill-current" /> Example: {item.example}
+                        Example: {item.example}
                       </div>
                       <div className="pt-3 border-t border-dashed border-border/40">
                         <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
-                          <span className="text-foreground">Context:</span> {item.why}
+                          Why: {item.why}
                         </p>
                       </div>
                     </div>
@@ -186,9 +185,8 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {/* Tutorial Content (Previously existed) */}
                 <div className="space-y-6">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60 px-1">Operational Guides</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60 px-1">How-to Guides</h4>
                   {TOPICS.map(topic => (
                     <button key={topic.id} onClick={() => setSelectedTopic(topic)} className="w-full text-left p-6 rounded-[2rem] border-2 border-border/40 hover:border-primary/20 bg-card transition-all flex items-center justify-between group">
                       <div className="flex items-center gap-4">
@@ -206,7 +204,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
 
         <div className="p-8 border-t bg-muted/10 text-center">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
-            System Intelligence v5.0.4
+            Assetain v5.0.4
           </p>
         </div>
       </DialogContent>

@@ -1,10 +1,9 @@
-
 'use client';
 
 /**
- * @fileOverview Super Admin Database Workstation.
- * Restricted strictly to SUPERADMIN roles.
- * Phase 105: Protected with mounted check for static export stability.
+ * @fileOverview Super Admin Database Hub.
+ * Restricted to SUPERADMIN roles.
+ * Phase 1914: Simplified terminology (Database Hub, Records, Clear Data).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -52,7 +51,7 @@ export default function DatabaseExplorerPage() {
       <AppLayout>
         <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4 py-40">
           <ShieldAlert className="h-20 w-20" />
-          <h2 className="text-xl font-black uppercase tracking-widest text-white">Clearance Denied: Super Admin Only</h2>
+          <h2 className="text-xl font-black uppercase tracking-widest text-white">Access Denied: Super Admin Only</h2>
         </div>
       </AppLayout>
     );
@@ -62,7 +61,7 @@ export default function DatabaseExplorerPage() {
     setIsProcessing(true);
     try {
       const count = await FirestoreService.purgeAllAssets();
-      toast({ title: "Global Reset Complete", description: `Purged ${count} records from Cloud Authority.` });
+      toast({ title: "Clear Data Complete", description: `Deleted ${count} records from the cloud.` });
       await refreshRegistry();
       setIsWipeOpen(false);
     } finally {
@@ -76,10 +75,10 @@ export default function DatabaseExplorerPage() {
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
             <div className="p-3 bg-primary/10 rounded-2xl"><Terminal className="h-8 w-8 text-primary" /></div>
-            Database Administration
+            Database Hub
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Unrestricted Registry Mutation & Infrastructure Reset
+            Advanced Record Management & Global Reset
           </p>
         </div>
 
@@ -87,16 +86,16 @@ export default function DatabaseExplorerPage() {
           <Card className="bg-[#050505] border-2 border-white/5 rounded-[2rem] p-10">
             <CardHeader className="p-0 mb-6">
               <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
-                Registry Pulse
+                Cloud Records
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 space-y-6">
               <div className="flex justify-between items-center text-sm font-bold">
-                <span className="opacity-40 uppercase">Total Cloud Records</span>
+                <span className="opacity-40 uppercase">Total Items</span>
                 <span className="text-primary">{assets?.length || 0}</span>
               </div>
               <Button onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/10 hover:bg-white/5">
-                <RefreshCw className="h-4 w-4" /> Force Parity Refresh
+                <RefreshCw className="h-4 w-4" /> Refresh Cloud Sync
               </Button>
             </CardContent>
           </Card>
@@ -108,9 +107,9 @@ export default function DatabaseExplorerPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 space-y-6">
-              <p className="text-xs font-medium text-destructive/60 italic">Permanently clear all data across the global registry.</p>
+              <p className="text-xs font-medium text-destructive/60 italic">Permanently delete all data from the global list.</p>
               <Button onClick={() => setIsWipeOpen(true)} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 bg-destructive text-white shadow-2xl">
-                <Hammer className="h-4 w-4" /> Execute Global Wipe
+                <Hammer className="h-4 w-4" /> Clear All Data
               </Button>
             </CardContent>
           </Card>
@@ -120,15 +119,15 @@ export default function DatabaseExplorerPage() {
       <AlertDialog open={isWipeOpen} onOpenChange={setIsWipeOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl text-white">
           <AlertDialogHeader className="space-y-4">
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Immutable System Reset?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Delete All Data?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/60">
-              This action will destroy EVERY record in the Firestore and RTDB storage nodes. It cannot be undone.
+              This will permanently delete EVERY record in the cloud database. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-10 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleGlobalWipe} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0">
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Commit Wipe
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldAlert className="h-5 w-5 mr-3" />} Delete Everything
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

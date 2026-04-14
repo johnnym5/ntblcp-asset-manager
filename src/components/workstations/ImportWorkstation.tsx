@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Strict Template-Driven Ingestion.
- * Phase 1210: Hardened Template Generator to avoid generic ghost fields.
+ * @fileOverview Import Center - Excel Data Setup.
+ * Phase 1914: Updated with simple terminology (Import, Scan, Groups).
  */
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -117,7 +117,7 @@ export function ImportWorkstation() {
         setCurrentStep('STRUCTURE');
       }, 800);
     } catch (error) {
-      addNotification({ title: "Scanning Error", variant: "destructive" });
+      addNotification({ title: "Scan Error", variant: "destructive" });
       setCurrentStep('INGEST');
     }
   };
@@ -128,11 +128,9 @@ export function ImportWorkstation() {
 
     setIsProcessing(true);
     try {
-      // STRICT: Generate display fields ONLY for headers present in the sheet
       const displayFields = group.headerSet.map(h => {
         const key = normalizeHeaderName(h);
-        // Only set essential identification columns to show in table by default
-        const isEssential = ['sn', 'asset_description', 'asset_id_code', 'location', 'serial_number', 'chassis_no'].includes(key);
+        const isEssential = ['sn', 'description', 'assetIdCode', 'location', 'serialNumber', 'chassisNo'].includes(key);
         return { 
           key: key as any, 
           label: h, 
@@ -167,7 +165,7 @@ export function ImportWorkstation() {
       setDiscoveredGroups(prev => prev.map(g => g.id === group.id ? { ...g, isTemplateMatched: true } : g));
       setSelectedIds(prev => new Set([...Array.from(prev), group.id]));
       
-      addNotification({ title: "Template Created", description: `"${group.groupName}" structure defined from sheet.`, variant: "success" });
+      addNotification({ title: "Folder Setup Created", description: `"${group.groupName}" structure defined.`, variant: "success" });
     } finally {
       setIsProcessing(false);
     }
@@ -200,8 +198,8 @@ export function ImportWorkstation() {
       const allStaged = allResults.flatMap(c => c.assets);
       setStagedAssets(allStaged);
       setSummary({
-        workbookName: fileInputRef.current?.files?.[0]?.name || 'Workbook',
-        sheetName: 'Multi-Sheet Pulse',
+        workbookName: fileInputRef.current?.files?.[0]?.name || 'File',
+        sheetName: 'Multi-Sheet Data',
         profileId: 'PRO_V12',
         totalRows: allStaged.length,
         groupCount: allResults.length,
@@ -259,9 +257,9 @@ export function ImportWorkstation() {
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
             <div className="p-3 bg-primary/10 rounded-2xl"><FileUp className="h-8 w-8 text-primary" /></div>
-            Import Workstation
+            Import Assets
           </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Strict Template-Driven Ingestion</p>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Add data from Excel workbooks</p>
         </div>
       </div>
 
@@ -272,9 +270,9 @@ export function ImportWorkstation() {
               <Card className="border-4 border-dashed border-white/5 bg-white/[0.02] hover:border-primary/40 rounded-[3rem] p-16 flex flex-col items-center justify-center text-center h-[450px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Initialize Ingestion</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">Identifying logical asset folders using Row 1 Title & Row 2 Headers.</p>
-                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Project Pulse</Button>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Start New Import</h3>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">Select an Excel file to scan for asset folders and records.</p>
+                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Excel File</Button>
               </Card>
             </motion.div>
           )}
@@ -283,7 +281,7 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-32 space-y-10">
               <div className="p-16 bg-primary/10 rounded-[3rem] animate-pulse"><ScanSearch className="h-20 w-20 text-primary" /></div>
               <div className="space-y-4 max-w-sm text-center">
-                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Traversing Workbook</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Scanning File...</h3>
                 <Progress value={progress} className="h-2" />
                 <p className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">{progress}% Complete</p>
               </div>
@@ -296,8 +294,8 @@ export function ImportWorkstation() {
                 <div className="p-6 rounded-3xl bg-orange-500/5 border-2 border-dashed border-orange-500/20 flex items-start gap-6 mb-10">
                   <div className="p-3 bg-orange-500 rounded-xl"><FileWarning className="h-6 w-6 text-black" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-black uppercase text-orange-600">New Folders Detected</h4>
-                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found {unrecognizedCount} blocks missing logical definitions. You must create templates for these to ensure no data is lost.</p>
+                    <h4 className="text-base font-black uppercase text-orange-600">New Folders Found</h4>
+                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found {unrecognizedCount} folders that need a setup. Please define them before importing data.</p>
                   </div>
                 </div>
               )}
@@ -312,7 +310,7 @@ export function ImportWorkstation() {
                     if (next.has(id)) next.delete(id); else next.add(id);
                     setSelectedIds(next);
                   } else {
-                    toast({ title: "Template Required", description: "Define this folder structure first." });
+                    toast({ title: "Setup Required", description: "Define this folder structure first." });
                   }
                 }} 
                 onSelectAll={(c) => setSelectedIds(c ? new Set(discoveredGroups.filter(g => g.isTemplateMatched).map(g => g.id)) : new Set())}
@@ -323,12 +321,12 @@ export function ImportWorkstation() {
                 <div className="flex items-start gap-6">
                   <div className="p-4 bg-primary/10 rounded-2xl shrink-0"><Layers className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Extraction Ready</h4>
-                    <p className="text-sm font-medium text-white/40 italic">{selectedGroupIds.size} folders enqueued for processing.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Ready to Extract</h4>
+                    <p className="text-sm font-medium text-white/40 italic">{selectedGroupIds.size} groups selected for import.</p>
                   </div>
                 </div>
                 <Button onClick={handleExecuteImport} disabled={!canProceed} className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 transition-all">
-                  Extract Asset Data <ChevronRight className="h-6 w-6" />
+                  Load Selected Data <ChevronRight className="h-6 w-6" />
                 </Button>
               </div>
             </motion.div>
@@ -342,16 +340,16 @@ export function ImportWorkstation() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <button onClick={() => setMergeStrategy('SKIP_EXISTING')} className={cn("p-8 rounded-[2rem] border-2 text-left transition-all flex gap-6", mergeStrategy === 'SKIP_EXISTING' ? "bg-primary/5 border-primary shadow-xl" : "bg-black border-white/5 opacity-40 hover:opacity-100")}>
                     <div className={cn("p-4 rounded-2xl shrink-0", mergeStrategy === 'SKIP_EXISTING' ? "bg-primary text-black" : "bg-muted")}><XCircle className="h-8 w-8" /></div>
-                    <div className="space-y-1"><h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'SKIP_EXISTING' ? "text-primary" : "text-white")}>Apply New Records Only</h5><p className="text-xs font-medium text-white/60 italic leading-relaxed">Preserve your local edits. Only add records that do not exist in the current registry.</p></div>
+                    <div className="space-y-1"><h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'SKIP_EXISTING' ? "text-primary" : "text-white")}>Add New Only</h5><p className="text-xs font-medium text-white/60 italic leading-relaxed">Only add records that do not currently exist in your list.</p></div>
                   </button>
                   <button onClick={() => setMergeStrategy('OVERWRITE_EXISTING')} className={cn("p-8 rounded-[2rem] border-2 text-left transition-all flex gap-6", mergeStrategy === 'OVERWRITE_EXISTING' ? "bg-primary/5 border-primary shadow-xl" : "bg-black border-white/5 opacity-40 hover:opacity-100")}>
                     <div className={cn("p-4 rounded-2xl shrink-0", mergeStrategy === 'OVERWRITE_EXISTING' ? "bg-primary text-black" : "bg-muted")}><CopyCheck className="h-8 w-8" /></div>
-                    <div className="space-y-1"><h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'OVERWRITE_EXISTING' ? "text-primary" : "text-white")}>Overwrite Existing</h5><p className="text-xs font-medium text-white/60 italic leading-relaxed">Refresh current records with the incoming workbook data. Useful for project-wide updates.</p></div>
+                    <div className="space-y-1"><h5 className={cn("text-lg font-black uppercase", mergeStrategy === 'OVERWRITE_EXISTING' ? "text-primary" : "text-white")}>Update All Matches</h5><p className="text-xs font-medium text-white/60 italic leading-relaxed">Refresh existing records with new data from this file.</p></div>
                   </button>
                 </div>
                 <Button onClick={handleCommit} disabled={isProcessing} className="h-20 w-full rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 group">
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <ShieldCheck className="h-6 w-6" />}
-                  Save Ingestion to Registry
+                  Save to Asset List
                 </Button>
               </div>
             </motion.div>
@@ -361,12 +359,12 @@ export function ImportWorkstation() {
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
               <div className="p-16 bg-green-500/10 rounded-[4rem] text-green-600 border border-green-500/20 shadow-2xl"><CheckCircle2 className="h-24 w-20" /></div>
               <div className="space-y-2">
-                <h3 className="text-4xl font-black uppercase text-white tracking-tight">Ingestion Complete</h3>
-                <p className="text-sm font-medium text-white/40 italic">Integrated {stagedAssets.length} records into the project scope.</p>
+                <h3 className="text-4xl font-black uppercase text-white tracking-tight">Import Successful</h3>
+                <p className="text-sm font-medium text-white/40 italic">Added {stagedAssets.length} records to your list.</p>
               </div>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2 transition-all hover:bg-white/5">Start New Session</Button>
-                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black transition-all hover:scale-105 active:scale-95">Open Registry</Button>
+                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2 transition-all hover:bg-white/5">Start New Import</Button>
+                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs bg-primary text-black transition-all hover:scale-105 active:scale-95">Open Asset List</Button>
               </div>
             </div>
           )}

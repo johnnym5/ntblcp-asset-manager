@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview History Center - Deterministic Trace of Registry Changes.
- * Refined terminology for standard asset management.
+ * @fileOverview History Hub - Detailed Log of Asset Changes.
+ * Phase 1914: Updated with simple terminology (History, Users, Changes).
  */
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -78,11 +78,11 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     setIsProcessing(true);
     try {
       await FirestoreService.restoreAsset(entryToRestore.assetId, userProfile.displayName);
-      toast({ title: "Change Undone", description: "Record successfully restored to previous version." });
+      toast({ title: "Undo Successful", description: "Record restored to previous version." });
       await loadLogs();
       await refreshRegistry();
     } catch (e) {
-      toast({ variant: "destructive", title: "Undo Failed", description: "No previous state found for this record." });
+      toast({ variant: "destructive", title: "Error", description: "Could not undo this change." });
     } finally {
       setIsProcessing(false);
       setEntryToRestore(null);
@@ -124,10 +124,10 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
               <div className="p-3 bg-primary/10 rounded-2xl">
                 <HistoryIcon className="h-8 w-8 text-primary" />
               </div>
-              History
+              Activity History
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Deterministic trace of all registry changes.
+              Detailed list of all changes made to assets.
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -169,14 +169,14 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                     variant="outline" 
                     onClick={() => { 
                       const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
-                      saveAs(blob, `Registry-History-${new Date().toISOString().split('T')[0]}.json`); 
+                      saveAs(blob, `Activity-History-${new Date().toISOString().split('T')[0]}.json`); 
                     }} 
                     className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-white/5 hover:bg-white/5 transition-all text-white"
                   >
-                    <FileJson className="h-4 w-4 text-primary" /> Export Data
+                    <FileJson className="h-4 w-4 text-primary" /> Download Log
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Download full history log.</TooltipContent>
+                <TooltipContent>Download history as a file.</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -210,7 +210,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                     <div className="space-y-4 min-w-0 flex-1">
                       <div className="space-y-1">
                         <h4 className="font-black text-lg uppercase tracking-tight text-white truncate leading-none">
-                          {entry.assetDescription || 'Registry Change'}
+                          {entry.assetDescription || 'System Activity'}
                         </h4>
                         <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-white/20 uppercase tracking-widest opacity-60">
                           <span className="flex items-center gap-2 px-2.5 py-1 bg-white/5 rounded-lg border border-white/10">
@@ -228,7 +228,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                       {entry.changes && Object.keys(entry.changes).length > 0 && (
                         <div className="p-6 rounded-[1.5rem] bg-black/40 border-2 border-dashed border-white/5 space-y-4">
                           <p className="text-[10px] font-black uppercase text-primary tracking-[0.3em] flex items-center gap-2">
-                            <Zap className="h-3 w-3 fill-current" /> Changes Detected:
+                            <Zap className="h-3 w-3 fill-current" /> Changes:
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
                             {Object.entries(entry.changes).map(([key, val]: [string, any]) => (
@@ -236,7 +236,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                                 <span className="text-[8px] font-black uppercase text-white/20 opacity-40">{key.replace(/([A-Z])/g, ' $1')}</span>
                                 <div className="flex items-center gap-3 text-[10px] font-bold">
                                   <div className="flex items-center gap-2 bg-red-500/5 border border-white/5 px-2 py-1 rounded-lg line-through text-red-500/40 truncate max-w-[120px] italic">
-                                    {String(val.old || 'EMPTY')}
+                                    {String(val.old || 'Empty')}
                                   </div>
                                   <ArrowRightLeft className="h-3 w-3 text-white/10 shrink-0" />
                                   <div className="flex items-center gap-2 bg-green-500/5 border border-white/5 px-2 py-1 rounded-lg text-green-600 font-black truncate max-w-[120px]">
@@ -267,7 +267,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
                               <RotateCcw className="h-5 w-5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Undo this change</TooltipContent>
+                          <TooltipContent>Undo change</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}
@@ -280,24 +280,24 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
           <div className="py-24 text-center opacity-30 border-2 border-dashed border-white/5 rounded-[3rem]">
             <HistoryIcon className="h-16 w-16 text-white/20 mx-auto mb-4" />
             <div className="space-y-2">
-              <h3 className="text-xl font-black uppercase tracking-[0.3em] text-white">No History Found</h3>
+              <h3 className="text-xl font-black uppercase tracking-[0.3em] text-white">No History</h3>
               <p className="text-sm font-medium italic max-w-xs mx-auto text-white/40">
-                No changes recorded in the current scope.
+                No record changes found in this view.
               </p>
             </div>
           </div>
         )}
       </div>
 
-      <AlertDialog open={!!entryToRestore} onOpenChange={() => setEntryToRestore(null)}>
+      <AlertDialog open={!!entryToRestore} onOpenChange={setEntryToRestore}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-3xl bg-black">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-primary/10 rounded-2xl w-fit">
               <RotateCcw className="h-12 w-12 text-primary" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Undo this change?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Undo change?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
-              This will restore <strong>{entryToRestore?.assetDescription}</strong> to its state before this update. This action will be saved to the database.
+              Restore <strong>{entryToRestore?.assetDescription}</strong> to its previous state. This action will be saved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
@@ -307,7 +307,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
               disabled={isProcessing} 
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-black m-0"
             >
-              Restore Data
+              Restore Now
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

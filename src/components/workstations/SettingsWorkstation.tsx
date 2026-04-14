@@ -1,12 +1,8 @@
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Governance Control Center.
- * Standardized terminology for professional asset management.
- * Implemented Concurrent Multi-Project Selection and Integrated Import.
- * Phase 1910: Added Delete Project pulse with deterministic cleanup.
- * Phase 1911: Added Single-Sheet Import trigger to folder list.
- * Phase 1912: Explicit Commit pattern for all renames.
+ * @fileOverview Settings Hub - Control Center.
+ * Phase 1914: Updated with simple terminology (Home, Scope, Users).
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -154,7 +150,7 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       await refreshRegistry();
-      toast({ title: `Settings Saved`, description: "System configuration updated." });
+      toast({ title: `Settings Updated`, description: "System configuration has been saved." });
     } finally {
       setIsSaving(false);
     }
@@ -162,11 +158,11 @@ export function SettingsWorkstation() {
 
   const handleUpdatePasscode = async () => {
     if (newPasscode !== confirmPasscode) {
-      toast({ variant: "destructive", title: "Update Failed", description: "The new passcodes do not match." });
+      toast({ variant: "destructive", title: "Error", description: "The new passcodes do not match." });
       return;
     }
     if (newPasscode.length < 4) {
-      toast({ variant: "destructive", title: "Invalid Passcode", description: "Passcode must be at least 4 characters." });
+      toast({ variant: "destructive", title: "Too Short", description: "Passcode must be at least 4 characters." });
       return;
     }
 
@@ -185,11 +181,11 @@ export function SettingsWorkstation() {
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       
-      toast({ title: "Passcode Updated", description: "Your system access passcode has been changed." });
+      toast({ title: "Passcode Changed", description: "Your system access passcode has been updated." });
       setNewPasscode('');
       setConfirmPasscode('');
     } catch (e) {
-      toast({ variant: "destructive", title: "Service Error" });
+      toast({ variant: "destructive", title: "Update Failed" });
     } finally {
       setIsUpdatingPasscode(false);
     }
@@ -216,8 +212,8 @@ export function SettingsWorkstation() {
     handleSettingChange('activeGrantIds', nextActiveGrantIds);
     
     toast({ 
-      title: "Project Marked for Deletion", 
-      description: `"${projectToDelete.name}" removed from scope. Save settings to commit changes.` 
+      title: "Project Removed", 
+      description: `"${projectToDelete.name}" has been removed from your scope.` 
     });
     setProjectToDelete(null);
     setIsProjectDeleteOpen(false);
@@ -310,7 +306,7 @@ export function SettingsWorkstation() {
       });
       
       handleSettingChange('grants', nextGrants);
-      toast({ title: 'Template Loaded', description: `${templates.length} asset groups identified.` });
+      toast({ title: 'Template Loaded', description: `${templates.length} folders recognized.` });
     } catch (error) {
       toast({ title: 'Load Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -354,7 +350,7 @@ export function SettingsWorkstation() {
             )}
             {isAdmin && (
               <TabsTrigger value="users" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
-                <Users className="h-3.5 w-3.5" /> Personnel
+                <Users className="h-3.5 w-3.5" /> Users
               </TabsTrigger>
             )}
             <TabsTrigger value="history" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black shadow-sm">
@@ -371,7 +367,7 @@ export function SettingsWorkstation() {
         <ScrollArea className="flex-1 px-1">
           <div className="pb-40">
             <TabsContent value="general" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Visual Identity" description="Display preferences" icon={Palette}>
+              <SettingSection title="Visual Appearance" description="Display style" icon={Palette}>
                 <div className="grid grid-cols-2 gap-3">
                   <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] gap-3">
                     <Sun className="h-4 w-4" /> Light Mode
@@ -382,7 +378,7 @@ export function SettingsWorkstation() {
                 </div>
               </SettingSection>
 
-              <SettingSection title="My Security" description="Passcode management" icon={KeyRound}>
+              <SettingSection title="My Security" description="Passcode update" icon={KeyRound}>
                 <div className="space-y-4 max-w-md">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">New System Passcode</Label>
@@ -400,11 +396,11 @@ export function SettingsWorkstation() {
               </SettingSection>
 
               {isAdmin && (
-                <SettingSection title="Operational Mode" description="System behavior" icon={Smartphone}>
+                <SettingSection title="Operational Mode" description="App behavior" icon={Smartphone}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { id: 'management', label: 'Registry Admin', desc: 'Full access to system logic and data engineering.' },
-                      { id: 'verification', label: 'Field Assessment', desc: 'Optimized for mobile auditors and reporting.' }
+                      { id: 'management', label: 'Admin Hub', desc: 'Full control over project settings and record labels.' },
+                      { id: 'verification', label: 'Field Audit', desc: 'Optimized for mobile verification and reporting.' }
                     ].map(m => (
                       <button key={m.id} onClick={() => handleSettingChange('appMode', m.id)} className={cn("p-6 rounded-2xl border-2 text-left transition-all relative group", draftSettings.appMode === m.id ? "border-primary bg-primary/[0.03]" : "border-border bg-muted/20")}>
                         {draftSettings.appMode === m.id && <CheckCircle2 className="absolute top-4 right-4 h-4 w-4 text-primary" />}
@@ -418,10 +414,10 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="projects" className="space-y-10 m-0 outline-none">
-              <SettingSection title="Project Management" description="Concurrent Multi-Project View" icon={LayoutGrid}>
+              <SettingSection title="Project Management" description="Assign and manage project visibility" icon={LayoutGrid}>
                 <div className="space-y-8">
                   <div className="flex gap-3">
-                    <Input placeholder="Enter new project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
+                    <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-background border-border rounded-xl font-bold text-sm" />
                     <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-lg">
                       <PlusCircle className="h-4 w-4 mr-2" /> Add Project
                     </Button>
@@ -454,7 +450,7 @@ export function SettingsWorkstation() {
                                     </div>
                                   </div>
                                 )}
-                                <span className="text-[8px] font-mono opacity-40 uppercase">System ID: {grant.id.split('-')[0]}</span>
+                                <span className="text-[8px] font-mono opacity-40 uppercase">ID: {grant.id.split('-')[0]}</span>
                               </div>
                             </div>
                             
@@ -465,12 +461,12 @@ export function SettingsWorkstation() {
                                   onClick={(e) => { e.stopPropagation(); setActiveView('IMPORT'); }}
                                   className="h-9 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest gap-2 shadow-sm"
                                 >
-                                  <FileUp className="h-3.5 w-3.5" /> Import Assets
+                                  <FileUp className="h-3.5 w-3.5" /> Import Records
                                 </Button>
                             </div>
 
                             <div className="flex items-center gap-3 pl-6">
-                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Enable Project</span>
+                              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Visible</span>
                               <Checkbox checked={isEnabled} onCheckedChange={(checked) => toggleProjectEnablement(grant.id, !!checked)} className="h-6 w-6 rounded-lg border-2 border-border data-[state=checked]:bg-primary" />
                             </div>
                           </div>
@@ -479,11 +475,11 @@ export function SettingsWorkstation() {
                             <div className="px-6 pb-8 pt-2 space-y-6 border-t border-dashed border-border/40 animate-in fade-in">
                               <div className="flex items-center justify-between px-1">
                                 <div className="space-y-1">
-                                  <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 leading-none">Registered Folder List</h4>
-                                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide specific asset groups</p>
+                                  <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 leading-none">Asset Folders</h4>
+                                  <p className="text-[8px] font-bold text-muted-foreground uppercase">Enable or hide specific categories</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3.5 w-3.5" /> Load Template</Button>
+                                  <Button variant="outline" size="sm" onClick={handleImportTemplate} className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2"><FileUp className="h-3.5 w-3.5" /> Get Template</Button>
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -510,14 +506,14 @@ export function SettingsWorkstation() {
                                         ) : (
                                           <div className="flex flex-col min-w-0">
                                             <span className={cn("text-[11px] font-black uppercase truncate leading-none", isSheetEnabled ? "text-foreground" : "text-muted-foreground")}>{name}</span>
-                                            <span className="text-[7px] font-bold uppercase text-muted-foreground mt-1">{isSheetEnabled ? 'Active in Registry' : 'Hidden from Registry'}</span>
+                                            <span className="text-[7px] font-bold uppercase text-muted-foreground mt-1">{isSheetEnabled ? 'Showing in List' : 'Hidden'}</span>
                                           </div>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2 text-white/20 shrink-0">
                                         {!isSheetEditing && <button className="p-1.5 hover:text-white transition-colors" onClick={() => { setEditingSheetKey({grantId: grant.id, name}); setEditSheetValue(name); }}><Edit3 className="h-3.5 w-3.5" /></button>}
-                                        <button className="p-1.5 hover:text-primary transition-colors" title="Import into this folder" onClick={() => { setTargetFolderForImport(name); setIsImportScannerOpen(true); }}><ScanSearch className="h-3.5 w-3.5" /></button>
-                                        <button className="p-1.5 hover:text-primary transition-colors" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>
+                                        <button className="p-1.5 hover:text-primary transition-colors" title="Import here" onClick={() => { setTargetFolderForImport(name); setIsImportScannerOpen(true); }}><ScanSearch className="h-3.5 w-3.5" /></button>
+                                        <button className="p-1.5 hover:text-primary transition-colors" title="Folder Setup" onClick={() => { setSelectedSheetDef(def); setOriginalSheetName(name); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-3.5 w-3.5" /></button>
                                         <button className="p-1.5 hover:text-destructive transition-colors" onClick={() => handleDeleteSheet(grant.id, name)}><Trash2 className="h-3.5 w-3.5" /></button>
                                       </div>
                                     </div>
@@ -535,7 +531,7 @@ export function SettingsWorkstation() {
             </TabsContent>
 
             <TabsContent value="users" className="m-0 outline-none">
-              <SettingSection title="Personnel" description="Identity management" icon={Users}>
+              <SettingSection title="Personnel" description="User accounts and access" icon={Users}>
                 <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
               </SettingSection>
             </TabsContent>
@@ -547,7 +543,7 @@ export function SettingsWorkstation() {
       </Tabs>
 
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-xl pt-4 pb-10 px-1 border-t border-border flex items-center justify-between shrink-0 z-50">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Discard Changes</Button>
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-12 px-10 rounded-xl font-black uppercase text-[10px] text-muted-foreground hover:text-foreground">Cancel Changes</Button>
         <Button onClick={handleSaveChange} disabled={!hasChanges || isSaving} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl gap-3">
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Settings
         </Button>
@@ -559,16 +555,14 @@ export function SettingsWorkstation() {
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
           <AlertDialogHeader>
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Bomb className="h-8 w-8 text-destructive" /></div>
-            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Irreversible Deletion?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Confirm Project Deletion?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
-              You are about to permanently delete the project <strong>{projectToDelete?.name}</strong>. This will also trigger an automatic purge of all local records associated with this project. This action is immutable.
+              This will permanently delete <strong>{projectToDelete?.name}</strong> and all associated local records. This action cannot be reversed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 flex gap-3">
-            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
-              Execute Purge
-            </AlertDialogAction>
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Delete Project</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

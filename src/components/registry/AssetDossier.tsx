@@ -1,10 +1,8 @@
 'use client';
 
 /**
- * @fileOverview AssetDossier - Professional Technical Registry Hub.
- * Phase 1511: Renamed Fidelity Audit to Asset Data Checklist.
- * Phase 1512: Added Project Name badge for multi-grant clarity.
- * Phase 1513: Implemented Explicit Save button for inline Remarks.
+ * @fileOverview Asset Profile - Detailed Technical View.
+ * Phase 1914: Simplified terminology (Profile, Setup, Changes).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -72,8 +70,8 @@ const DetailField = ({
         <div className="flex items-center gap-3 mb-2 animate-in slide-in-from-top-1 duration-300">
           <TooltipProvider>
             <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md p-1 px-2 rounded-lg border border-primary/20 shadow-sm">
-              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Table</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.quickView} onCheckedChange={() => onToggleFlag?.('quickView')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Card</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">List View</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.quickView} onCheckedChange={() => onToggleFlag?.('quickView')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><Checkbox checked={header.inChecklist} onCheckedChange={() => onToggleFlag?.('inChecklist')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Checklist</TooltipContent></Tooltip>
             </div>
           </TooltipProvider>
@@ -133,7 +131,7 @@ export function AssetDossier({
   const syncStatus = (record.rawRow as any).syncStatus || 'local';
   const isVerified = status === 'VERIFIED';
   const grantId = (record.rawRow as any).grantId;
-  const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
+  const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Project';
 
   const handleToggleHeaderFlag = (headerId: string, flag: 'table' | 'quickView' | 'inChecklist') => {
     setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, [flag]: !h[flag] } : h));
@@ -152,7 +150,7 @@ export function AssetDossier({
       "flex flex-col lg:flex-row min-h-0 bg-muted/5 rounded-[2rem] border border-border/40 overflow-hidden", 
       className
     )}>
-      {/* Dossier Sidebar - Assessment & Visuals */}
+      {/* Sidebar - Quick Info */}
       <div className="w-full lg:w-[320px] bg-card/30 flex flex-col shrink-0 border-r border-border/40 p-6 space-y-10">
         
         {/* Physical Identity */}
@@ -169,7 +167,7 @@ export function AssetDossier({
             <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-border/60 shadow-xl group">
               <Image 
                 src={(record.rawRow.photoUrl || record.rawRow.photoDataUri) as string} 
-                alt="Asset Evidence"
+                alt="Asset Photo"
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
                 unoptimized
@@ -178,11 +176,11 @@ export function AssetDossier({
           )}
         </div>
 
-        {/* Verification Hub */}
+        {/* Audit Status */}
         {isVerificationMode && (
           <div className="p-5 rounded-[1.5rem] bg-muted/30 border-2 border-primary/10 space-y-4 shadow-inner">
             <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-primary" /> Assessment Pulse
+              <ClipboardCheck className="h-4 w-4 text-primary" /> Verification Status
             </h4>
             <div className="space-y-3">
               <Button 
@@ -193,24 +191,24 @@ export function AssetDossier({
                 )}
               >
                 {isVerified ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <XCircle className="mr-2 h-4 w-4" />}
-                {isVerified ? 'Verified' : 'Mark Verified'}
+                {isVerified ? 'Verified' : 'Verify Asset'}
               </Button>
 
               <div className="space-y-1.5">
                 <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Asset Condition</label>
                 <Select value={String(record.rawRow.condition || '')} onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}>
                   <SelectTrigger className="h-11 bg-background border-border text-[10px] font-black uppercase rounded-xl">
-                    <SelectValue placeholder="Condition" />
+                    <SelectValue placeholder="Select Condition" />
                   </SelectTrigger>
                   <SelectContent className="bg-background border-border">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Auditor Remarks</label>
+                <label className="text-[8px] font-black uppercase text-muted-foreground opacity-60 ml-1">Field Remarks</label>
                 <div className="flex gap-2">
                   <Input 
-                    placeholder="Field observations..." 
+                    placeholder="Enter notes..." 
                     className={cn(
                       "h-11 text-[10px] font-medium bg-background border-border rounded-xl focus-visible:ring-primary/20 flex-1",
                       hasUnsavedRemark && "border-primary/40 ring-1 ring-primary/10"
@@ -221,7 +219,7 @@ export function AssetDossier({
                   <AnimatePresence>
                     {hasUnsavedRemark && (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                        <Button size="icon" onClick={handleSaveRemark} className="h-11 w-11 rounded-xl bg-primary text-black">
+                        <Button size="icon" onClick={handleSaveRemark} title="Save Remark" className="h-11 w-11 rounded-xl bg-primary text-black">
                           <Save className="h-4 w-4" />
                         </Button>
                       </motion.div>
@@ -233,10 +231,10 @@ export function AssetDossier({
           </div>
         )}
 
-        {/* Data Checklist */}
+        {/* Data Quality Checklist */}
         <div className="space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Data Checklist
+            <ShieldCheck className="h-4 w-4 text-primary" /> Data Quality
           </h4>
           <AssetChecklist values={record.rawRow as any} />
         </div>
@@ -246,12 +244,12 @@ export function AssetDossier({
             onClick={() => onEdit(record.id)} 
             className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest bg-primary text-black gap-2 transition-transform active:scale-95"
           >
-            <Edit3 className="h-4 w-4" /> Full Record Edit
+            <Edit3 className="h-4 w-4" /> Full Edit
           </Button>
         )}
       </div>
 
-      {/* Main Data Core */}
+      {/* Main Data Section */}
       <div className="flex-1 flex flex-col bg-background min-h-0 overflow-hidden relative">
         <div className="p-8 border-b border-border/40 flex items-center justify-between">
           <div className="flex flex-col gap-2">
@@ -260,13 +258,13 @@ export function AssetDossier({
                 {grantName}
               </Badge>
               <Badge className="bg-primary text-black font-black uppercase text-[8px] h-5 px-2 rounded-full">
-                {record.sourceSheet || 'REGISTRY PULSE'}
+                {record.sourceSheet || 'Record'}
               </Badge>
             </div>
-            <p className="text-xl font-black uppercase text-foreground leading-none">Technical Dossier</p>
+            <p className="text-xl font-black uppercase text-foreground leading-none">Asset Profile</p>
           </div>
           <Badge variant="outline" className="h-7 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px]">
-            {syncStatus === 'synced' ? 'Synchronized' : 'Local Pulse'}
+            {syncStatus === 'synced' ? 'Saved to Cloud' : 'Local Change'}
           </Badge>
         </div>
 
@@ -292,21 +290,21 @@ export function AssetDossier({
           <div className="p-8 border-t border-border/40 space-y-6">
             <div className="flex items-center gap-3 text-muted-foreground/40">
               <Database className="h-4 w-4" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">System Metadata</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Technical History</h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4">
-                <div className="flex items-center gap-2 opacity-40"><History className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Traceability</span></div>
+                <div className="flex items-center gap-2 opacity-40"><History className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Source</span></div>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Source Folder</span><span className="text-foreground">{record.sourceSheet || 'MANUAL'}</span></div>
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Position</span><span className="text-primary font-bold">ROW #{record.sourceRow || 'N/A'}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Original Sheet</span><span className="text-foreground">{record.sourceSheet || 'Manual Entry'}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Excel Row</span><span className="text-primary font-bold">#{record.sourceRow || 'N/A'}</span></div>
                 </div>
               </div>
               <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4">
-                <div className="flex items-center gap-2 opacity-40"><Clock className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Audit Stamp</span></div>
+                <div className="flex items-center gap-2 opacity-40"><Clock className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Last Update</span></div>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Last Modified</span><span className="text-foreground">{new Date(record.rawRow.lastModified as string).toLocaleString()}</span></div>
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Auditor</span><span className="text-foreground truncate max-w-[100px]">{String(record.rawRow.lastModifiedBy || 'System')}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Time</span><span className="text-foreground">{new Date(record.rawRow.lastModified as string).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Updated By</span><span className="text-foreground truncate max-w-[100px]">{String(record.rawRow.lastModifiedBy || 'System')}</span></div>
                 </div>
               </div>
             </div>

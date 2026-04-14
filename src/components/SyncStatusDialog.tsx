@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * @fileOverview SyncStatusDialog - High-Fidelity Sync Management Workstation.
- * Finalized for deployment with Bi-directional Sync (Push/Pull).
- * Phase 1902: Integrated Scan-Before-Sync workflow.
+ * @fileOverview SyncStatusDialog - Simplified Sync Hub.
+ * Phase 1914: Simplified terminology (Sync Hub, Records, Push/Pull).
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -71,12 +70,10 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
 
   const handlePushPulse = async () => {
     await manualUpload();
-    // confirmation dialog handles the rest
   };
 
   const handlePullPulse = async () => {
     await manualDownload();
-    // confirmation dialog handles the rest
   };
 
   return (
@@ -85,8 +82,8 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
         {/* Header Ribbon */}
         <DialogHeader className="px-10 py-6 flex flex-row items-center justify-between gap-3 space-y-0 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <Zap className="h-4 w-4 text-primary fill-current" />
-            <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Status Hub</DialogTitle>
+            <RefreshCw className="h-4 w-4 text-primary" />
+            <DialogTitle className="text-[11px] font-black uppercase tracking-[0.3em] text-primary/80 leading-none">Sync Hub</DialogTitle>
           </div>
           <button onClick={() => onOpenChange(false)} className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
             <X className="h-4 w-4" />
@@ -105,18 +102,18 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                 {isOnline ? <Wifi className="h-10 w-10 animate-pulse" /> : <WifiOff className="h-10 w-10" />}
               </div>
               <div className="space-y-1">
-                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Registry Status</h3>
+                <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Connection Status</h3>
                 <p className={cn(
                   "text-[10px] font-black uppercase tracking-widest",
                   isOnline ? "text-green-500/60" : "text-red-500/60"
                 )}>
-                  Network Protocol: {isOnline ? 'Active' : 'Disconnected'}
+                  Network: {isOnline ? 'Online' : 'Offline'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 bg-white/[0.03] p-3 px-6 rounded-2xl border border-white/10 shadow-xl">
-              <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Online</span>
+              <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Connect</span>
               <Switch 
                 checked={isOnline} 
                 onCheckedChange={setIsOnline} 
@@ -127,19 +124,19 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
 
           <div className="h-px w-full bg-white/[0.05]" />
 
-          {/* Middle Section: Metrics & Bi-directional Actions */}
+          {/* Middle Section: Metrics */}
           <div className="flex flex-col gap-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-12">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Queued</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Waiting</span>
                   <span className="text-5xl font-black text-white tabular-nums">{stats.pending}</span>
                 </div>
 
                 <div className="w-px h-10 bg-white/10" />
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-red-600/40 uppercase tracking-[0.3em]">Conflicts</span>
+                  <span className="text-[9px] font-black text-red-600/40 uppercase tracking-[0.3em]">Errors</span>
                   <span className="text-5xl font-black text-red-600 tabular-nums">{stats.errors}</span>
                 </div>
               </div>
@@ -152,7 +149,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                   className="h-16 px-8 rounded-2xl bg-white/[0.03] border-2 border-white/10 hover:border-primary/20 text-white font-black uppercase text-[10px] tracking-widest gap-3 transition-all"
                 >
                   {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-primary" />}
-                  Pull Scan
+                  Get Data
                 </Button>
                 <Button 
                   onClick={handlePushPulse}
@@ -160,13 +157,13 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
                   className="h-16 px-10 rounded-2xl bg-primary text-black font-black uppercase text-xs tracking-widest gap-3 shadow-2xl transition-transform hover:scale-105 active:scale-95"
                 >
                   {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Push Scan
+                  Save Changes
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Bottom Section: Fidelity Shield */}
+          {/* Bottom Section */}
           <div className="pt-10 flex flex-col items-center justify-center gap-6 border-t border-dashed border-white/5">
             <div className={cn(
               "p-6 rounded-full transition-all duration-700",
@@ -178,7 +175,7 @@ export function SyncStatusDialog({ isOpen, onOpenChange }: SyncStatusDialogProps
               "text-[11px] font-black uppercase tracking-[0.4em] transition-all",
               isFullySynced ? "text-green-500/40" : "text-white/10"
             )}>
-              {isFullySynced ? 'High-Availability Parity Confirmed' : 'Sync Scan Required'}
+              {isFullySynced ? 'Up To Date' : 'Update Required'}
             </p>
           </div>
         </div>

@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * @fileOverview WelcomeExperience - High-Fidelity Onboarding Workflow.
- * Phase 1600: Integrated Swipe Actions & Updated Feature Pulse.
+ * @fileOverview WelcomeExperience - Plain English Onboarding.
  */
 
 import React, { useState } from 'react';
@@ -41,48 +40,48 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: "Intelligence Hub v5",
-    description: "Welcome back. Assetain has been upgraded to a high-fidelity intelligence hub for Nigerian asset registers.",
+    title: "Home Hub v5",
+    description: "Welcome. Assetain is your central hub for managing Nigerian asset registers.",
     icon: Zap,
     benefits: [
-      "Dynamic Folder-Based Schemas",
-      "Forensic Audit Ledger (Long-press bell)",
-      "Mode-Aware Accents (Gold/Green/Blue)",
-      "High-Density Desktop Optimization"
+      "Custom Folder Setup",
+      "Activity History (Hold bell icon)",
+      "Simple Mobile Layout",
+      "High-Density Desktop View"
     ]
   },
   {
-    title: "Offline-First Autonomy",
-    description: "Your workstation operates with absolute independence. Modifications are saved to local encrypted storage first.",
+    title: "Works Offline",
+    description: "Your work is saved locally even without internet. Updates are saved to your device first.",
     icon: Cloud,
     benefits: [
-      "Deterministic Conflict Resolution",
-      "Manual Sync Control (Long-press sync)",
-      "Zero-Data-Loss Reliability",
-      "Regional Scope Lockdown"
+      "Smart Sync Control",
+      "Manual Save (Hold sync icon)",
+      "Zero Data Loss",
+      "Assigned State View"
     ]
   },
   {
-    title: "Initialize Your Registry",
-    description: "While we synchronize your authorized regional scope, review the new governance features implemented for this project pulse.",
+    title: "Get Your List",
+    description: "While we download your asset list, review the new tools available for this project.",
     icon: Database,
     isSyncStep: true,
     benefits: [
-      "Role-Based Approval Workflow",
-      "Synthetic Header discovery",
-      "Location-Aware Anomaly Detection",
-      "Geographic Coordinate Anchoring"
+      "Approval Workflow",
+      "Automatic Header Setup",
+      "Error Detection",
+      "Location Mapping"
     ]
   },
   {
-    title: "Operational Ready",
-    description: "Your session is now configured. Access specialized tools by long-pressing the 'Live Registry Protocol' badge on the dashboard.",
+    title: "Ready To Start",
+    description: "Your session is ready. Access extra tools by holding the 'Update Status' badge on the dashboard.",
     icon: ShieldCheck,
     benefits: [
-      "Custom Column Visibility",
-      "Zonal Store Management",
-      "Automated Word Report Builder",
-      "Heuristic Quality Cleansing"
+      "Edit Field Labels",
+      "Manage Local Stores",
+      "Automatic Word Reports",
+      "Data Quality Checks"
     ]
   }
 ];
@@ -121,15 +120,15 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
     <Dialog open={isOpen} onOpenChange={(open) => !open && onComplete()}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden border-none rounded-[2.5rem] shadow-2xl bg-background">
         <div className="flex flex-col h-[600px]">
-          {/* Header Pulse */}
+          {/* Header */}
           <div className="p-10 pb-6 bg-primary/5 border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-primary rounded-2xl shadow-xl shadow-primary/20">
                 <Zap className="h-6 w-6 text-black fill-current" />
               </div>
               <div className="flex flex-col">
-                <DialogTitle className="text-xl font-black tracking-tighter uppercase leading-none">System Initialize</DialogTitle>
-                <DialogDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1.5">Pulse {currentStep + 1} of {STEPS.length}</DialogDescription>
+                <DialogTitle className="text-xl font-black tracking-tighter uppercase leading-none">Initialize Hub</DialogTitle>
+                <DialogDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1.5">Step {currentStep + 1} of {STEPS.length}</DialogDescription>
               </div>
             </div>
             <div className="flex gap-1.5">
@@ -139,7 +138,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
             </div>
           </div>
 
-          {/* Content Surface */}
+          {/* Content */}
           <div className="flex-1 p-10 flex flex-col justify-center">
             <AnimatePresence mode="wait">
               <motion.div
@@ -163,7 +162,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                     {isSyncing && <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="h-20 w-20 animate-spin text-primary opacity-20" /></div>}
                   </div>
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black tracking-tight uppercase text-foreground leading-tight">{step.title}</h2>
+                    <h2 className="text-3xl font-black uppercase text-foreground leading-tight">{step.title}</h2>
                     <p className="text-sm font-medium text-muted-foreground leading-relaxed italic">{step.description}</p>
                   </div>
                 </div>
@@ -173,8 +172,8 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                     <div className="col-span-2 p-6 rounded-3xl bg-green-500/10 border-2 border-green-500/20 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-500">
                       <div className="p-3 bg-green-500 rounded-2xl shadow-lg shadow-green-500/20"><CheckCircle2 className="h-8 w-8 text-black" /></div>
                       <div className="text-center">
-                        <p className="text-sm font-black uppercase text-green-600">Parity Established</p>
-                        <p className="text-[10px] font-bold text-green-600/60 uppercase mt-1">{assets.length} Records loaded for {userProfile?.state}</p>
+                        <p className="text-sm font-black uppercase text-green-600">Assets Loaded</p>
+                        <p className="text-[10px] font-bold text-green-600/60 uppercase mt-1">{assets.length} Records found for {userProfile?.state}</p>
                       </div>
                     </div>
                   ) : (
@@ -190,13 +189,13 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
             </AnimatePresence>
           </div>
 
-          {/* Footer Control */}
+          {/* Footer */}
           <div className="p-10 pt-0 flex items-center justify-between">
-            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100 h-12 rounded-xl">Skip Setup</Button>
+            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100 h-12 rounded-xl">Skip</Button>
             <div className="flex items-center gap-3">
               {currentStep > 0 && <Button variant="outline" onClick={handlePrev} disabled={isSyncing} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2">Back</Button>}
               <Button onClick={handleNext} disabled={isSyncing} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3">
-                {isSyncing ? <><Loader2 className="h-4 w-4 animate-spin" /> Fetching Pulse...</> : step.isSyncStep && !hasDownloaded ? <><Database className="h-4 w-4" /> Download Registry</> : currentStep === STEPS.length - 1 ? 'Start Workstation' : <>Next Pulse <ArrowRight className="h-4 w-4" /></>}
+                {isSyncing ? <><Loader2 className="h-4 w-4 animate-spin" /> Fetching Data...</> : step.isSyncStep && !hasDownloaded ? <><Database className="h-4 w-4" /> Download Records</> : currentStep === STEPS.length - 1 ? 'Start Using App' : <>Next Step <ArrowRight className="h-4 w-4" /></>}
               </Button>
             </div>
           </div>
