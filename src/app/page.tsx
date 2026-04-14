@@ -59,6 +59,9 @@ import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstati
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
+import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
+import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
+import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -135,9 +138,9 @@ export default function SPAHub() {
       case 'REPORTS': return <ReportsWorkstation isEmbedded={false} />; 
       case 'ALERTS': return <AlertsWorkstation />;
       case 'SYNC_QUEUE': return <SyncQueueWorkstation isEmbedded={false} />;
-      case 'USERS' as any: return <RegistryWorkstation />; 
-      case 'INFRASTRUCTURE' as any: return <DashboardWorkstation />; 
-      case 'DATABASE' as any: return <DashboardWorkstation />; 
+      case 'USERS': return <UsersWorkstation />; 
+      case 'INFRASTRUCTURE': return <InfrastructureWorkstation />; 
+      case 'DATABASE': return <DatabaseWorkstation />; 
       default: return <DashboardWorkstation />;
     }
   }, [activeView]);
@@ -153,7 +156,7 @@ export default function SPAHub() {
     const base = [
       { label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
       { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-      { label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
+      { label: 'Folder Browse', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
       { label: 'Report Hub', icon: FileText, onClick: () => setActiveView('REPORTS') },
       { label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
       { label: 'Error Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
@@ -164,15 +167,15 @@ export default function SPAHub() {
     if (isAdmin) {
       base.push(
         { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-        { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS' as any) },
+        { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS') },
         { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
       );
     }
 
     if (isSuperAdmin) {
       base.push(
-        { label: 'Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE' as any) },
-        { label: 'Database Explorer', icon: Terminal, onClick: () => setActiveView('DATABASE' as any) }
+        { label: 'Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') },
+        { label: 'Database Explorer', icon: Terminal, onClick: () => setActiveView('DATABASE') }
       );
     }
 
