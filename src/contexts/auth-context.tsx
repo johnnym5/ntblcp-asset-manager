@@ -3,6 +3,7 @@
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
  * Hardened for deployment with robust isAdmin derivation.
+ * Phase 1925: Optimized login to handle multi-state Zonal pulses.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -181,7 +182,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      await manualDownload([state]);
+      // Deterministic Sync Scope: Zonal admins sync all assigned states, others sync the selected one.
+      const syncScope = user.isZonalAdmin ? user.states : [state];
+      await manualDownload(syncScope);
       
     } catch (e) {
       console.error("Auth: Login failed", e);

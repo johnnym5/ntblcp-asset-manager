@@ -3,7 +3,7 @@
 /**
  * @fileOverview Verify Records - Field Audit Center.
  * Phase 1914: Updated with simple terminology (Verify, Records, Audit).
- * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 1925: Scoped regional filtering for Zonal Admins.
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -64,9 +64,12 @@ export function VerifyWorkstation() {
   const unverified = useMemo(() => {
     let list = assets.filter(a => a.status === 'UNVERIFIED');
     
-    if (!userProfile?.isAdmin && userProfile?.state) {
-      const userStateFuzzy = getFuzzySignature(userProfile.state);
-      list = list.filter(a => getFuzzySignature(a.location) === userStateFuzzy);
+    // Regional Scope Enforcement
+    if (!userProfile?.isAdmin && userProfile?.states) {
+      if (!userProfile.states.includes('All')) {
+        const authorizedFuzzy = userProfile.states.map(s => getFuzzySignature(s));
+        list = list.filter(a => authorizedFuzzy.includes(getFuzzySignature(a.location)));
+      }
     }
 
     if (searchTerm) {

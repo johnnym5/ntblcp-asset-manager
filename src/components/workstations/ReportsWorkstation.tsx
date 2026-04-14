@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Reports Workstation - Executive Reporting & Data Quality.
- * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 1925: Regional scope enforcement for multi-state Zonal Admins.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -33,7 +33,7 @@ import { TravelReportDialog } from '@/components/travel-report-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { cn, getFuzzySignature } from '@/lib/utils';
 import { IntegrityEngine, type IntegrityIssue } from '@/lib/integrity-engine';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
@@ -55,9 +55,11 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
   const [isExporting, setIsExporting] = useState(false);
 
   const scopedAssets = useMemo(() => {
-    if (!userProfile?.isAdmin && userProfile?.state) {
-      const userState = userProfile.state.toLowerCase().trim();
-      return assets.filter(a => (a.location || '').toLowerCase().trim() === userState);
+    if (!userProfile?.isAdmin && userProfile?.states) {
+      if (!userProfile.states.includes('All')) {
+        const authorizedFuzzy = userProfile.states.map(s => getFuzzySignature(s));
+        return assets.filter(a => authorizedFuzzy.includes(getFuzzySignature(a.location)));
+      }
     }
     return assets;
   }, [assets, userProfile]);
@@ -145,7 +147,6 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
                 </CardContent>
               </Card>
 
-              {/* Exception List - Hidden from Dashboard per user request */}
               {!isEmbedded && (
                 <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
                   <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">

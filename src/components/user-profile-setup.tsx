@@ -3,6 +3,7 @@
 /**
  * @fileOverview Authentication Gateway.
  * Updated with requested terminology: "Input Username" and "Passcode".
+ * Phase 1925: Automatic login for Zonal Administrators.
  */
 
 import React, { useState } from 'react';
@@ -99,7 +100,11 @@ export default function UserProfileSetup() {
 
     if (user.password === password) {
       setFoundUser(user);
-      if (user.states.length === 1 && user.states[0] !== 'All') {
+      
+      // Zonal Admin: Automatic login with full zone scope
+      if (user.isZonalAdmin) {
+        handleConfirm(user, user.assignedZone || 'Zonal Scope');
+      } else if (user.states.length === 1 && user.states[0] !== 'All') {
         setSelectedState(user.states[0]);
         handleConfirm(user, user.states[0]);
       } else if (user.isAdmin || user.states.includes('All')) {
@@ -123,7 +128,11 @@ export default function UserProfileSetup() {
     setIsSaving(false);
   };
   
-  const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin && !foundUser.states.includes('All');
+  const isMultiStateUser = foundUser && 
+                           foundUser.states.length > 1 && 
+                           !foundUser.isAdmin && 
+                           !foundUser.isZonalAdmin && 
+                           !foundUser.states.includes('All');
 
   if (!settingsLoaded) {
     return (

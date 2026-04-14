@@ -3,6 +3,7 @@
 /**
  * @fileOverview History Hub - Detailed Log of Asset Changes.
  * Phase 1914: Updated with simple terminology (History, Users, Changes).
+ * Phase 1925: Scoped regional filtering for Zonal Admins.
  */
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -28,7 +29,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { cn, sanitizeSearch } from '@/lib/utils';
+import { cn, sanitizeSearch, getFuzzySignature } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { ActivityLogEntry } from '@/types/domain';
@@ -100,10 +101,18 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
 
   const filteredLog = useMemo(() => {
     let results = log;
-    if (!userProfile?.isAdmin && userProfile?.state) {
-      const userState = userProfile.state.toLowerCase().trim();
-      results = results.filter(entry => (entry.userState || '').toLowerCase().trim() === userState);
+    
+    // Regional Scope Enforcement for History
+    if (!userProfile?.isAdmin && userProfile?.states) {
+      if (!userProfile.states.includes('All')) {
+        const authorizedFuzzy = [
+          getFuzzySignature(userProfile.state), // Zone Name
+          ...userProfile.states.map(s => getFuzzySignature(s)) // Component States
+        ];
+        results = results.filter(entry => authorizedFuzzy.includes(getFuzzySignature(entry.userState)));
+      }
     }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(entry => 
