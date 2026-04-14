@@ -299,7 +299,7 @@ export default function HomeHub() {
             options={[
               { label: 'Sync Hub', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
               { label: 'Fetch Data', icon: Download, onClick: handleDownloadPulse, disabled: !isOnline },
-              { label: 'Save Changes', icon: manualUpload, disabled: !isOnline },
+              { label: 'Save Changes', icon: Upload, onClick: manualUpload, disabled: !isOnline },
               ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onClick: refreshRegistry }] : [])
             ]}
           >

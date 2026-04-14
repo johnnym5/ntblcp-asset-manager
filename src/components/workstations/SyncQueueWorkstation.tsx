@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { storage } from '@/offline/storage';
 import { Switch } from '@/components/ui/switch';
@@ -52,15 +53,19 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { TactileMenu } from '@/components/TactileMenu';
 
 export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { isSyncing, refreshRegistry, manualDownload, manualUpload, isOnline, setIsOnline } = useAppState();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
   
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
   const [isRetryingId, setIsRetryingId] = useState<string | null>(null);
+
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   const loadQueue = async () => { 
     const items = await storage.getQueue(); 
@@ -165,40 +170,50 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
   return (
     <div className={cn("space-y-8 h-full flex flex-col", !isEmbedded && "max-w-5xl mx-auto pb-40")}>
-      <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
-        <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5">
-          <div className="flex items-center gap-5">
-            <div className={cn("p-4 rounded-2xl", isOnline ? "bg-green-500/10" : "bg-red-500/10")}>
-              {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
+      <TactileMenu
+        title="Sync Control"
+        options={[
+          { label: 'Sync Hub', icon: Activity, onClick: () => setIsFullViewOpen(true) },
+          { label: 'Fetch Data', icon: Download, onClick: () => manualDownload(userProfile?.states || []), disabled: !isOnline },
+          { label: 'Save Changes', icon: Upload, onClick: manualUpload, disabled: !isOnline },
+          ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onClick: refreshRegistry }] : [])
+        ]}
+      >
+        <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+          <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5">
+            <div className="flex items-center gap-5">
+              <div className={cn("p-4 rounded-2xl", isOnline ? "bg-green-500/10" : "bg-red-500/10")}>
+                {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black uppercase text-white">Pending Changes</h3>
+                <p className="text-[10px] font-bold text-white/40 uppercase">{isOnline ? 'Online' : 'Offline'}</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <h3 className="text-xl font-black uppercase text-white">Pending Changes</h3>
-              <p className="text-[10px] font-bold text-white/40 uppercase">{isOnline ? 'Online' : 'Offline'}</p>
+            <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10">
+              <span className="text-[10px] font-black uppercase text-white/60">Connect</span>
+              <Switch checked={isOnline} onCheckedChange={setIsOnline} className="data-[state=checked]:bg-green-500" />
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10">
-            <span className="text-[10px] font-black uppercase text-white/60">Connect</span>
-            <Switch checked={isOnline} onCheckedChange={setIsOnline} className="data-[state=checked]:bg-green-500" />
-          </div>
-        </div>
 
-        <CardContent className="p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-8">
-              <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Waiting</span><span className="text-3xl font-black text-white">{pendingCount}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Errors</span><span className="text-3xl font-black text-red-600">{failedCount}</span></div>
+          <CardContent className="p-8 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-8">
+                <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Waiting</span><span className="text-3xl font-black text-white">{pendingCount}</span></div>
+                <div className="flex flex-col gap-1"><span className="text-[9px] font-black text-white/20 uppercase">Errors</span><span className="text-3xl font-black text-red-600">{failedCount}</span></div>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => manualDownload(userProfile?.states || [])} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase"><Download className="h-4 w-4 mr-2" /> Download</Button>
+                <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline || pendingCount === 0} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase text-primary border-primary/20"><Upload className="h-4 w-4 mr-2" /> Upload Changes</Button>
+                <Button onClick={() => setIsFullViewOpen(true)} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Review Registry</Button>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase"><Download className="h-4 w-4 mr-2" /> Download</Button>
-              <Button variant="outline" onClick={manualUpload} disabled={isSyncing || !isOnline || pendingCount === 0} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase text-primary border-primary/20"><Upload className="h-4 w-4 mr-2" /> Upload Changes</Button>
-              <Button onClick={() => setIsFullViewOpen(true)} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px]">Review Registry</Button>
+            <div className="space-y-2">
+              {recentQueue.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
             </div>
-          </div>
-          <div className="space-y-2">
-            {recentQueue.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </TactileMenu>
 
       <Dialog open={isFullViewOpen} onOpenChange={setIsFullViewOpen}>
         <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black text-white rounded-[2.5rem]">
