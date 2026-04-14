@@ -71,7 +71,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
