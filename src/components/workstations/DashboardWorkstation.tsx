@@ -4,6 +4,7 @@
  * @fileOverview Dashboard Center - Registry Overview.
  * Phase 1913: Simplified terminology (Hub, History, Updates).
  * Phase 1915: Integrated Tactile Menus for Sample Cards.
+ * Phase 1920: SSR Stability - Moved random sorting to useEffect to prevent build-time non-determinism.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -84,7 +85,11 @@ export function DashboardWorkstation() {
   const [pendingSync, setPendingSync] = useState<OfflineQueueEntry[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
 
-  // --- Load Ledger ---
+  // SSR-Safe Sample State
+  const [glanceAssets, setGlanceAssets] = useState<Asset[]>([]);
+  const [issueAssets, setIssueAssets] = useState<(Asset & { activeIssues: string[] })[]>([]);
+
+  // --- Load Ledger & Deterministic Samples ---
   useEffect(() => {
     const loadLedger = async () => {
       const [queue, logs] = await Promise.all([
@@ -99,41 +104,46 @@ export function DashboardWorkstation() {
     return () => clearInterval(interval);
   }, [assets, userProfile]);
 
-  const glanceAssets = useMemo(() => {
-    return [...assets].sort(() => 0.5 - Math.random()).slice(0, 8);
-  }, [assets, randomSeed]);
+  // Handle Non-Deterministic Sorting client-side only
+  useEffect(() => {
+    const generateSamples = () => {
+      // 1. Glance Assets
+      const gList = [...assets].sort(() => 0.5 - Math.random()).slice(0, 8);
+      setGlanceAssets(gList);
 
-  const issueAssets = useMemo(() => {
-    const list = assets.map(a => {
-      const issues: string[] = [];
-      const catFuzzy = getFuzzySignature(a.category);
-      const isVehicle = catFuzzy.includes('motor') || catFuzzy.includes('vehicle');
-      
-      const meta = (a.metadata as any) || {};
-      
-      const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
-                        Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
-      
-      const hasEngine = (!!a.engineNo && a.engineNo !== 'N/A') || 
-                       Object.keys(meta).some(k => getFuzzySignature(k) === 'engineno' && meta[k]);
-      
-      if (mode === 'verification' && a.status !== 'VERIFIED') issues.push("Not Verified");
-      if (['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')) issues.push(`State: ${a.condition}`);
-      if (!a.assetIdCode || a.assetIdCode === 'N/A') issues.push("Missing ID");
-      
-      if (isVehicle) {
-        if (!hasChassis) issues.push("No Chassis");
-        if (!hasEngine) issues.push("No Engine");
-      } else {
-        const hasSerial = (!!a.serialNumber && a.serialNumber !== 'N/A') ||
-                         Object.keys(meta).some(k => getFuzzySignature(k) === 'serialnumber' && meta[k]);
-        if (!hasSerial) issues.push("No Serial");
-      }
+      // 2. Issue Assets
+      const iList = assets.map(a => {
+        const issues: string[] = [];
+        const catFuzzy = getFuzzySignature(a.category);
+        const isVehicle = catFuzzy.includes('motor') || catFuzzy.includes('vehicle');
+        const meta = (a.metadata as any) || {};
+        
+        const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
+                          Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
+        
+        const hasEngine = (!!a.engineNo && a.engineNo !== 'N/A') || 
+                         Object.keys(meta).some(k => getFuzzySignature(k) === 'engineno' && meta[k]);
+        
+        if (mode === 'verification' && a.status !== 'VERIFIED') issues.push("Not Verified");
+        if (['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')) issues.push(`State: ${a.condition}`);
+        if (!a.assetIdCode || a.assetIdCode === 'N/A') issues.push("Missing ID");
+        
+        if (isVehicle) {
+          if (!hasChassis) issues.push("No Chassis");
+          if (!hasEngine) issues.push("No Engine");
+        } else {
+          const hasSerial = (!!a.serialNumber && a.serialNumber !== 'N/A') ||
+                           Object.keys(meta).some(k => getFuzzySignature(k) === 'serialnumber' && meta[k]);
+          if (!hasSerial) issues.push("No Serial");
+        }
 
-      return { ...a, activeIssues: issues };
-    }).filter(a => a.activeIssues.length > 0);
+        return { ...a, activeIssues: issues };
+      }).filter(a => a.activeIssues.length > 0);
 
-    return [...list].sort(() => 0.5 - Math.random()).slice(0, 8);
+      setIssueAssets(iList.sort(() => 0.5 - Math.random()).slice(0, 8));
+    };
+
+    generateSamples();
   }, [assets, mode, randomSeed]);
 
   const handleRefreshRandom = () => {
@@ -247,7 +257,11 @@ export function DashboardWorkstation() {
                     </Card>
                   </TactileMenu>
                 </motion.div>
-              ) : null}
+              ) : (
+                <div className="h-[200px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-[2rem] opacity-20">
+                  <Database className="h-10 w-10 text-muted-foreground" />
+                </div>
+              )}
             </AnimatePresence>
           </div>
         </div>
@@ -296,7 +310,7 @@ export function DashboardWorkstation() {
                         <div className="space-y-3 flex-1 min-w-0">
                           <h4 className="text-lg font-black uppercase text-foreground truncate leading-none">{issueAssets[issueIndex].description}</h4>
                           <div className="flex flex-wrap items-center gap-2">
-                            {(issueAssets[issueIndex] as any).activeIssues.map((issue: string, i: number) => (
+                            {issueAssets[issueIndex].activeIssues.map((issue: string, i: number) => (
                               <Badge key={i} variant="outline" className="text-[7px] font-black uppercase border-red-500/20 text-red-600 bg-red-500/5">{issue}</Badge>
                             ))}
                           </div>
@@ -392,6 +406,7 @@ export function DashboardWorkstation() {
         </Card>
       </div>
 
+      {/* 5. Detail Overlay */}
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 

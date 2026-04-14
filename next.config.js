@@ -6,6 +6,8 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  reloadOnOnline: true,
+  sw: 'sw.js'
 });
 
 const nextConfig = {
@@ -19,6 +21,10 @@ const nextConfig = {
   },
   // Ensure absolute paths work correctly in the deployed bundle
   trailingSlash: false,
+  // Optimized folder scanning for App Router
+  images: {
+    unoptimized: true
+  }
 };
 
 module.exports = withPWA(nextConfig);

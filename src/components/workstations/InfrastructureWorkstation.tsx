@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -6,6 +5,7 @@
  * Phase 165: Renamed to System Infrastructure.
  * Phase 167: Updated Purge pulse to be local-only per user request.
  * Phase 168: Implemented Global Registry Reset to prepare for new Project Pulse.
+ * Phase 1920: SSR Stability - Moved heartbeat generation to useEffect.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -71,10 +71,17 @@ export function InfrastructureWorkstation() {
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
   const [isGlobalWipeOpen, setIsGlobalWipeOpen] = useState(false);
 
-  const heartbeatData = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
-    time: i,
-    latency: 20 + Math.random() * 30
-  })), []);
+  // SSR-Safe Heartbeat Data
+  const [heartbeatData, setHeartbeatData] = useState<{time: number, latency: number}[]>([]);
+
+  useEffect(() => {
+    // Generate deterministic heartbeat pulses client-side only
+    const data = Array.from({ length: 20 }).map((_, i) => ({
+      time: i,
+      latency: 20 + Math.random() * 30
+    }));
+    setHeartbeatData(data);
+  }, []);
 
   useEffect(() => { 
     VirtualDBService.getGlobalDiscrepancies().then(ids => setDiscrepancyCount(ids.length)); 
@@ -308,7 +315,7 @@ export function InfrastructureWorkstation() {
             <CardDescription className="text-xs font-medium">Permanently clear all records from the global authority.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
-            <div className="p-6 rounded-2xl bg-destructive/5 border-2 border-dashed border-destructive/20 space-y-2">
+            <div className="p-6 rounded-2xl bg-destructive/5 border-2 border-dashed border-orange-500/20 space-y-2">
               <h5 className="text-[10px] font-black uppercase text-destructive tracking-widest">Wipe ALL Cloud & Local Data</h5>
               <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
                 This action is IRREVERSIBLE. It will delete all asset data across Firestore, the Standby Mirror, and all local device caches. Use this ONLY to prepare the system for a total project restart.
