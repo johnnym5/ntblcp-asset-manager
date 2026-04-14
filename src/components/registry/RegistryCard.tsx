@@ -28,7 +28,7 @@ import {
   X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AssetRecord } from '@/types/registry';
+import type { AssetRecord, RegistryHeader } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -55,8 +56,9 @@ interface RegistryCardProps {
   onToggleExpand?: () => void;
   onManageLabels?: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
+  onUpdateHeader?: (id: string, updates: Partial<RegistryHeader>) => void;
   densityMode?: 'compact' | 'comfortable' | 'expanded';
-  isSetupMode?: boolean; // NEW: Controls in-place header editing
+  isSetupMode?: boolean;
 }
 
 const InlineField = ({ 
@@ -118,10 +120,11 @@ export function RegistryCard({
   onToggleExpand,
   onManageLabels,
   onQuickUpdate,
+  onUpdateHeader,
   densityMode = 'comfortable',
   isSetupMode = false
 }: RegistryCardProps) {
-  const { appSettings, setHeaders, headers: allHeaders } = useAppState();
+  const { appSettings } = useAppState();
   const { userProfile } = useAuth();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
@@ -134,24 +137,18 @@ export function RegistryCard({
   const isSystemAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canEditBase = isAdminMode || isVerificationMode;
 
-  // Deterministic 7-header slice derived from the record's source headers
   const activeHeaders = useMemo(() => {
     const folderHeaders = record.headers || [];
-    
-    // Core Identity Filters
     const core = folderHeaders.filter(h => {
       const n = h.normalizedName.toLowerCase().replace(/_/g, '');
       return n === 'sn' || n === 'assetidcode';
     });
-    
-    // Secondary Technical Fields (filtered by quickView setup)
     const others = folderHeaders.filter(h => {
       if (!h.quickView) return false;
       const n = h.normalizedName.toLowerCase().replace(/_/g, '');
       if (n === 'sn' || n === 'assetidcode' || n === 'description' || n === 'assetdescription') return false;
       return true;
     });
-    
     return [...core, ...others].slice(0, 7);
   }, [record.headers]);
 
@@ -174,7 +171,7 @@ export function RegistryCard({
   };
 
   const handleToggleQuickView = (headerId: string, state: boolean) => {
-    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, quickView: state } : h));
+    onUpdateHeader?.(headerId, { quickView: state });
   };
 
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
@@ -199,7 +196,6 @@ export function RegistryCard({
         )}
       >
         <CardContent className="p-0 flex flex-col flex-1">
-          {/* Header Pulse */}
           <div className="p-4 flex flex-col gap-3 border-b border-border/40 bg-muted/10 relative">
             {isSetupMode && (
               <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
@@ -248,7 +244,6 @@ export function RegistryCard({
             />
           </div>
 
-          {/* Core Location Pulse */}
           <div className="p-4 grid grid-cols-2 gap-4 bg-background relative">
             {isSetupMode && (
               <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
@@ -271,7 +266,6 @@ export function RegistryCard({
             />
           </div>
 
-          {/* Technical Data Grid (Configurable 7-slice) */}
           <div className="divide-y divide-border/20 bg-muted/5 flex-1">
             {activeHeaders
               .filter(h => !['description', 'location', 'lga'].includes(h.normalizedName.toLowerCase().replace(/_/g, '')))
@@ -301,7 +295,6 @@ export function RegistryCard({
                 );
               })}
 
-            {/* In-Place Add Pulse */}
             {isSetupMode && activeHeaders.length < 7 && availableHeaders.length > 0 && (
               <div className="p-3 flex justify-center bg-primary/[0.03]">
                 <DropdownMenu>
@@ -311,7 +304,7 @@ export function RegistryCard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56 bg-card border-border shadow-3xl">
-                    <DropdownMenuLabel className="text-[8px] font-black uppercase text-muted-foreground opacity-40">Select Pulse</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-[8px] font-black uppercase text-muted-foreground opacity-40">Select Field</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <ScrollArea className="h-48">
                       {availableHeaders.map(h => (
@@ -330,13 +323,12 @@ export function RegistryCard({
             )}
           </div>
 
-          {/* Verification Hub */}
           {isVerificationMode && !isSetupMode && (
             <div className="p-4 bg-muted/20 border-t border-border/20 space-y-3">
               <div className="flex items-center gap-2">
                 <Button 
                   size="sm" 
-                  onClick={() => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' })}
+                  onClick={() => onQuickUpdate?.(record.id, { status: isVerified ? 'UNVERIFIED' : 'VERIFIED' })}
                   className={cn(
                     "flex-1 h-9 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md",
                     status === 'VERIFIED' 

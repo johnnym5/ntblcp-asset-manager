@@ -35,7 +35,7 @@ import {
   Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AssetRecord } from '@/types/registry';
+import type { AssetRecord, RegistryHeader } from '@/types/registry';
 import { AssetChecklist } from '@/components/asset-checklist';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -130,16 +130,18 @@ export function AssetDossier({
   record, 
   onEdit, 
   onQuickUpdate,
+  onUpdateHeader,
   className,
   isHeaderEditingMode: externalHeaderSetup 
 }: { 
   record: AssetRecord, 
   onEdit?: (id: string) => void, 
   onQuickUpdate?: (id: string, updates: any) => void,
+  onUpdateHeader?: (id: string, updates: Partial<RegistryHeader>) => void,
   className?: string,
   isHeaderEditingMode?: boolean
 }) {
-  const { headers, setHeaders, appSettings } = useAppState();
+  const { appSettings } = useAppState();
   const { userProfile } = useAuth();
   const [remarkValue, setRemarkValue] = useState(String(record.rawRow.remarks || ''));
   const [internalSetupMode, setInternalSetupMode] = useState(false);
@@ -159,30 +161,29 @@ export function AssetDossier({
   const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Project';
 
   const handleToggleHeaderFlag = (headerId: string, flag: 'table' | 'quickView' | 'inChecklist') => {
-    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, [flag]: !h[flag] } : h));
+    onUpdateHeader?.(headerId, { [flag]: true }); // Parent logic handles toggle
   };
 
   const handleRenameHeader = (headerId: string, newName: string) => {
-    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, displayName: newName } : h));
+    onUpdateHeader?.(headerId, { displayName: newName });
   };
 
   const handleSaveRemark = () => {
     onQuickUpdate?.(record.id, { remarks: remarkValue });
   };
 
+  const hasUnsavedRemark = remarkValue !== (record.rawRow.remarks || '');
+
   const hiddenFields = useMemo(() => {
-    return headers.filter(h => !h.table && !h.quickView && !h.locked);
-  }, [headers]);
+    return (record.headers || []).filter(h => !h.table && !h.quickView && !h.locked);
+  }, [record.headers]);
 
   return (
     <div className={cn(
       "flex flex-col lg:flex-row min-h-0 bg-muted/5 rounded-[2rem] border border-border/40 overflow-hidden", 
       className
     )}>
-      {/* Sidebar - Quick Info & Visuals */}
       <div className="w-full lg:w-[320px] bg-card/30 flex flex-col shrink-0 border-b lg:border-b-0 lg:border-r border-border/40 p-6 space-y-10">
-        
-        {/* Physical Identity */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl"><Tag className="h-5 w-5 text-primary" /></div>
@@ -205,7 +206,6 @@ export function AssetDossier({
           )}
         </div>
 
-        {/* Audit Status */}
         {isVerificationMode && (
           <div className="p-5 rounded-[1.5rem] bg-muted/30 border-2 border-primary/10 space-y-4 shadow-inner">
             <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
@@ -260,7 +260,6 @@ export function AssetDossier({
           </div>
         )}
 
-        {/* Data Quality Checklist */}
         <div className="space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" /> Data Quality
@@ -278,7 +277,6 @@ export function AssetDossier({
         )}
       </div>
 
-      {/* Main Data Section */}
       <div className="flex-1 flex flex-col bg-background min-h-0 overflow-hidden relative">
         <div className="p-6 sm:p-8 border-b border-border/40 flex items-center justify-between">
           <div className="flex flex-col gap-2">
@@ -325,7 +323,7 @@ export function AssetDossier({
                   label={header.displayName} 
                   value={field.displayValue} 
                   isEditing={isSetupActive}
-                  onToggleFlag={(flag) => handleToggleHeaderFlag(header.id, flag)}
+                  onToggleFlag={(flag) => onUpdateHeader?.(header.id, { [flag]: true })}
                   onRename={(newName) => handleRenameHeader(header.id, newName)}
                 />
               );
@@ -358,7 +356,7 @@ export function AssetDossier({
                         {hiddenFields.map(h => (
                           <DropdownMenuItem 
                             key={h.id} 
-                            onClick={() => handleToggleHeaderFlag(h.id, 'table')}
+                            onClick={() => onUpdateHeader?.(h.id, { table: true })}
                             className="text-[10px] font-black uppercase py-2.5 cursor-pointer focus:bg-primary/10 focus:text-primary"
                           >
                             {h.displayName}
