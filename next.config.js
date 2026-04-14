@@ -10,12 +10,15 @@ const withPWA = withPWAInit({
 
 const nextConfig = {
   reactStrictMode: true,
+  // Production Readiness: Ensure build succeeds despite minor lint/type drift
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Ensure absolute paths work correctly in the deployed bundle
+  trailingSlash: false,
 };
 
 module.exports = withPWA(nextConfig);

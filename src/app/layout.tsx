@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: 'Assetain | Professional Asset Intelligence',
@@ -50,9 +51,11 @@ export default function RootLayout({
         >
           <AppStateProvider>
             <AuthProvider>
-              {children}
-              <Toaster />
-              <FirebaseErrorListener />
+              <TooltipProvider>
+                {children}
+                <Toaster />
+                <FirebaseErrorListener />
+              </TooltipProvider>
             </AuthProvider>
           </AppStateProvider>
         </ThemeProvider>

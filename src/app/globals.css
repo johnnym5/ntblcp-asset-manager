@@ -10,7 +10,7 @@
     --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
-    --primary: 45 100% 50%; /* Management Gold */
+    --primary: 45 100% 50%; /* Assetain Gold */
     --primary-foreground: 0 0% 0%;
     --secondary: 0 0% 92%;
     --secondary-foreground: 0 0% 10%;
@@ -48,17 +48,10 @@
     --ring: 45 100% 50%;
   }
 
-  /* Mode Specific Accents - Injected via SPAHub classes */
   .mode-verification {
-    --primary: 142 76% 36%; /* Field Green */
+    --primary: 142 76% 36%; /* Auditor Green */
     --ring: 142 76% 36%;
     --accent: 142 76% 36%;
-  }
-
-  .mode-reporting {
-    --primary: 210 100% 50%; /* Executive Blue */
-    --ring: 210 100% 50%;
-    --accent: 210 100% 50%;
   }
 }
 
@@ -71,13 +64,13 @@
     font-family: 'Inter', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     
-    /* Native App Feel */
+    /* Cross-Device Touch Precision */
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     user-select: none;
 
-    /* Hardware Notch Safety */
+    /* Hardware Safe Areas */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -123,15 +116,6 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
-  }
-
-  .app-container {
-    height: 100vh;
-    height: 100dvh;
-    width: 100vw;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
   }
 
   .pb-safe {
