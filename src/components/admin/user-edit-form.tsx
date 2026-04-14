@@ -4,6 +4,7 @@
  * @fileOverview UserEditForm - Personnel Identity Configuration.
  * Terminology: Passcode.
  * Phase 1800: Integrated Granular Access Control Hub (Permissions).
+ * Phase 1810: Hidden Super-Admin Tier via Tactile Interaction.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -48,6 +49,8 @@ import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { TactileMenu } from '@/components/TactileMenu';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const defaultPermissions: UserPermissions = {
   page_dashboard: true,
@@ -139,6 +142,8 @@ type UserFormValues = z.infer<typeof userFormSchema>;
 
 export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: boolean, onOpenChange: (o: boolean) => void, user: AuthorizedUser | null, onSave: (u: any, orig?: string) => Promise<void> }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: { 
@@ -159,7 +164,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
     },
   });
   
-  const isAdmin = form.watch('isAdmin');
+  const currentRole = form.watch('role');
   const isZonalAdmin = form.watch('isZonalAdmin');
   const assignedZone = form.watch('assignedZone');
 
@@ -174,6 +179,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
             role: user.role || 'VERIFIER',
             permissions: user.permissions || defaultPermissions
         });
+        setShowSuperAdmin(user.role === 'SUPERADMIN');
       } else {
         form.reset({ 
             displayName: '', 
@@ -191,31 +197,15 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
             role: 'VERIFIER',
             permissions: defaultPermissions
         });
+        setShowSuperAdmin(false);
       }
     }
   }, [isOpen, user, form]);
 
-  useEffect(() => {
-    if (isAdmin) {
-      form.setValue('states', ['All']);
-      form.setValue('permissions', superAdminPermissions);
-    } else if (isZonalAdmin) {
-      form.setValue('permissions', adminPermissions);
-      if (assignedZone) {
-        const zoneStates = NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES] || [];
-        form.setValue('states', zoneStates);
-      }
-    }
-  }, [isAdmin, isZonalAdmin, assignedZone, form]);
-
   const handleSubmit = async (data: UserFormValues) => {
     setIsSaving(true);
     const { confirmPassword, ...userToSave } = data;
-    let derivedRole = data.role;
-    if (data.isAdmin) derivedRole = 'SUPERADMIN';
-    else if (data.isZonalAdmin) derivedRole = 'ADMIN';
-
-    await onSave({ ...userToSave, role: derivedRole } as AuthorizedUser, user?.loginName);
+    await onSave(userToSave as AuthorizedUser, user?.loginName);
     setIsSaving(false);
   };
 
@@ -280,7 +270,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
 
                 <div className="space-y-4">
                     <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Regional Scope</Label>
-                    {!isAdmin && !isZonalAdmin ? (
+                    {currentRole !== 'SUPERADMIN' && !isZonalAdmin ? (
                         <FormField control={form.control} name="states" render={({ field }) => (
                             <FormItem className="flex flex-col">
                                 <Popover>
@@ -322,49 +312,48 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                     )}
                 </div>
 
-                {/* ACCORDION PERMISSIONS HUB */}
                 <div className="space-y-4">
-                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Governance</Label>
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Access Control Hub</Label>
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="permissions" className="border-2 border-border/40 rounded-[1.5rem] bg-card/50 overflow-hidden px-1">
                             <AccordionTrigger className="px-6 hover:no-underline py-5 group">
                                 <div className="flex items-center gap-4">
                                     <div className="p-2 bg-primary/10 rounded-lg group-hover:scale-110 transition-transform"><Lock className="h-4 w-4 text-primary" /></div>
                                     <div className="text-left">
-                                        <span className="text-sm font-black uppercase tracking-tight">Access Control Hub</span>
-                                        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Granular Function & Page Access</p>
+                                        <span className="text-sm font-black uppercase tracking-tight">Capabilities</span>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Granular Page & Action Pulse</p>
                                     </div>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent className="px-6 pb-8 space-y-8">
                                 <div className="space-y-4">
-                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><LayoutGrid className="h-3 w-3" /> Page Access</h5>
+                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><LayoutGrid className="h-3 w-3" /> Navigation Scope</h5>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                                        <PermissionRow label="Dashboard Hub" pKey="page_dashboard" icon={Activity} />
+                                        <PermissionRow label="Dashboard" pKey="page_dashboard" icon={Activity} />
                                         <PermissionRow label="Asset List" pKey="page_registry" icon={Database} />
                                         <PermissionRow label="Folder Browse" pKey="page_groups" icon={LayoutGrid} />
-                                        <PermissionRow label="Reports Center" pKey="page_reports" icon={Activity} />
-                                        <PermissionRow label="Tactical Alerts" pKey="page_alerts" icon={ShieldAlert} />
-                                        <PermissionRow label="Activity History" pKey="page_audit_log" icon={History} />
+                                        <PermissionRow label="Reports" pKey="page_reports" icon={Activity} />
+                                        <PermissionRow label="Alerts" pKey="page_alerts" icon={ShieldAlert} />
+                                        <PermissionRow label="History" pKey="page_audit_log" icon={History} />
                                         <PermissionRow label="Sync Queue" pKey="page_sync_queue" icon={RefreshCw} />
-                                        <PermissionRow label="Personnel Hub" pKey="page_users" icon={User} />
+                                        <PermissionRow label="Personnel" pKey="page_users" icon={User} />
                                         <PermissionRow label="Infrastructure" pKey="page_infrastructure" icon={Monitor} />
                                         <PermissionRow label="Database Hub" pKey="page_database" icon={Terminal} />
-                                        <PermissionRow label="App Settings" pKey="page_settings" icon={SettingsIcon} />
+                                        <PermissionRow label="Settings" pKey="page_settings" icon={SettingsIcon} />
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><Lock className="h-3 w-3" /> Functional Pulse</h5>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                                        <PermissionRow label="Add New Assets" pKey="func_add_asset" icon={PlusCircle} />
-                                        <PermissionRow label="Edit Profiles" pKey="func_edit_asset" icon={FileEdit} />
-                                        <PermissionRow label="Delete Records" pKey="func_delete_asset" icon={Trash2} />
+                                        <PermissionRow label="Create Assets" pKey="func_add_asset" icon={PlusCircle} />
+                                        <PermissionRow label="Edit Assets" pKey="func_edit_asset" icon={FileEdit} />
+                                        <PermissionRow label="Delete Assets" pKey="func_delete_asset" icon={Trash2} />
                                         <PermissionRow label="Import Excel" pKey="func_import" icon={FileUp} />
                                         <PermissionRow label="Batch Update" pKey="func_batch_edit" icon={Activity} />
-                                        <PermissionRow label="Setup Layouts" pKey="func_edit_headers" icon={Wrench} />
-                                        <PermissionRow label="Undo Changes" pKey="func_revert" icon={RotateCcw} />
-                                        <PermissionRow label="Approve Updates" pKey="func_approve" icon={ShieldCheck} />
+                                        <PermissionRow label="Manage Layouts" pKey="func_edit_headers" icon={Wrench} />
+                                        <PermissionRow label="Rollback History" pKey="func_revert" icon={RotateCcw} />
+                                        <PermissionRow label="Approve Changes" pKey="func_approve" icon={ShieldCheck} />
                                     </div>
                                 </div>
                             </AccordionContent>
@@ -373,20 +362,104 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
                 </div>
 
                 <div className="space-y-4">
-                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Quick Tiers</Label>
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Security Tiers</Label>
                     <div className="grid grid-cols-1 gap-3">
-                        <FormField control={form.control} name="isAdmin" render={({ field }) => (
-                            <FormItem className="flex items-center justify-between p-5 rounded-2xl border transition-all hover:bg-primary/[0.02] group">
-                                <div className="space-y-0.5"><FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">Super Administrator</FormLabel><FormDescription className="text-[10px] font-bold uppercase opacity-40">Unrestricted global access and user provisioning.</FormDescription></div>
-                                <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isZonalAdmin', false); }}/></FormControl>
-                            </FormItem>
-                        )}/>
+                        {/* System Admin - Wrapped in TactileMenu to reveal Super Admin */}
+                        <TactileMenu
+                            title="Advanced Security"
+                            options={[
+                                { 
+                                    label: showSuperAdmin ? "Disable Super-Admin Mode" : "Enable Super-Admin Mode", 
+                                    icon: ShieldAlert, 
+                                    onClick: () => setShowSuperAdmin(!showSuperAdmin) 
+                                }
+                            ]}
+                        >
+                            <FormField control={form.control} name="role" render={({ field }) => (
+                                <FormItem className="flex items-center justify-between p-5 rounded-2xl border transition-all hover:bg-primary/[0.02] group">
+                                    <div className="space-y-0.5">
+                                        <FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">System Administrator</FormLabel>
+                                        <FormDescription className="text-[10px] font-bold uppercase opacity-40">Full project management and user oversight.</FormDescription>
+                                    </div>
+                                    <FormControl>
+                                        <Switch 
+                                            checked={field.value === 'ADMIN' || field.value === 'SUPERADMIN'} 
+                                            onCheckedChange={(v) => { 
+                                                if (v) {
+                                                    field.onChange('ADMIN');
+                                                    form.setValue('isAdmin', true);
+                                                    form.setValue('permissions', adminPermissions);
+                                                } else {
+                                                    field.onChange('VERIFIER');
+                                                    form.setValue('isAdmin', false);
+                                                    form.setValue('permissions', defaultPermissions);
+                                                }
+                                                form.setValue('isZonalAdmin', false);
+                                            }}
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}/>
+                        </TactileMenu>
+
+                        {/* Zonal Admin */}
                         <FormField control={form.control} name="isZonalAdmin" render={({ field }) => (
                             <FormItem className="flex items-center justify-between p-5 rounded-2xl border transition-all hover:bg-primary/[0.02] group">
-                                <div className="space-y-0.5"><FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">Zonal Administrator</FormLabel><FormDescription className="text-[10px] font-bold uppercase opacity-40">Manages regional states within a zone.</FormDescription></div>
-                                <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isAdmin', false); }}/></FormControl>
+                                <div className="space-y-0.5">
+                                    <FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">Zonal Administrator</FormLabel>
+                                    <FormDescription className="text-[10px] font-bold uppercase opacity-40">Regional oversight for assigned zones.</FormDescription>
+                                </div>
+                                <FormControl>
+                                    <Switch 
+                                        checked={field.value} 
+                                        onCheckedChange={(v) => { 
+                                            field.onChange(v); 
+                                            if(v) {
+                                                form.setValue('role', 'MANAGER');
+                                                form.setValue('isAdmin', false);
+                                                form.setValue('permissions', adminPermissions);
+                                            } else {
+                                                form.setValue('role', 'VERIFIER');
+                                                form.setValue('permissions', defaultPermissions);
+                                            }
+                                        }}
+                                    />
+                                </FormControl>
                             </FormItem>
                         )}/>
+
+                        {/* Hidden Super Admin Tier */}
+                        <AnimatePresence>
+                            {showSuperAdmin && (
+                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
+                                    <FormField control={form.control} name="role" render={({ field }) => (
+                                        <FormItem className="flex items-center justify-between p-5 rounded-2xl border-2 border-primary/20 bg-primary/5 group mt-3">
+                                            <div className="space-y-0.5">
+                                                <FormLabel className="font-black text-sm uppercase text-primary">Super Administrator</FormLabel>
+                                                <FormDescription className="text-[10px] font-bold uppercase text-primary/40">Unrestricted infrastructure & database access.</FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch 
+                                                    checked={field.value === 'SUPERADMIN'} 
+                                                    onCheckedChange={(v) => { 
+                                                        if (v) {
+                                                            field.onChange('SUPERADMIN');
+                                                            form.setValue('isAdmin', true);
+                                                            form.setValue('permissions', superAdminPermissions);
+                                                            form.setValue('states', ['All']);
+                                                        } else {
+                                                            field.onChange('ADMIN');
+                                                            form.setValue('permissions', adminPermissions);
+                                                        }
+                                                    }}
+                                                    className="data-[state=checked]:bg-primary"
+                                                />
+                                            </FormControl>
+                                        </FormItem>
+                                    )}/>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </form>
@@ -395,7 +468,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: b
         <DialogFooter className="p-8 bg-muted/20 border-t gap-3 shrink-0">
             <DialogClose asChild><Button variant="ghost" className="font-black uppercase text-[10px] px-8 rounded-xl">Discard</Button></DialogClose>
             <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 px-10 rounded-[1.5rem] bg-primary text-black transition-transform active:scale-95">
-                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>} Commit Personnel Pulse
+                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>} Commit Identity Pulse
             </Button>
         </DialogFooter>
       </DialogContent>

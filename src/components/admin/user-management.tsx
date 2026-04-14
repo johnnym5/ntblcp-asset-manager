@@ -4,6 +4,7 @@
  * @fileOverview User Management Directory.
  * Phase 1600: Zonal Admin scoping. Filters users by zonal states.
  * Phase 1610: Integrated Tactile Menu for User Rows.
+ * Phase 1620: Simplified Role Labels (Admin, Zonal Admin, User, Super Admin).
  */
 
 import React, { useState, useMemo } from 'react';
@@ -16,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon, KeyRound, Mail } from 'lucide-react';
+import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon, KeyRound, Mail, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AuthorizedUser } from '@/types/domain';
 import { UserEditForm } from './user-edit-form';
@@ -100,6 +101,13 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     setUserToDelete(null);
     toast({ title: "Identity Purged" });
   };
+
+  const getRoleLabel = (user: AuthorizedUser) => {
+    if (user.role === 'SUPERADMIN') return 'Super Admin';
+    if (user.role === 'ADMIN') return 'Admin';
+    if (user.isZonalAdmin) return 'Zonal Admin';
+    return 'User';
+  };
   
   return (
     <div className="space-y-6">
@@ -149,10 +157,14 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
                 <TableCell className="py-4">
                   <Badge variant="outline" className={cn(
                     "text-[8px] font-black uppercase h-6 px-3 rounded-lg border-2",
-                    user.isAdmin ? "border-primary/20 bg-primary/5 text-primary" : "border-muted-foreground/20"
+                    user.role === 'SUPERADMIN' ? "border-primary/40 bg-primary/10 text-primary" :
+                    user.role === 'ADMIN' ? "border-primary/20 bg-primary/5 text-primary" : 
+                    user.isZonalAdmin ? "border-teal-500/20 bg-teal-500/5 text-teal-600" :
+                    "border-muted-foreground/20"
                   )}>
-                    {user.isAdmin && <ShieldCheck className="mr-1.5 h-2.5 w-2.5" />}
-                    {user.role}
+                    {user.role === 'SUPERADMIN' ? <ShieldAlert className="mr-1.5 h-2.5 w-2.5" /> :
+                     user.isAdmin && <ShieldCheck className="mr-1.5 h-2.5 w-2.5" />}
+                    {getRoleLabel(user)}
                   </Badge>
                 </TableCell>
                 <TableCell className="py-4">
