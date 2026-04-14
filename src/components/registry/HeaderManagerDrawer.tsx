@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
- * Phase 38: Implemented Triple-View Toggles (Card, List, Check).
- * Phase 39: Converted to focused Dialog window with vertical group stacking.
- * Phase 40: Reinforced administrative access pulse.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState } from 'react';
@@ -46,7 +44,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { storage } from '@/offline/storage';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { addNotification } from '@/hooks/use-notifications';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface HeaderManagerProps {
   isOpen: boolean;
@@ -140,7 +138,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
             <Input 
               placeholder="Search registry fields..." 
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-12 rounded-2xl bg-background border-none shadow-inner text-xs font-bold"
             />
           </div>
@@ -183,32 +181,26 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                         </div>
                         
                         <div className="flex items-center gap-8 pl-4">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} className="data-[state=checked]:bg-primary" />
-                              </TooltipTrigger>
-                              <TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Switch checked={header.quickView} onCheckedChange={() => toggleFlag(header.id, 'quickView')} className="data-[state=checked]:bg-primary" />
+                            </TooltipTrigger>
+                            <TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent>
+                          </Tooltip>
 
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} className="data-[state=checked]:bg-primary" />
-                              </TooltipTrigger>
-                              <TooltipContent className="text-[8px] font-black uppercase">Table View</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Switch checked={header.table} onCheckedChange={() => toggleFlag(header.id, 'table')} className="data-[state=checked]:bg-primary" />
+                            </TooltipTrigger>
+                            <TooltipContent className="text-[8px] font-black uppercase">Table View</TooltipContent>
+                          </Tooltip>
 
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Switch checked={header.inChecklist} onCheckedChange={() => toggleFlag(header.id, 'inChecklist')} className="data-[state=checked]:bg-primary" />
-                              </TooltipTrigger>
-                              <TooltipContent className="text-[8px] font-black uppercase">Fidelity Check</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Switch checked={header.inChecklist} onCheckedChange={() => toggleFlag(header.id, 'inChecklist')} className="data-[state=checked]:bg-primary" />
+                            </TooltipTrigger>
+                            <TooltipContent className="text-[8px] font-black uppercase">Fidelity Check</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     ))}

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Optimized for Mobile High-DPI Viewports and Keyboard Interaction.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -52,7 +52,7 @@ import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
 import { getCanonicalGroup } from "@/lib/condition-logic";
 import type { Asset } from "@/types/domain";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { addNotification } from "@/hooks/use-notifications";
 
 interface AssetFormProps {

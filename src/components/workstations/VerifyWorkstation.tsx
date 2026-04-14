@@ -3,6 +3,7 @@
 /**
  * @fileOverview Verify Records - Field Audit Center.
  * Phase 1914: Updated with simple terminology (Verify, Records, Audit).
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -35,7 +36,7 @@ import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry
 import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function VerifyWorkstation() {
   const { assets, refreshRegistry, settingsLoaded, appSettings } = useAppState();
@@ -158,27 +159,23 @@ export function VerifyWorkstation() {
                 <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout className="relative group">
                   <RegistryCard record={transformAssetToRecord(asset, headers)} onInspect={() => { setSelectedAsset(asset); setIsFormOpen(true); }} />
                   <div className="absolute top-14 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all z-20">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl hover:bg-green-600" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }}>
-                            <CheckCircle2 className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Mark Verified</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl hover:bg-green-600" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }}>
+                          <CheckCircle2 className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Mark Verified</TooltipContent>
+                    </Tooltip>
                     
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl hover:bg-destructive/90" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }}>
-                            <XCircle className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Report Problem</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl hover:bg-destructive/90" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }}>
+                          <XCircle className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Report Problem</TooltipContent>
+                    </Tooltip>
                   </div>
                 </motion.div>
               ))}

@@ -3,7 +3,7 @@
 /**
  * @fileOverview Application Shell - Home Hub.
  * Optimized for Production Deployment & Simplified Terminology.
- * Phase 1805: Integrated user-specific Page & Function Visibility.
+ * Phase 1914: Fixed TooltipProvider ReferenceError by leveraging root provider.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -269,26 +269,24 @@ export default function HomeHub() {
 
         <div className="flex items-center gap-2 sm:gap-5">
           {isAdmin && perms?.func_approve && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsInboxOpen(true)} 
-                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
-                  >
-                    <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                    {pendingApprovalsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
-                        {pendingApprovalsCount}
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsInboxOpen(true)} 
+                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                >
+                  <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                  {pendingApprovalsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                      {pendingApprovalsCount}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
+            </Tooltip>
           )}
 
           <TactileMenu
@@ -313,8 +311,8 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip></TooltipProvider>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip>
                 </>
               )}
             </div>

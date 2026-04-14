@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Dashboard Center - Registry Overview.
- * Phase 1913: Simplified terminology (Hub, History, Updates).
- * Phase 1915: Integrated Tactile Menus for Sample Cards.
- * Phase 1920: SSR Stability - Moved random sorting to useEffect to prevent build-time non-determinism.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -47,7 +45,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn, getFuzzySignature } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from 'framer-motion';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
@@ -364,7 +362,7 @@ export function DashboardWorkstation() {
                   <div className="space-y-2 mb-4">
                     {pendingSync.slice(0, 3).map(q => (
                       <div key={q.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
-                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Profile Update'}</span>
+                        <span className="text-10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Profile Update'}</span>
                         <Badge variant="outline" className="text-[7px] font-mono">{q.operation}</Badge>
                       </div>
                     ))}

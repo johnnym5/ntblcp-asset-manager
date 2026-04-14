@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview Critical Alerts Workstation - High-Priority Asset Issues.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -28,7 +29,7 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function AlertsWorkstation() {
   const { assets, settingsLoaded, setActiveView, appSettings } = useAppState();
@@ -95,16 +96,14 @@ export function AlertsWorkstation() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all">
-                  <Megaphone className="h-4 w-4" /> Notify Manager
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Alert management about these items.</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all">
+                <Megaphone className="h-4 w-4" /> Notify Manager
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Alert management about these items.</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

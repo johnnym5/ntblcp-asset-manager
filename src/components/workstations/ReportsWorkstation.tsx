@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Reports Workstation - Executive Reporting & Data Quality.
- * Phase 58: Refined for Dashboard embedding. Hides exception PDF pulse from overview.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -40,7 +40,7 @@ import { enqueueMutation } from '@/offline/queue';
 import { useToast } from '@/hooks/use-toast';
 import { PdfService } from '@/services/pdf-service';
 import { useAuth } from '@/contexts/auth-context';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { assets, refreshRegistry } = useAppState();
@@ -134,16 +134,14 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
                 </CardHeader>
                 <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
                   <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a Word document report for your site visit or audit period.</p>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button onClick={() => setIsTravelReportOpen(true)} className="h-14 px-10 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
-                          <FileText className="h-4 w-4" /> Create Report
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Start the guided process to generate a Travel Report document.</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={() => setIsTravelReportOpen(true)} className="h-14 px-10 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
+                        <FileText className="h-4 w-4" /> Create Report
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Start the guided process to generate a Travel Report document.</TooltipContent>
+                  </Tooltip>
                 </CardContent>
               </Card>
 
@@ -155,16 +153,14 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
                     <Badge variant="outline" className="text-destructive border-destructive/20 font-black text-[9px]">{stats.exceptions} Issues</Badge>
                   </CardHeader>
                   <CardContent className="p-8">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-16 rounded-2xl font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4 transition-transform hover:scale-105 active:scale-95">
-                            {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Download Issues PDF <ArrowRight className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Download a PDF summary of all stolen, damaged, or out-of-sync assets.</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-16 rounded-2xl font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4 transition-transform hover:scale-105 active:scale-95">
+                          {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Download Issues PDF <ArrowRight className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download a PDF summary of all stolen, damaged, or out-of-sync assets.</TooltipContent>
+                    </Tooltip>
                   </CardContent>
                 </Card>
               )}
@@ -179,14 +175,12 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
                 <CardTitle className="text-xl font-black uppercase flex items-center gap-3"><Wrench className="h-5 w-5 text-primary" /> Data Quality Check</CardTitle>
                 <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Automatic Scan for Errors</p>
               </div>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={runAuditPulse} disabled={isScanning} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase"><RefreshCw className="h-3 w-3 mr-2" /> Scan Again</Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Re-scan the registry to find new data errors or inconsistencies.</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={runAuditPulse} disabled={isScanning} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase"><RefreshCw className="h-3 w-3 mr-2" /> Scan Again</Button>
+                </TooltipTrigger>
+                <TooltipContent>Re-scan the registry to find new data errors or inconsistencies.</TooltipContent>
+              </Tooltip>
             </CardHeader>
             <ScrollArea className="h-[400px]">
               {isScanning ? <div className="h-full flex items-center justify-center opacity-40"><Loader2 className="h-12 w-12 animate-spin" /></div> : 

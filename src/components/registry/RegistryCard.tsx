@@ -1,10 +1,6 @@
 /**
  * @fileOverview RegistryCard - High-Density UI Pulse.
- * Phase 1500: Reformatted to support 7 headers with prioritized S/N and ID.
- * Phase 1501: Added inline editing for Name, Location, and LGA with explicit save buttons.
- * Phase 1505: Upgraded to use record-specific headers for accurate setup reflection.
- * Phase 1510: Integrated In-Place Header Setup Mode for Quick View management.
- * Phase 1805: Integrated UserPermissions for functional lockdown.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -48,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RegistryCardProps {
   record: AssetRecord;

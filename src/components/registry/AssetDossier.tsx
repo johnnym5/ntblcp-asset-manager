@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Profile - Detailed Technical View.
- * Optimized for Mobile Responsiveness & Stacked Layout Pulse.
- * Phase 1515: Isolated Full Profile Setup mode from Quick View card editing.
+ * Phase 1915: Removed redundant TooltipProvider.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -41,7 +40,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ASSET_CONDITIONS } from '@/lib/constants';
