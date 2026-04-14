@@ -46,7 +46,8 @@ import {
   LayoutGrid,
   ArrowRight,
   X,
-  Terminal
+  Terminal,
+  Filter // Resolved ReferenceError: Filter icon added
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstati
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useNotifications, type Notification } from '@/hooks/use-notifications';
+import { useNotifications, type Notification, clearAll } from '@/hooks/use-notifications'; // Resolved clearAll import
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -87,8 +88,6 @@ import { TactileMenu } from '@/components/TactileMenu';
 import { InboxSheet } from '@/components/inbox-sheet';
 import { SyncStatusDialog } from '@/components/SyncStatusDialog';
 import { SyncConfirmationDialog } from '@/components/sync-confirmation-dialog';
-import { useLongPress } from '@/hooks/use-long-press';
-import { addNotification } from '@/hooks/use-notifications';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -163,22 +162,18 @@ export default function SPAHub() {
     ];
 
     if (isAdmin) {
+      // Admins now have full access to all workstations as requested
       base.push(
         { label: 'Import Assets', icon: FileUp, onClick: () => setActiveView('IMPORT') },
         { label: 'User Directory', icon: UserIcon, onClick: () => setActiveView('USERS') },
-        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
-      );
-    }
-
-    if (isSuperAdmin) {
-      base.push(
-        { label: 'Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') },
+        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') },
+        { label: 'System Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') },
         { label: 'Database Explorer', icon: Terminal, onClick: () => setActiveView('DATABASE') }
       );
     }
 
     return base;
-  }, [isAdmin, isSuperAdmin, setActiveView]);
+  }, [isAdmin, setActiveView]);
 
   const handleManualUploadWithFeedback = async () => {
     if (!isOnline) {
@@ -320,9 +315,9 @@ export default function SPAHub() {
             title="Sync Protocol"
             options={[
               { label: 'Sync Workspace', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
-              { label: 'Download Pulse', icon: Download, onClick: handleManualDownloadWithFeedback, disabled: !isOnline },
-              { label: 'Upload Pulse', icon: Upload, onClick: handleManualUploadWithFeedback, disabled: !isOnline },
-              ...(isSuperAdmin ? [{ label: 'Force Reconcile', icon: RefreshCw, onClick: refreshRegistry }] : [])
+              { label: 'Download Update', icon: Download, onClick: handleManualDownloadWithFeedback, disabled: !isOnline },
+              { label: 'Upload Changes', icon: Upload, onClick: handleManualUploadWithFeedback, disabled: !isOnline },
+              ...(isAdmin ? [{ label: 'Force Reconcile', icon: RefreshCw, onClick: refreshRegistry }] : [])
             ]}
           >
             <div 
@@ -346,11 +341,11 @@ export default function SPAHub() {
           </TactileMenu>
 
           <TactileMenu
-            title="Alert Ledger"
+            title="Alert History"
             options={[
               { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
-              { label: 'Clear Pulse', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'Full Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+              { label: 'Clear Alert Ledger', icon: Trash2, onClick: clearAll, destructive: true }
             ]}
           >
             <button 
