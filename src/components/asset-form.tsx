@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Fully Template-Driven: Renders fields based on the Folder's Sheet Definition.
- * Phase 1210: Eliminated hardcoded fields to prevent "ghost" headers.
+ * Optimized for Mobile High-DPI Viewports and Keyboard Interaction.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -84,16 +83,12 @@ export default function AssetForm({
   const canUserEditFull = !!userProfile?.canEditAssets;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
-  // 1. Resolve Template for current folder
   const currentTemplate = useMemo(() => {
     const category = asset?.category || form.watch('category');
     if (!category || !appSettings) return null;
-    
-    // Find grant that contains this category
     const grant = appSettings.grants.find(g => 
       Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(category))
     );
-    
     if (!grant) return null;
     const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(category));
     return defKey ? grant.sheetDefinitions[defKey] : null;
@@ -116,7 +111,7 @@ export default function AssetForm({
           custodian: 'Unassigned',
           serialNumber: 'N/A',
           lastModified: new Date().toISOString(),
-          lastModifiedBy: userProfile?.displayName || 'System User',
+          lastModifiedBy: userProfile?.displayName || 'User',
           hierarchy: { document: 'Manual', section: 'General', subsection: 'Base Register', assetFamily: 'Uncategorized' },
           importMetadata: { sourceFile: 'MANUAL', sheetName: 'MANUAL', rowNumber: 0, importedAt: new Date().toISOString() },
           metadata: {},
@@ -136,11 +131,10 @@ export default function AssetForm({
             ...data,
             conditionGroup: nextGroup,
             lastModified: new Date().toISOString(),
-            lastModifiedBy: userProfile?.displayName || 'System User',
+            lastModifiedBy: userProfile?.displayName || 'User',
             updateCount: (asset?.updateCount || 0) + 1
         };
 
-        // Approval Logic
         if (!isAdmin && !canUserEditFull && asset) {
           const changes: Partial<Asset> = {};
           (Object.keys(data) as Array<keyof Asset>).forEach(key => {
@@ -161,7 +155,7 @@ export default function AssetForm({
               },
               lastModified: new Date().toISOString()
             };
-            addNotification({ title: "Update Submitted", description: "Your changes are awaiting administrative review.", variant: "default", assetId: asset.id });
+            addNotification({ title: "Update Submitted", description: "Changes awaiting administrative review.", variant: "default", assetId: asset.id });
           }
         }
 
@@ -186,17 +180,15 @@ export default function AssetForm({
       <div className="flex items-center gap-2 mb-1.5">
         <FormLabel className="text-[9px] font-black uppercase text-white/40 mb-0">{label}</FormLabel>
         {header?.guidance && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40 hover:opacity-100" /></div>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
-                <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
-                <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40" /></div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
+              <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
+              <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     );
@@ -206,16 +198,14 @@ export default function AssetForm({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1100px] w-full h-[100dvh] sm:h-[85vh] sm:w-[95vw] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 sm:rounded-[2.5rem] shadow-3xl">
         <div className="flex flex-col h-full overflow-hidden">
-          <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0 flex items-center justify-between">
+          <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
             <div className="space-y-1">
-              <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
-                {asset ? 'Record Update' : 'New Entry'}
+              <DialogTitle className="text-xl sm:text-2xl font-black uppercase text-white leading-none">
+                {asset ? 'Record Update' : 'New Asset Pulse'}
               </DialogTitle>
-              <div className="flex items-center gap-2 mt-1.5">
-                <DialogDescription className="text-[9px] sm:text-xs font-bold text-white/40 uppercase tracking-widest truncate">
-                  {asset ? `System ID: ${asset.id.split('-')[0]}` : 'Registry Pulse: Manual'}
-                </DialogDescription>
-              </div>
+              <DialogDescription className="text-[10px] font-bold text-white/40 uppercase tracking-widest truncate">
+                {asset ? `System ID: ${asset.id.split('-')[0]}` : 'Manual Register Entry'}
+              </DialogDescription>
             </div>
           </div>
 
@@ -224,8 +214,6 @@ export default function AssetForm({
               <div className="p-6 sm:p-8 space-y-10 sm:space-y-12 pb-32">
                 <Form {...form}>
                   <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 sm:space-y-12">
-                    
-                    {/* Dynamic Template Fields */}
                     <div className="space-y-6">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                         <Terminal className="h-3 w-3" /> Technical Attributes
@@ -249,7 +237,7 @@ export default function AssetForm({
                                         {...formField} 
                                         value={formField.value || ''}
                                         readOnly={isFieldDisabled(fieldName)} 
-                                        className="h-12 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase" 
+                                        className="h-12 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase shadow-inner" 
                                         placeholder={`Enter ${field.label}...`}
                                       />
                                     </FormControl>
@@ -267,8 +255,7 @@ export default function AssetForm({
                       </div>
                     </div>
 
-                    {/* Assessment Pulse Section */}
-                    <div className="p-6 sm:p-8 rounded-[1.5rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8">
+                    <div className="p-6 sm:p-8 rounded-[1.5rem] border-2 border-dashed border-primary/20 bg-primary/[0.02] space-y-8 shadow-inner">
                       <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                         <Activity className="h-3 w-3" /> Audit Assessment
                       </h4>
@@ -286,7 +273,7 @@ export default function AssetForm({
                         )}/>
                         <FormField control={form.control} name="status" render={({ field }) => (
                           <FormItem>
-                            <LabelWithInfo label="Registry Status" name="status" />
+                            <LabelWithInfo label="Verification Status" name="status" />
                             <Select onValueChange={field.onChange} value={field.value} disabled={isFieldDisabled('status')}>
                               <FormControl><SelectTrigger className="h-12 sm:h-14 bg-black border-2 border-white/10 rounded-xl font-black text-sm uppercase"><SelectValue /></SelectTrigger></FormControl>
                               <SelectContent className="bg-black border-white/10">
@@ -304,7 +291,7 @@ export default function AssetForm({
                               <Textarea 
                                 {...field} 
                                 readOnly={isFieldDisabled('remarks')}
-                                className="min-h-[100px] bg-white/[0.03] border-white/5 rounded-xl text-sm italic" 
+                                className="min-h-[100px] bg-white/[0.03] border-white/5 rounded-xl text-sm italic shadow-inner" 
                                 placeholder="Record site observations..."
                               />
                             </FormControl>
@@ -324,11 +311,11 @@ export default function AssetForm({
             </ScrollArea>
           </div>
 
-          <div className="p-6 sm:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe">
+          <div className="p-6 sm:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe shadow-3xl">
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 font-black uppercase text-[9px] text-white/40 hover:text-white px-10">Discard</Button>
             <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-              {isAdmin || canUserEditFull ? 'Save Record' : 'Submit for Review'}
+              {isAdmin || canUserEditFull ? 'Save Profile' : 'Submit Update'}
             </Button>
           </div>
         </div>

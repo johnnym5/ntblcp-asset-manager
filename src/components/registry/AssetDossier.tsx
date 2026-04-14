@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Profile - Detailed Technical View.
- * Phase 1914: Simplified terminology (Profile, Setup, Changes).
- * Phase 1925: Integrated 'Setup Mode' with Remove/Hide controls.
+ * Optimized for Mobile Responsiveness & Stacked Layout Pulse.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -74,25 +73,14 @@ const DetailField = ({
     )}>
       {isEditing && header && (
         <div className="flex items-center justify-between mb-2 animate-in slide-in-from-top-1 duration-300">
-          <TooltipProvider>
-            <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md p-1 px-2 rounded-lg border border-primary/20 shadow-sm">
-              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">List View</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.quickView} onCheckedChange={() => onToggleFlag?.('quickView')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Checkbox checked={header.inChecklist} onCheckedChange={() => onToggleFlag?.('inChecklist')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Checklist</TooltipContent></Tooltip>
-            </div>
-          </TooltipProvider>
+          <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md p-1 px-2 rounded-lg border border-primary/20 shadow-sm">
+            <Tooltip><TooltipTrigger asChild><Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-4 w-4" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">List View</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Checkbox checked={header.quickView} onCheckedChange={() => onToggleFlag?.('quickView')} className="h-4 w-4" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Card View</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Checkbox checked={header.inChecklist} onCheckedChange={() => onToggleFlag?.('inChecklist')} className="h-4 w-4" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Checklist</TooltipContent></Tooltip>
+          </div>
           
           {!header.locked && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => onToggleFlag?.('quickView')}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Hide from Card</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => onToggleFlag?.('quickView')}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Hide from Card</TooltipContent></Tooltip>
           )}
         </div>
       )}
@@ -169,16 +157,16 @@ export function AssetDossier({
       "flex flex-col lg:flex-row min-h-0 bg-muted/5 rounded-[2rem] border border-border/40 overflow-hidden", 
       className
     )}>
-      {/* Sidebar - Quick Info */}
-      <div className="w-full lg:w-[320px] bg-card/30 flex flex-col shrink-0 border-r border-border/40 p-6 space-y-10">
+      {/* Sidebar - Quick Info & Visuals */}
+      <div className="w-full lg:w-[320px] bg-card/30 flex flex-col shrink-0 border-b lg:border-b-0 lg:border-r border-border/40 p-6 space-y-10">
         
         {/* Physical Identity */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl"><Tag className="h-5 w-5 text-primary" /></div>
-            <div className="space-y-0.5">
-              <h3 className="text-xl font-black uppercase text-foreground tracking-tight leading-none truncate w-[200px]">{String(record.rawRow.description || 'Untitled')}</h3>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">ID: {record.rawRow.assetIdCode || 'UNSET'}</p>
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <h3 className="text-xl font-black uppercase text-foreground tracking-tight leading-none truncate">{String(record.rawRow.description || 'Untitled')}</h3>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest truncate">ID: {record.rawRow.assetIdCode || 'UNSET'}</p>
             </div>
           </div>
           
@@ -263,14 +251,14 @@ export function AssetDossier({
             onClick={() => onEdit(record.id)} 
             className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest bg-primary text-black gap-2 transition-transform active:scale-95"
           >
-            <Edit3 className="h-4 w-4" /> Full Edit
+            <Edit3 className="h-4 w-4" /> Full Profile Edit
           </Button>
         )}
       </div>
 
       {/* Main Data Section */}
       <div className="flex-1 flex flex-col bg-background min-h-0 overflow-hidden relative">
-        <div className="p-8 border-b border-border/40 flex items-center justify-between">
+        <div className="p-6 sm:p-8 border-b border-border/40 flex items-center justify-between">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[8px] h-5 px-2 rounded-full">
@@ -283,7 +271,7 @@ export function AssetDossier({
             <p className="text-xl font-black uppercase text-foreground leading-none">Asset Profile</p>
           </div>
           <Badge variant="outline" className="h-7 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px]">
-            {syncStatus === 'synced' ? 'Saved to Cloud' : 'Local Change'}
+            {syncStatus === 'synced' ? 'SAVED' : 'LOCAL'}
           </Badge>
         </div>
 
@@ -309,21 +297,21 @@ export function AssetDossier({
           <div className="p-8 border-t border-border/40 space-y-6">
             <div className="flex items-center gap-3 text-muted-foreground/40">
               <Database className="h-4 w-4" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Technical History</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">Registry Metadata</h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4">
-                <div className="flex items-center gap-2 opacity-40"><History className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Source</span></div>
+              <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4 shadow-inner">
+                <div className="flex items-center gap-2 opacity-40"><History className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Source Trace</span></div>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Original Sheet</span><span className="text-foreground">{record.sourceSheet || 'Manual Entry'}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Original Sheet</span><span className="text-foreground">{record.sourceSheet || 'Manual'}</span></div>
                   <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Excel Row</span><span className="text-primary font-bold">#{record.sourceRow || 'N/A'}</span></div>
                 </div>
               </div>
-              <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4">
-                <div className="flex items-center gap-2 opacity-40"><Clock className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Last Update</span></div>
+              <div className="p-5 rounded-2xl bg-muted/5 border-2 border-dashed border-border/40 space-y-4 shadow-inner">
+                <div className="flex items-center gap-2 opacity-40"><Clock className="h-3 w-3" /><span className="text-[8px] font-black uppercase tracking-widest">Audit Pulse</span></div>
                 <div className="space-y-3">
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Time</span><span className="text-foreground">{new Date(record.rawRow.lastModified as string).toLocaleString()}</span></div>
-                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Updated By</span><span className="text-foreground truncate max-w-[100px]">{String(record.rawRow.lastModifiedBy || 'System')}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Updated At</span><span className="text-foreground">{new Date(record.rawRow.lastModified as string).toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-muted-foreground">Officer</span><span className="text-foreground truncate max-w-[100px]">{String(record.rawRow.lastModifiedBy || 'System')}</span></div>
                 </div>
               </div>
             </div>

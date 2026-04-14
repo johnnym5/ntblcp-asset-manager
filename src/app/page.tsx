@@ -70,7 +70,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { HelpCenter } from '@/components/HelpCenter';
@@ -175,7 +175,6 @@ export default function HomeHub() {
   const modeClass = appSettings?.appMode === 'verification' ? 'mode-verification' : '';
 
   const handleDownloadPulse = () => {
-    // PASS USER STATES FOR SCOPED FETCH
     manualDownload(userProfile?.states || []);
   };
 
@@ -272,26 +271,24 @@ export default function HomeHub() {
 
         <div className="flex items-center gap-2 sm:gap-5">
           {isAdmin && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setIsInboxOpen(true)} 
-                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
-                  >
-                    <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                    {pendingApprovalsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
-                        {pendingApprovalsCount}
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsInboxOpen(true)} 
+                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                >
+                  <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                  {pendingApprovalsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                      {pendingApprovalsCount}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
+            </Tooltip>
           )}
 
           <TactileMenu
@@ -316,8 +313,8 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
-                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip></TooltipProvider>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip>
                 </>
               )}
             </div>
@@ -360,12 +357,12 @@ export default function HomeHub() {
         </div>
       </header>
 
-      <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background">
+      <div className="flex-1 relative flex flex-col p-2 sm:p-4 overflow-hidden bg-background pb-safe">
         <div className="flex-1 flex flex-col border border-border rounded-[2.5rem] bg-card/30 overflow-hidden relative shadow-inner">
           <ErrorBoundary module={activeView}>
             <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
-                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full pb-safe">
+                <div className="flex-1 p-4 sm:p-8 max-w-[1800px] mx-auto w-full">
                   <AnimatePresence mode="wait">
                     <motion.div 
                       key={activeView} 

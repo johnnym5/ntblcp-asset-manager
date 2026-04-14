@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Asset Center - Primary Management Workspace.
- * Phase 1914: Updated with simple terminology (List, Folders, Setup).
- * Phase 1930: Swapped Folder Import for direct Add Asset pulse.
+ * Optimized for High-Density Grid Pulse & Mobile Responsiveness.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -248,26 +247,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return results;
   }, [filteredAssets, sortKey, sortDir, selectedCategories, activeFolderHeaders]);
 
-  const optionsMap = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    activeFolderHeaders.forEach(header => {
-      const values = new Set<string>();
-      assets.filter(a => activeGrantIds.includes(a.grantId)).forEach(asset => {
-        let val = "";
-        switch(header.normalizedName) {
-          case "location": val = asset.location; break;
-          case "condition": val = asset.condition; break;
-          case "status": val = asset.status; break;
-          case "category": val = asset.category; break;
-          default: val = String((asset.metadata as any)?.[header.rawName] || "");
-        }
-        if (val && val !== "---") values.add(val);
-      });
-      map[header.id] = Array.from(values).sort();
-    });
-    return map;
-  }, [activeFolderHeaders, assets, activeGrantIds]);
-
   const totalPages = useMemo(() => itemsPerPage === 'all' ? 1 : Math.ceil(processedAssets.length / (itemsPerPage as number)), [processedAssets.length, itemsPerPage]);
   const paginatedAssets = useMemo(() => itemsPerPage === 'all' ? processedAssets : processedAssets.slice((currentPage - 1) * (itemsPerPage as number), currentPage * (itemsPerPage as number)), [processedAssets, currentPage, itemsPerPage]);
 
@@ -456,7 +435,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const totalCoverage = useMemo(() => filteredAssets.length > 0 ? Math.round((totalVerified / filteredAssets.length) * 100) : 0, [totalVerified, filteredAssets]);
 
   return (
-    <div className="space-y-4 h-full flex flex-col relative pb-safe">
+    <div className="space-y-4 h-full flex flex-col relative">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start min-w-0">
@@ -470,7 +449,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   onClick={goBack}
                   className="h-10 w-10 flex items-center justify-center bg-muted/50 hover:bg-muted border border-border rounded-xl transition-all shadow-sm shrink-0"
                 >
-                  <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+                  <ArrowLeft className="h-5 w-5" />
                 </motion.button>
               ) : (
                 <div key="logo-icon" className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5 shrink-0">
@@ -488,7 +467,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
               {showList && isAdmin && (
                 <div className="flex gap-2 shrink-0">
@@ -556,7 +535,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0 hidden sm:flex">
+              <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border shadow-inner shrink-0 hidden lg:flex">
                 <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('grid')} className="h-8 w-8 rounded-lg transition-all"><LayoutGrid className="h-4 w-4" /></Button>
                 <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="icon" onClick={() => setViewMode('list')} className="h-8 w-8 rounded-lg transition-all"><Columns className="h-4 w-4" /></Button>
               </div>
@@ -583,37 +562,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExpandedAssetId(null)} className="fixed inset-0 z-40 bg-background/60 backdrop-blur-md" />
           )}
         </AnimatePresence>
-
-        {isVerificationMode && !showList && (
-          <div className="px-1 mb-6">
-            <Card className="rounded-3xl border-2 border-primary/20 bg-primary/[0.02] p-6 shadow-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                <TrendingUp className="h-32 w-32 text-primary" />
-              </div>
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-                <div className="flex items-center gap-5">
-                  <div className="p-4 bg-primary rounded-2xl shadow-xl shadow-primary/20">
-                    <ShieldCheck className="h-8 w-8 text-black" />
-                  </div>
-                  <div className="space-y-1 text-center md:text-left">
-                    <h3 className="text-2xl font-black uppercase text-foreground tracking-tight leading-none">Audit Progress</h3>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{totalVerified} of {filteredAssets.length} Verified Records</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-8 min-w-[200px] w-full md:w-auto">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase"><span className="text-primary">{totalCoverage}%</span></div>
-                    <Progress value={totalCoverage} className="h-2 bg-primary/10" />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-3xl font-black text-foreground tracking-tighter">{totalCoverage}%</span>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest opacity-40 whitespace-nowrap">Total Hub</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
 
         <ScrollArea className={cn("flex-1 px-1 h-full transition-all duration-500", expandedAssetId && "blur-sm grayscale-[0.2] pointer-events-none")}>
           {!showList ? (
@@ -681,7 +629,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
           ) : (
             <div className="flex flex-col h-full">
-              <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 pb-10" : ""}>
+              <div className={viewMode === 'grid' || isMobile ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 pb-10" : ""}>
                 <AnimatePresence mode="popLayout">
                   {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -736,7 +684,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         variant="outline"
                         className="h-10 px-4 rounded-xl border-primary/20 text-primary font-black uppercase text-[10px] gap-2"
                       >
-                        <PlusCircle className="h-3.5 w-3.5" /> Add Field
+                        <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Field</span>
                       </Button>
                       <Button 
                         onClick={handleSaveGlobalHeaders}
@@ -780,16 +728,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       <AnimatePresence>
         {isSelectionBarVisible && (
-          <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-full sm:w-auto max-w-[calc(100vw-2rem)] bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
+          <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-[calc(100vw-1rem)] sm:w-auto bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0">
               <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div>
-              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Records Selected</span>
+              <span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Records</span>
             </div>
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-1">
                 {showList && selectedAssetIds.size === 1 ? (
                   (canEdit || isVerificationMode) && (
-                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit Profile</Button>
+                    <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>
                   )
                 ) : (
                   canEdit && (
