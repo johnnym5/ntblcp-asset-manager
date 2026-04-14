@@ -4,6 +4,7 @@
  * @file Overview Asset Hub - Primary Record Workspace.
  * Optimized for High-Density Grid Pulse & Dual-Mode Setup Interface.
  * Phase 1520: Separated Card Setup Mode from Profile Setup Mode.
+ * Phase 1525: Resolved optionsMap ReferenceError by implementing deterministic value discovery.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -126,7 +127,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHeaderEditingMode, setIsHeaderEditingMode] = useState(false);
-  const [isQuickViewSetupActive, setIsQuickViewSetupActive] = useState(false); // NEW: Card Setup Toggle
+  const [isQuickViewSetupActive, setIsQuickViewSetupActive] = useState(false); 
   const [selectedAssetIdForEdit, setSelectedAssetIdForEdit] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -181,11 +182,57 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           sortEnabled: true,
           dataType: 'text' as const,
           orderIndex: i
-        }));
+        })) as RegistryHeader[];
       }
     }
     return workstationHeaders;
   }, [selectedCategories, mergedSheetDefinitions, workstationHeaders]);
+
+  /**
+   * Deterministic Options Discovery Logic.
+   * Scans available assets to populate filter options keyed by header ID.
+   */
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    activeFolderHeaders.forEach(header => {
+      const values = new Set<string>();
+      const norm = header.normalizedName.toLowerCase().replace(/_/g, '');
+      
+      assets.forEach(asset => {
+        let val: any = undefined;
+        
+        // Resolve from core or metadata using same priority as record transformation
+        switch(norm) {
+          case "sn": val = asset.sn; break;
+          case "location": val = asset.location; break;
+          case "state": val = asset.location; break;
+          case "custodian": val = asset.custodian; break;
+          case "assignee": val = asset.custodian; break;
+          case "description": val = asset.description; break;
+          case "assetidcode": val = asset.assetIdCode; break;
+          case "serialnumber": val = asset.serialNumber; break;
+          case "chassisno": val = asset.chassisNo; break;
+          case "engineno": val = asset.engineNo; break;
+          case "lga": val = asset.lga; break;
+          case "category": val = asset.category; break;
+          case "assetclass": val = asset.category; break;
+          case "condition": val = asset.condition; break;
+          case "manufacturer": val = asset.manufacturer; break;
+          case "modelnumber": val = asset.modelNumber; break;
+          case "status": val = asset.status; break;
+          default:
+            val = (asset.metadata as any)?.[header.rawName] || (asset.metadata as any)?.[header.displayName];
+        }
+
+        const strVal = String(val || "").trim();
+        if (strVal && strVal.toLowerCase() !== "n/a" && strVal !== "---") {
+          values.add(strVal);
+        }
+      });
+      map[header.id] = Array.from(values).sort();
+    });
+    return map;
+  }, [assets, activeFolderHeaders]);
 
   const groupStats = useMemo(() => {
     const stats: Record<string, { total: number, verified: number }> = {};
