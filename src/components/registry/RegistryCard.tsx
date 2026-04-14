@@ -3,11 +3,30 @@
  * Phase 1500: Reformatted to support 7 headers with prioritized S/N and ID.
  * Phase 1501: Added inline editing for Name, Location, and LGA with explicit save buttons.
  * Phase 1505: Upgraded to use record-specific headers for accurate setup reflection.
+ * Phase 1510: Integrated In-Place Header Setup Mode for Quick View management.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck, Save, Trash2, Tag, MapPin, Building, Columns } from 'lucide-react';
+import { 
+  Check, 
+  Globe, 
+  CloudOff, 
+  Maximize2, 
+  CheckCircle2, 
+  XCircle, 
+  Edit3, 
+  FolderOpen, 
+  ShieldCheck, 
+  Save, 
+  Trash2, 
+  Tag, 
+  MapPin, 
+  Building, 
+  Columns,
+  PlusCircle,
+  X
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
@@ -19,6 +38,14 @@ import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { TactileMenu } from '@/components/TactileMenu';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -29,6 +56,7 @@ interface RegistryCardProps {
   onManageLabels?: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
   densityMode?: 'compact' | 'comfortable' | 'expanded';
+  isSetupMode?: boolean; // NEW: Controls in-place header editing
 }
 
 const InlineField = ({ 
@@ -90,9 +118,10 @@ export function RegistryCard({
   onToggleExpand,
   onManageLabels,
   onQuickUpdate,
-  densityMode = 'comfortable'
+  densityMode = 'comfortable',
+  isSetupMode = false
 }: RegistryCardProps) {
-  const { appSettings } = useAppState();
+  const { appSettings, setHeaders, headers: allHeaders } = useAppState();
   const { userProfile } = useAuth();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
@@ -119,12 +148,19 @@ export function RegistryCard({
     const others = folderHeaders.filter(h => {
       if (!h.quickView) return false;
       const n = h.normalizedName.toLowerCase().replace(/_/g, '');
-      // Description and ID are handled specially in the card header/core
       if (n === 'sn' || n === 'assetidcode' || n === 'description' || n === 'assetdescription') return false;
       return true;
     });
     
     return [...core, ...others].slice(0, 7);
+  }, [record.headers]);
+
+  const availableHeaders = useMemo(() => {
+    return (record.headers || []).filter(h => {
+      const n = h.normalizedName.toLowerCase().replace(/_/g, '');
+      const isEssential = ['sn', 'assetidcode', 'description', 'location', 'lga'].includes(n);
+      return !h.quickView && !isEssential;
+    });
   }, [record.headers]);
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
@@ -135,6 +171,10 @@ export function RegistryCard({
 
   const handleSaveRemark = () => {
     onQuickUpdate?.(record.id, { remarks: localRemark });
+  };
+
+  const handleToggleQuickView = (headerId: string, state: boolean) => {
+    setHeaders(prev => prev.map(h => h.id === headerId ? { ...h, quickView: state } : h));
   };
 
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
@@ -153,13 +193,19 @@ export function RegistryCard({
     >
       <Card 
         className={cn(
-          "bg-card border border-border/60 rounded-xl overflow-hidden transition-all relative group h-full flex flex-col shadow-xl",
-          selected ? "ring-1 ring-primary border-primary/40 shadow-2xl" : "hover:border-primary/20",
+          "bg-card border-2 rounded-xl overflow-hidden transition-all relative group h-full flex flex-col shadow-xl",
+          selected ? "ring-1 ring-primary border-primary/40 shadow-2xl" : "border-border/60 hover:border-primary/20",
+          isSetupMode && "border-primary/40 border-dashed animate-in zoom-in-95 duration-300"
         )}
       >
         <CardContent className="p-0 flex flex-col flex-1">
           {/* Header Pulse */}
-          <div className="p-4 flex flex-col gap-3 border-b border-border/40 bg-muted/10">
+          <div className="p-4 flex flex-col gap-3 border-b border-border/40 bg-muted/10 relative">
+            {isSetupMode && (
+              <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                <Badge className="bg-primary text-black font-black uppercase text-[8px] tracking-widest">Fixed Identity</Badge>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div 
                 onClick={(e) => { e.stopPropagation(); onToggleSelect?.(record.id); }}
@@ -203,7 +249,12 @@ export function RegistryCard({
           </div>
 
           {/* Core Location Pulse */}
-          <div className="p-4 grid grid-cols-2 gap-4 bg-background">
+          <div className="p-4 grid grid-cols-2 gap-4 bg-background relative">
+            {isSetupMode && (
+              <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                <Badge className="bg-primary text-black font-black uppercase text-[8px] tracking-widest">Fixed Regional</Badge>
+              </div>
+            )}
             <InlineField 
               label="Location" 
               value={String(record.rawRow.location || 'Global')} 
@@ -226,21 +277,61 @@ export function RegistryCard({
               .filter(h => !['description', 'location', 'lga'].includes(h.normalizedName.toLowerCase().replace(/_/g, '')))
               .map((header) => {
                 const field = record.fields.find(f => f.headerId === header.id);
+                const isIdentity = header.normalizedName.toLowerCase().replace(/_/g, '') === 'sn' || header.normalizedName.toLowerCase().replace(/_/g, '') === 'assetidcode';
+                
                 return (
-                  <div key={header.id} className="px-4 py-2 flex items-center justify-between gap-4 group/field">
+                  <div key={header.id} className="px-4 py-2 flex items-center justify-between gap-4 group/field relative">
                     <span className="text-[7px] font-black uppercase text-muted-foreground opacity-40 shrink-0 group-hover/field:text-primary transition-colors">
                       {header.displayName}
                     </span>
-                    <p className="text-[9px] font-bold uppercase text-foreground/80 truncate text-right">
-                      {field?.displayValue || '---'}
-                    </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <p className="text-[9px] font-bold uppercase text-foreground/80 truncate text-right">
+                        {field?.displayValue || '---'}
+                      </p>
+                      {isSetupMode && !isIdentity && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleToggleQuickView(header.id, false); }}
+                          className="p-1 rounded bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all shadow-sm"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
+
+            {/* In-Place Add Pulse */}
+            {isSetupMode && activeHeaders.length < 7 && availableHeaders.length > 0 && (
+              <div className="p-3 flex justify-center bg-primary/[0.03]">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 px-4 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 text-primary border border-primary/20 hover:bg-primary/10">
+                      <PlusCircle className="h-3 w-3" /> Add technical Field
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56 bg-card border-border shadow-3xl">
+                    <DropdownMenuLabel className="text-[8px] font-black uppercase text-muted-foreground opacity-40">Select Pulse</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <ScrollArea className="h-48">
+                      {availableHeaders.map(h => (
+                        <DropdownMenuItem 
+                          key={h.id} 
+                          onClick={() => handleToggleQuickView(h.id, true)}
+                          className="text-[10px] font-black uppercase py-2 cursor-pointer focus:bg-primary/10 focus:text-primary"
+                        >
+                          {h.displayName}
+                        </DropdownMenuItem>
+                      ))}
+                    </ScrollArea>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
 
           {/* Verification Hub */}
-          {isVerificationMode && (
+          {isVerificationMode && !isSetupMode && (
             <div className="p-4 bg-muted/20 border-t border-border/20 space-y-3">
               <div className="flex items-center gap-2">
                 <Button 

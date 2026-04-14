@@ -3,9 +3,10 @@
 /**
  * @fileOverview Asset Profile - Detailed Technical View.
  * Optimized for Mobile Responsiveness & Stacked Layout Pulse.
+ * Phase 1515: Isolated Full Profile Setup mode from Quick View card editing.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -27,7 +28,11 @@ import {
   XCircle,
   Database,
   Save,
-  Trash2
+  Trash2,
+  Wrench,
+  X,
+  PlusCircle,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -35,12 +40,21 @@ import { AssetChecklist } from '@/components/asset-checklist';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const DetailField = ({ 
   headerId, 
@@ -80,7 +94,7 @@ const DetailField = ({
           </div>
           
           {!header.locked && (
-            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => onToggleFlag?.('quickView')}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Hide from Card</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => onToggleFlag?.('table')}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Hide Column</TooltipContent></Tooltip>
           )}
         </div>
       )}
@@ -117,7 +131,7 @@ export function AssetDossier({
   onEdit, 
   onQuickUpdate,
   className,
-  isHeaderEditingMode 
+  isHeaderEditingMode: externalHeaderSetup 
 }: { 
   record: AssetRecord, 
   onEdit?: (id: string) => void, 
@@ -126,8 +140,12 @@ export function AssetDossier({
   isHeaderEditingMode?: boolean
 }) {
   const { headers, setHeaders, appSettings } = useAppState();
+  const { userProfile } = useAuth();
   const [remarkValue, setRemarkValue] = useState(String(record.rawRow.remarks || ''));
-  const hasUnsavedRemark = remarkValue !== (record.rawRow.remarks || '');
+  const [internalSetupMode, setInternalSetupMode] = useState(false);
+  
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isSetupActive = internalSetupMode || externalHeaderSetup;
 
   useEffect(() => {
     setRemarkValue(String(record.rawRow.remarks || ''));
@@ -151,6 +169,10 @@ export function AssetDossier({
   const handleSaveRemark = () => {
     onQuickUpdate?.(record.id, { remarks: remarkValue });
   };
+
+  const hiddenFields = useMemo(() => {
+    return headers.filter(h => !h.table && !h.quickView && !h.locked);
+  }, [headers]);
 
   return (
     <div className={cn(
@@ -270,9 +292,25 @@ export function AssetDossier({
             </div>
             <p className="text-xl font-black uppercase text-foreground leading-none">Asset Profile</p>
           </div>
-          <Badge variant="outline" className="h-7 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px]">
-            {syncStatus === 'synced' ? 'SAVED' : 'LOCAL'}
-          </Badge>
+          
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setInternalSetupMode(!internalSetupMode)}
+                className={cn(
+                  "h-9 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest border-2 gap-2 transition-all",
+                  isSetupActive ? "bg-primary text-black border-primary" : "bg-muted/50 border-border/40"
+                )}
+              >
+                <Wrench className="h-3.5 w-3.5" /> {isSetupActive ? 'Exit Setup' : 'Manage Profile Labels'}
+              </Button>
+            )}
+            <Badge variant="outline" className="h-7 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px]">
+              {syncStatus === 'synced' ? 'SAVED' : 'LOCAL'}
+            </Badge>
+          </div>
         </div>
 
         <ScrollArea className="flex-1">
@@ -286,13 +324,53 @@ export function AssetDossier({
                   headerId={header.id}
                   label={header.displayName} 
                   value={field.displayValue} 
-                  isEditing={isHeaderEditingMode}
+                  isEditing={isSetupActive}
                   onToggleFlag={(flag) => handleToggleHeaderFlag(header.id, flag)}
                   onRename={(newName) => handleRenameHeader(header.id, newName)}
                 />
               );
             })}
           </div>
+
+          <AnimatePresence>
+            {isSetupActive && hiddenFields.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, y: 10 }}
+                className="p-8 border-t border-primary/10 bg-primary/[0.02] flex flex-col items-center gap-4"
+              >
+                <div className="flex items-center gap-3 text-primary">
+                  <PlusCircle className="h-5 w-5" />
+                  <h4 className="text-[11px] font-black uppercase tracking-widest">Restore Hidden Technical Parameter</h4>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="h-11 rounded-xl border-primary/40 bg-background text-primary font-black uppercase text-[10px]">
+                        Select field to reactivate
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64 bg-card border-border shadow-3xl">
+                      <DropdownMenuLabel className="text-[8px] font-black uppercase opacity-40">Available Parameters</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <ScrollArea className="h-48">
+                        {hiddenFields.map(h => (
+                          <DropdownMenuItem 
+                            key={h.id} 
+                            onClick={() => handleToggleHeaderFlag(h.id, 'table')}
+                            className="text-[10px] font-black uppercase py-2.5 cursor-pointer focus:bg-primary/10 focus:text-primary"
+                          >
+                            {h.displayName}
+                          </DropdownMenuItem>
+                        ))}
+                      </ScrollArea>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="p-8 border-t border-border/40 space-y-6">
             <div className="flex items-center gap-3 text-muted-foreground/40">

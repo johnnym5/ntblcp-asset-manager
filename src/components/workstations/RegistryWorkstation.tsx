@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * @fileOverview Asset Center - Primary Management Workspace.
- * Optimized for High-Density Grid Pulse & Mobile Responsiveness.
+ * @file Overview Asset Hub - Primary Record Workspace.
+ * Optimized for High-Density Grid Pulse & Dual-Mode Setup Interface.
+ * Phase 1520: Separated Card Setup Mode from Profile Setup Mode.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -125,6 +126,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHeaderEditingMode, setIsHeaderEditingMode] = useState(false);
+  const [isQuickViewSetupActive, setIsQuickViewSetupActive] = useState(false); // NEW: Card Setup Toggle
   const [selectedAssetIdForEdit, setSelectedAssetIdForEdit] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,13 +144,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
   
-  const [projectToDelete, setProjectToDelete] = useState<any>(null);
-  const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
-
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin || userProfile?.isAdmin;
   const canEdit = isAdmin || !!userProfile?.canEditAssets;
@@ -304,14 +301,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!isAdmin || !appSettings) return;
     setIsProcessing(true);
     try {
-      const updatedSettings = { ...appSettings, globalHeaders: activeFolderHeaders };
+      const updatedSettings = { ...appSettings, globalHeaders: workstationHeaders };
       if (isOnline) await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
       setIsHeaderEditingMode(false);
-      addNotification({ title: "Folder Setup Updated", variant: "success" });
+      setIsQuickViewSetupActive(false);
+      addNotification({ title: "Arrangement Saved", variant: "success" });
     } catch (e) {
-      addNotification({ title: "Update Failed", variant: "destructive" });
+      addNotification({ title: "Save Failed", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -332,7 +330,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedAssetIds(new Set());
       setIsAssetDeleteOpen(false);
-      addNotification({ title: "Records Removed", description: `${idsToDelete.length} records deleted.`, variant: "success" });
+      addNotification({ title: "Records Removed", variant: "success" });
     } catch (e) {
       addNotification({ title: "Removal Failed", variant: "destructive" });
     } finally {
@@ -358,7 +356,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedCategories([]);
       setIsPurgeDialogOpen(false);
-      addNotification({ title: "Folders Cleared", description: `${foldersToPurge.length} folders emptied.`, variant: "success" });
+      addNotification({ title: "Folders Cleared", variant: "success" });
     } catch (e) {
       addNotification({ title: "Clear Failed", variant: "destructive" });
     } finally {
@@ -431,9 +429,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const isSelectionBarVisible = (showList && selectedAssetIds.size > 0) || (!showList && selectedCategories.length > 0);
 
-  const totalVerified = useMemo(() => filteredAssets.filter(a => a.status === 'VERIFIED').length, [filteredAssets]);
-  const totalCoverage = useMemo(() => filteredAssets.length > 0 ? Math.round((totalVerified / filteredAssets.length) * 100) : 0, [totalVerified, filteredAssets]);
-
   return (
     <div className="space-y-4 h-full flex flex-col relative">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
@@ -469,6 +464,18 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              
+              {isQuickViewSetupActive && (
+                <Button 
+                  onClick={handleSaveGlobalHeaders}
+                  disabled={isProcessing}
+                  className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl animate-in fade-in zoom-in-95"
+                >
+                  {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Commit Arrangement
+                </Button>
+              )}
+
               {showList && isAdmin && (
                 <div className="flex gap-2 shrink-0">
                   <Button 
@@ -482,21 +489,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   >
                     <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Asset</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      const cat = selectedCategories[0];
-                      if (cat && mergedSheetDefinitions[cat]) {
-                        setSelectedSheetDef(mergedSheetDefinitions[cat]);
-                        setOriginalSheetName(cat);
-                        setIsColumnSheetOpen(true);
-                      }
-                    }}
-                    className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm"
-                  >
-                    <Wrench className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Folder Setup</span>
-                  </Button>
+                  
+                  {viewMode === 'grid' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setIsQuickViewSetupActive(!isQuickViewSetupActive)}
+                      className={cn(
+                        "h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm transition-all",
+                        isQuickViewSetupActive ? "bg-primary text-black border-primary" : "bg-muted/50 border-border/40"
+                      )}
+                    >
+                      <Wrench className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{isQuickViewSetupActive ? 'Exit Setup' : 'Setup Card Layout'}</span>
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -641,6 +647,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         onToggleExpand={() => handleToggleExpand(asset.id)}
                         onManageLabels={handleManageLabels}
                         onQuickUpdate={handleQuickUpdate}
+                        isSetupMode={isQuickViewSetupActive}
                       />
                     </motion.div>
                   )) : (
@@ -671,39 +678,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
                 <div className="flex items-center gap-3">
                   {isHeaderEditingMode && isAdmin && (
-                    <>
-                      <Button 
-                        onClick={() => {
-                          const cat = selectedCategories[0];
-                          if (cat && mergedSheetDefinitions[cat]) {
-                            setSelectedSheetDef(mergedSheetDefinitions[cat]);
-                            setOriginalSheetName(cat);
-                            setIsColumnSheetOpen(true);
-                          }
-                        }}
-                        variant="outline"
-                        className="h-10 px-4 rounded-xl border-primary/20 text-primary font-black uppercase text-[10px] gap-2"
-                      >
-                        <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Field</span>
-                      </Button>
-                      <Button 
-                        onClick={handleSaveGlobalHeaders}
-                        disabled={isProcessing}
-                        className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
-                      >
-                        {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                        Save Labels
-                      </Button>
-                    </>
-                  )}
-                  {isAdmin && (
                     <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setIsHeaderEditingMode(!isHeaderEditingMode)}
-                      className={cn("h-10 w-10 rounded-xl transition-all shadow-sm", isHeaderEditingMode ? "bg-primary text-black" : "bg-muted hover:bg-primary/10 hover:text-primary")}
+                      onClick={handleSaveGlobalHeaders}
+                      disabled={isProcessing}
+                      className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
                     >
-                      <Columns className="h-5 w-5" />
+                      {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      Save Arrangement
                     </Button>
                   )}
                   <button onClick={() => setExpandedAssetId(null)} className="h-10 w-10 flex items-center justify-center bg-muted/50 rounded-xl hover:bg-destructive/10 transition-colors shadow-sm"><X className="h-5 w-5" /></button>
