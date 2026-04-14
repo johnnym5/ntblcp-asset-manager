@@ -3,6 +3,7 @@
 /**
  * @fileOverview UserEditForm - Personnel Identity Configuration.
  * Terminology: Passcode.
+ * Phase 1800: Integrated Granular Access Control Hub (Permissions).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -38,14 +39,81 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import type { AuthorizedUser } from '@/types/domain';
+import type { AuthorizedUser, UserPermissions } from '@/types/domain';
 import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail, PlusCircle, FileEdit, KeyRound } from 'lucide-react';
+import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail, PlusCircle, FileEdit, KeyRound, Lock, ShieldAlert, LayoutGrid, Activity, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+
+const defaultPermissions: UserPermissions = {
+  page_dashboard: true,
+  page_registry: true,
+  page_groups: true,
+  page_reports: true,
+  page_alerts: true,
+  page_audit_log: true,
+  page_sync_queue: true,
+  page_users: false,
+  page_infrastructure: false,
+  page_database: false,
+  page_settings: true,
+  func_add_asset: true,
+  func_edit_asset: true,
+  func_delete_asset: false,
+  func_import: false,
+  func_batch_edit: false,
+  func_edit_headers: false,
+  func_revert: false,
+  func_approve: false,
+};
+
+const adminPermissions: UserPermissions = {
+  page_dashboard: true,
+  page_registry: true,
+  page_groups: true,
+  page_reports: true,
+  page_alerts: true,
+  page_audit_log: true,
+  page_sync_queue: true,
+  page_users: true,
+  page_infrastructure: false,
+  page_database: false,
+  page_settings: true,
+  func_add_asset: true,
+  func_edit_asset: true,
+  func_delete_asset: true,
+  func_import: true,
+  func_batch_edit: true,
+  func_edit_headers: true,
+  func_revert: true,
+  func_approve: true,
+};
+
+const superAdminPermissions: UserPermissions = {
+  page_dashboard: true,
+  page_registry: true,
+  page_groups: true,
+  page_reports: true,
+  page_alerts: true,
+  page_audit_log: true,
+  page_sync_queue: true,
+  page_users: true,
+  page_infrastructure: true,
+  page_database: true,
+  page_settings: true,
+  func_add_asset: true,
+  func_edit_asset: true,
+  func_delete_asset: true,
+  func_import: true,
+  func_batch_edit: true,
+  func_edit_headers: true,
+  func_revert: true,
+  func_approve: true,
+};
 
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name required.'),
@@ -61,6 +129,7 @@ const userFormSchema = z.object({
   canAddAssets: z.boolean(),
   canEditAssets: z.boolean(),
   role: z.enum(['ADMIN', 'MANAGER', 'VERIFIER', 'VIEWER', 'SUPERADMIN']).default('VERIFIER'),
+  permissions: z.any(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passcodes don't match",
   path: ["confirmPassword"],
@@ -68,14 +137,7 @@ const userFormSchema = z.object({
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
-interface UserEditFormProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  user: AuthorizedUser | null;
-  onSave: (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => Promise<void>;
-}
-
-export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFormProps) {
+export function UserEditForm({ isOpen, onOpenChange, user, onSave }: { isOpen: boolean, onOpenChange: (o: boolean) => void, user: AuthorizedUser | null, onSave: (u: any, orig?: string) => Promise<void> }) {
   const [isSaving, setIsSaving] = useState(false);
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -92,7 +154,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         confirmPassword: '', 
         canAddAssets: false, 
         canEditAssets: false,
-        role: 'VERIFIER'
+        role: 'VERIFIER',
+        permissions: defaultPermissions
     },
   });
   
@@ -108,7 +171,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             email: user.email || '',
             password: user.password || '', 
             confirmPassword: user.password || '',
-            role: user.role || 'VERIFIER'
+            role: user.role || 'VERIFIER',
+            permissions: user.permissions || defaultPermissions
         });
       } else {
         form.reset({ 
@@ -124,221 +188,214 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             confirmPassword: '', 
             canAddAssets: true, 
             canEditAssets: true,
-            role: 'VERIFIER'
+            role: 'VERIFIER',
+            permissions: defaultPermissions
         });
       }
     }
   }, [isOpen, user, form]);
 
   useEffect(() => {
-    if (isAdmin) form.setValue('states', ['All']);
-    else if (isZonalAdmin && assignedZone) {
+    if (isAdmin) {
+      form.setValue('states', ['All']);
+      form.setValue('permissions', superAdminPermissions);
+    } else if (isZonalAdmin) {
+      form.setValue('permissions', adminPermissions);
+      if (assignedZone) {
         const zoneStates = NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES] || [];
         form.setValue('states', zoneStates);
+      }
     }
   }, [isAdmin, isZonalAdmin, assignedZone, form]);
 
   const handleSubmit = async (data: UserFormValues) => {
     setIsSaving(true);
     const { confirmPassword, ...userToSave } = data;
-    
-    // Deterministic Role Derivation from Switches
     let derivedRole = data.role;
-    if (data.isAdmin) {
-      derivedRole = 'SUPERADMIN'; // "Super Administrator" toggle grants global unrestricted access
-    } else if (data.isZonalAdmin) {
-      derivedRole = 'ADMIN'; // "Zonal Administrator" toggle grants administrative access scoped to a zone
-    }
+    if (data.isAdmin) derivedRole = 'SUPERADMIN';
+    else if (data.isZonalAdmin) derivedRole = 'ADMIN';
 
     await onSave({ ...userToSave, role: derivedRole } as AuthorizedUser, user?.loginName);
     setIsSaving(false);
   };
 
+  const handlePermissionToggle = (key: keyof UserPermissions, val: boolean) => {
+    const current = form.getValues('permissions');
+    form.setValue('permissions', { ...current, [key]: val });
+  };
+
+  const PermissionRow = ({ label, pKey, icon: Icon }: { label: string, pKey: keyof UserPermissions, icon?: any }) => {
+    const val = form.watch(`permissions.${pKey}`);
+    return (
+      <div className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/30 transition-all group">
+        <div className="flex items-center gap-3">
+          {Icon && <Icon className="h-3.5 w-3.5 text-primary opacity-40 group-hover:opacity-100 transition-opacity" />}
+          <span className="text-[11px] font-black uppercase tracking-tight text-foreground/70">{label}</span>
+        </div>
+        <Checkbox checked={val} onCheckedChange={(c) => handlePermissionToggle(pKey, !!c)} className="h-5 w-5 rounded-md border-2 border-border" />
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl rounded-3xl overflow-hidden p-0 border-primary/10 shadow-2xl bg-background">
+      <DialogContent className="sm:max-w-2xl rounded-[2.5rem] overflow-hidden p-0 border-primary/10 shadow-3xl bg-background">
         <DialogHeader className="p-8 bg-muted/20 border-b">
           <DialogTitle className="flex items-center gap-3 text-2xl font-black uppercase tracking-tight leading-none text-foreground">
             <User className="h-6 w-6 text-primary"/> {user ? 'Edit Identity' : 'New Personnel'}
           </DialogTitle>
           <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground opacity-70 mt-1">
-            Define system roles and authorized regional scopes.
+            Define system roles and authorized access pulses.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">
             <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="p-8 space-y-8">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="p-8 space-y-10 pb-32">
                 <div className="space-y-4">
                     <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Identity Hub</Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="displayName" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Full Name</FormLabel>
-                                <FormControl><Input placeholder="Auditor Name" {...field} className="h-12 rounded-xl bg-muted/10 border-border focus-visible:ring-primary/20" /></FormControl>
-                                <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Full Name</FormLabel><FormControl><Input placeholder="Auditor Name" {...field} className="h-12 rounded-xl bg-muted/10 border-border" /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={form.control} name="loginName" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Login ID (Username)</FormLabel>
-                                <FormControl><Input placeholder="username" {...field} className="h-12 rounded-xl bg-muted/10 border-border focus-visible:ring-primary/20" /></FormControl>
-                                <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Login ID (Username)</FormLabel><FormControl><Input placeholder="username" {...field} className="h-12 rounded-xl bg-muted/10 border-border" /></FormControl><FormMessage /></FormItem>
                         )}/>
                     </div>
                     <FormField control={form.control} name="email" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Mail className="h-3 w-3" /> Email Link</FormLabel>
-                            <FormControl><Input placeholder="user@example.com" type="email" {...field} className="h-12 rounded-xl bg-muted/10 border-border focus-visible:ring-primary/20" /></FormControl>
-                            <FormMessage />
-                        </FormItem>
+                        <FormItem><FormLabel className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><Mail className="h-3 w-3" /> Email Link</FormLabel><FormControl><Input placeholder="user@example.com" type="email" {...field} className="h-12 rounded-xl bg-muted/10 border-border" /></FormControl><FormMessage /></FormItem>
                     )}/>
                 </div>
 
                 <div className="space-y-4">
-                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Security Pulse</Label>
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Access Credentials</Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="password" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">System Passcode</FormLabel>
-                                <FormControl><Input type="password" placeholder="••••••••" {...field} className="h-12 rounded-xl bg-muted/10 border-border focus-visible:ring-primary/20" /></FormControl>
-                            </FormItem>
+                            <FormItem><FormLabel className="text-[10px] font-black uppercase text-muted-foreground">System Passcode</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} className="h-12 rounded-xl bg-muted/10 border-border" /></FormControl></FormItem>
                         )}/>
                         <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Confirm Passcode</FormLabel>
-                                <FormControl><Input type="password" placeholder="••••••••" {...field} className="h-12 rounded-xl bg-muted/10 border-border focus-visible:ring-primary/20" /></FormControl>
-                                <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Confirm Passcode</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} className="h-12 rounded-xl bg-muted/10 border-border" /></FormControl><FormMessage /></FormItem>
                         )}/>
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Capabilities</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <FormField control={form.control} name="canAddAssets" render={({ field }) => (
-                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
-                                <div className="space-y-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <PlusCircle className="h-3.5 w-3.5 text-primary" />
-                                        <FormLabel className="font-black text-[10px] uppercase">Allow Entry</FormLabel>
-                                    </div>
-                                    <FormDescription className="text-[8px] font-bold uppercase opacity-40">Create new registry records.</FormDescription>
-                                </div>
-                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Regional Scope</Label>
+                    {!isAdmin && !isZonalAdmin ? (
+                        <FormField control={form.control} name="states" render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-full h-14 justify-between rounded-xl border-2 border-border/40 bg-muted/10">
+                                            <div className="flex items-center gap-3">
+                                                {field.value?.length > 0 ? (
+                                                    <Badge className="bg-primary text-black font-black text-[9px] h-6 px-3">{field.value.length} STATES</Badge>
+                                                ) : (
+                                                    <span className="text-[10px] font-black uppercase text-muted-foreground opacity-40">Select authorized states...</span>
+                                                )}
+                                            </div>
+                                            <ChevronsUpDown className="h-4 w-4 opacity-20" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[400px] p-0 rounded-2xl shadow-3xl border-primary/10 overflow-hidden" align="start">
+                                        <div className="p-4 bg-muted/30 border-b flex items-center justify-between"><h4 className="text-[10px] font-black uppercase tracking-widest">Authorized States</h4></div>
+                                        <ScrollArea className="h-72 bg-background">
+                                            <div className="p-3 grid grid-cols-2 gap-1">
+                                                {NIGERIAN_STATES.map(s => (
+                                                    <div key={s} className="flex items-center gap-3 p-2.5 hover:bg-primary/5 rounded-xl cursor-pointer" onClick={() => {
+                                                        const cur = field.value || [];
+                                                        field.onChange(cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]);
+                                                    }}>
+                                                        <Checkbox checked={field.value?.includes(s)} className="rounded-md h-5 w-5 border-2"/>
+                                                        <span className="text-[11px] font-black uppercase">{s}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    </PopoverContent>
+                                </Popover>
                             </FormItem>
                         )}/>
+                    ) : (
+                        <div className="p-5 rounded-2xl bg-muted/10 border-2 border-dashed border-border/40 text-center">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Scope automatically locked based on Admin tier.</span>
+                        </div>
+                    )}
+                </div>
 
-                        <FormField control={form.control} name="canEditAssets" render={({ field }) => (
-                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
-                                <div className="space-y-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <FileEdit className="h-3.5 w-3.5 text-primary" />
-                                        <FormLabel className="font-black text-[10px] uppercase">Allow Mutation</FormLabel>
+                {/* ACCORDION PERMISSIONS HUB */}
+                <div className="space-y-4">
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Governance</Label>
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="permissions" className="border-2 border-border/40 rounded-[1.5rem] bg-card/50 overflow-hidden px-1">
+                            <AccordionTrigger className="px-6 hover:no-underline py-5 group">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-primary/10 rounded-lg group-hover:scale-110 transition-transform"><Lock className="h-4 w-4 text-primary" /></div>
+                                    <div className="text-left">
+                                        <span className="text-sm font-black uppercase tracking-tight">Access Control Hub</span>
+                                        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Granular Function & Page Access</p>
                                     </div>
-                                    <FormDescription className="text-[8px] font-bold uppercase opacity-40">Modify existing item attributes.</FormDescription>
                                 </div>
-                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
-                            </FormItem>
-                        )}/>
-                    </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-6 pb-8 space-y-8">
+                                <div className="space-y-4">
+                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><LayoutGrid className="h-3 w-3" /> Page Access</h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                                        <PermissionRow label="Dashboard Hub" pKey="page_dashboard" icon={Activity} />
+                                        <PermissionRow label="Asset List" pKey="page_registry" icon={Database} />
+                                        <PermissionRow label="Folder Browse" pKey="page_groups" icon={LayoutGrid} />
+                                        <PermissionRow label="Reports Center" pKey="page_reports" icon={Activity} />
+                                        <PermissionRow label="Tactical Alerts" pKey="page_alerts" icon={ShieldAlert} />
+                                        <PermissionRow label="Activity History" pKey="page_audit_log" icon={History} />
+                                        <PermissionRow label="Sync Queue" pKey="page_sync_queue" icon={RefreshCw} />
+                                        <PermissionRow label="Personnel Hub" pKey="page_users" icon={User} />
+                                        <PermissionRow label="Infrastructure" pKey="page_infrastructure" icon={Monitor} />
+                                        <PermissionRow label="Database Hub" pKey="page_database" icon={Terminal} />
+                                        <PermissionRow label="App Settings" pKey="page_settings" icon={SettingsIcon} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h5 className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-primary/10 pb-2 flex items-center gap-2"><Lock className="h-3 w-3" /> Functional Pulse</h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                                        <PermissionRow label="Add New Assets" pKey="func_add_asset" icon={PlusCircle} />
+                                        <PermissionRow label="Edit Profiles" pKey="func_edit_asset" icon={FileEdit} />
+                                        <PermissionRow label="Delete Records" pKey="func_delete_asset" icon={Trash2} />
+                                        <PermissionRow label="Import Excel" pKey="func_import" icon={FileUp} />
+                                        <PermissionRow label="Batch Update" pKey="func_batch_edit" icon={Activity} />
+                                        <PermissionRow label="Setup Layouts" pKey="func_edit_headers" icon={Wrench} />
+                                        <PermissionRow label="Undo Changes" pKey="func_revert" icon={RotateCcw} />
+                                        <PermissionRow label="Approve Updates" pKey="func_approve" icon={ShieldCheck} />
+                                    </div>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
 
                 <div className="space-y-4">
-                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Governance Tiers</Label>
+                    <Label className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">Quick Tiers</Label>
                     <div className="grid grid-cols-1 gap-3">
                         <FormField control={form.control} name="isAdmin" render={({ field }) => (
                             <FormItem className="flex items-center justify-between p-5 rounded-2xl border transition-all hover:bg-primary/[0.02] group">
-                                <div className="space-y-0.5">
-                                    <FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary transition-colors">Super Administrator</FormLabel>
-                                    <FormDescription className="text-[10px] font-bold uppercase opacity-40">Unrestricted global project access and user management.</FormDescription>
-                                </div>
+                                <div className="space-y-0.5"><FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">Super Administrator</FormLabel><FormDescription className="text-[10px] font-bold uppercase opacity-40">Unrestricted global access and user provisioning.</FormDescription></div>
                                 <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isZonalAdmin', false); }}/></FormControl>
                             </FormItem>
                         )}/>
-
                         <FormField control={form.control} name="isZonalAdmin" render={({ field }) => (
                             <FormItem className="flex items-center justify-between p-5 rounded-2xl border transition-all hover:bg-primary/[0.02] group">
-                                <div className="space-y-0.5">
-                                    <FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary transition-colors">Zonal Administrator</FormLabel>
-                                    <FormDescription className="text-[10px] font-bold uppercase opacity-40">Manages regional states within a geopolitical zone.</FormDescription>
-                                </div>
+                                <div className="space-y-0.5"><FormLabel className="font-black text-sm uppercase text-foreground group-hover:text-primary">Zonal Administrator</FormLabel><FormDescription className="text-[10px] font-bold uppercase opacity-40">Manages regional states within a zone.</FormDescription></div>
                                 <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isAdmin', false); }}/></FormControl>
                             </FormItem>
                         )}/>
                     </div>
-
-                    {isZonalAdmin && (
-                        <FormField control={form.control} name="assignedZone" render={({ field }) => (
-                            <FormItem className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                <FormLabel className="text-[10px] font-black uppercase text-muted-foreground">Assigned Geopolitical Zone</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-12 rounded-xl border-2 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
-                                        <SelectValue placeholder="Select Zone..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-xl border-border">{ZONAL_STORES.map(z => <SelectItem key={z} value={z} className="rounded-lg text-[10px] font-black uppercase">{z}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </FormItem>
-                        )}/>
-                    )}
                 </div>
-
-                {!isAdmin && !isZonalAdmin && (
-                    <FormField control={form.control} name="states" render={({ field }) => (
-                        <FormItem className="flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
-                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-primary mb-3 flex items-center gap-2"><MapPin className="h-3 w-3" /> Regional Scope</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className="w-full h-14 justify-between rounded-xl border-2 border-border/40 bg-muted/10 hover:border-primary/40 transition-all">
-                                        <div className="flex items-center gap-3">
-                                            {field.value?.length > 0 ? (
-                                                <Badge className="bg-primary text-black font-black text-[9px] h-6 px-3">{field.value.length} STATES</Badge>
-                                            ) : (
-                                                <span className="text-[10px] font-black uppercase text-muted-foreground opacity-40">Select authorized states...</span>
-                                            )}
-                                        </div>
-                                        <ChevronsUpDown className="h-4 w-4 opacity-20" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[400px] p-0 rounded-2xl shadow-3xl border-primary/10 overflow-hidden" align="start">
-                                    <div className="p-4 bg-muted/30 border-b flex items-center justify-between">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest">Select Regional Jurisdiction</h4>
-                                        <Badge variant="outline" className="text-[8px] font-mono opacity-40">37 NODES</Badge>
-                                    </div>
-                                    <ScrollArea className="h-72 bg-background">
-                                        <div className="p-3 grid grid-cols-2 gap-1">
-                                            {NIGERIAN_STATES.map(s => (
-                                                <div key={s} className="flex items-center gap-3 p-2.5 hover:bg-primary/5 rounded-xl cursor-pointer transition-colors group" onClick={() => {
-                                                    const cur = field.value || [];
-                                                    field.onChange(cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]);
-                                                }}>
-                                                    <Checkbox checked={field.value?.includes(s)} className="rounded-md h-5 w-5 border-2"/>
-                                                    <span className="text-[11px] font-black uppercase group-hover:text-primary transition-colors">{s}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </ScrollArea>
-                                </PopoverContent>
-                            </Popover>
-                            <div className="flex flex-wrap gap-1.5 mt-4">
-                                {field.value?.map(s => (
-                                    <Badge key={s} variant="secondary" className="rounded-lg text-[8px] font-black uppercase tracking-tighter bg-muted border border-border/40 text-foreground/60">
-                                        {s}
-                                    </Badge>
-                                ))}
-                            </div>
-                        </FormItem>
-                    )}/>
-                )}
             </form>
             </Form>
         </ScrollArea>
         <DialogFooter className="p-8 bg-muted/20 border-t gap-3 shrink-0">
             <DialogClose asChild><Button variant="ghost" className="font-black uppercase text-[10px] px-8 rounded-xl">Discard</Button></DialogClose>
             <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="h-14 font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 px-10 rounded-[1.5rem] bg-primary text-black transition-transform active:scale-95">
-                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>}
-                Commit Identity Pulse
+                {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-3"/> : <ShieldCheck className="h-4 w-4 mr-3"/>} Commit Personnel Pulse
             </Button>
         </DialogFooter>
       </DialogContent>

@@ -3,6 +3,7 @@
 /**
  * @fileOverview Application Shell - Home Hub.
  * Optimized for Production Deployment & Simplified Terminology.
+ * Phase 1805: Integrated user-specific Page & Function Visibility.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -114,6 +115,7 @@ export default function HomeHub() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const perms = userProfile?.permissions;
   const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const CurrentWorkstation = useMemo(() => {
@@ -140,34 +142,30 @@ export default function HomeHub() {
   }, [profileSetupComplete]);
 
   const jumpOptions = useMemo(() => {
-    const base = [
-      { label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-      { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-      { label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') },
-      { label: 'Report Center', icon: FileText, onClick: () => setActiveView('REPORTS') },
-      { label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-      { label: 'Problem Review', icon: SearchCode, onClick: () => setActiveView('ANOMALIES') },
-      { label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
-      { label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') },
-    ];
+    const base = [];
+    
+    // Page access logic
+    if (perms?.page_dashboard) base.push({ label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') });
+    if (perms?.page_registry) base.push({ label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') });
+    if (perms?.page_groups) base.push({ label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') });
+    if (perms?.page_reports) base.push({ label: 'Report Center', icon: FileText, onClick: () => setActiveView('REPORTS') });
+    if (perms?.page_alerts) base.push({ label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') });
+    if (perms?.page_audit_log) base.push({ label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') });
+    if (perms?.page_sync_queue) base.push({ label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') });
 
     if (isAdmin) {
-      base.push(
-        { label: 'Import Data', icon: FileUp, onClick: () => setActiveView('IMPORT') },
-        { label: 'Personnel List', icon: UserIcon, onClick: () => setActiveView('USERS') },
-        { label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
-      );
+      if (perms?.func_import) base.push({ label: 'Import Data', icon: FileUp, onClick: () => setActiveView('IMPORT') });
+      if (perms?.page_users) base.push({ label: 'Personnel List', icon: UserIcon, onClick: () => setActiveView('USERS') });
+      if (perms?.page_settings) base.push({ label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') });
     }
 
     if (userProfile?.role === 'SUPERADMIN') {
-      base.push(
-        { label: 'System Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') },
-        { label: 'Database Center', icon: Terminal, onClick: () => setActiveView('DATABASE') }
-      );
+      if (perms?.page_infrastructure) base.push({ label: 'System Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') });
+      if (perms?.page_database) base.push({ label: 'Database Center', icon: Terminal, onClick: () => setActiveView('DATABASE') });
     }
 
     return base;
-  }, [isAdmin, userProfile?.role, setActiveView]);
+  }, [isAdmin, userProfile?.role, perms, setActiveView]);
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
@@ -270,25 +268,27 @@ export default function HomeHub() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-5">
-          {isAdmin && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setIsInboxOpen(true)} 
-                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
-                >
-                  <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                  {pendingApprovalsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
-                      {pendingApprovalsCount}
-                    </span>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
-            </Tooltip>
+          {isAdmin && perms?.func_approve && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsInboxOpen(true)} 
+                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 relative tactile-pulse"
+                  >
+                    <Inbox className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                    {pendingApprovalsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black text-[8px] font-black shadow-lg animate-bounce">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Pending Approvals</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           <TactileMenu
@@ -313,8 +313,8 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip></TooltipProvider>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip></TooltipProvider>
                 </>
               )}
             </div>
@@ -349,7 +349,9 @@ export default function HomeHub() {
                 <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">{userProfile?.role} &bull; {userProfile?.state}</p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
+              {perms?.page_settings && (
+                <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-2.5 rounded-xl focus:bg-primary/10 focus:text-primary gap-3"><SettingsIcon className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Settings</span></DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="p-2.5 rounded-xl focus:bg-red-600 focus:text-white text-red-500 gap-3"><LogOut className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Sign Out</span></DropdownMenuItem>
             </DropdownMenuContent>

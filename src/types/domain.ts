@@ -36,6 +36,30 @@ export type WorkstationView =
   | 'SETTINGS'
   | 'ANOMALIES';
 
+export interface UserPermissions {
+  // Page Access
+  page_dashboard: boolean;
+  page_registry: boolean;
+  page_groups: boolean;
+  page_reports: boolean;
+  page_alerts: boolean;
+  page_audit_log: boolean;
+  page_sync_queue: boolean;
+  page_users: boolean;
+  page_infrastructure: boolean;
+  page_database: boolean;
+  page_settings: boolean;
+  // Function Access
+  func_add_asset: boolean;
+  func_edit_asset: boolean;
+  func_delete_asset: boolean;
+  func_import: boolean;
+  func_batch_edit: boolean;
+  func_edit_headers: boolean;
+  func_revert: boolean;
+  func_approve: boolean;
+}
+
 export interface OptionType {
   label: string;
   value: string;
@@ -246,6 +270,7 @@ export interface AuthorizedUser {
   assignedZone?: string;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  permissions?: UserPermissions;
 }
 
 export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';

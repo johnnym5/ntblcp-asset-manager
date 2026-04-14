@@ -4,6 +4,7 @@
  * Phase 1501: Added inline editing for Name, Location, and LGA with explicit save buttons.
  * Phase 1505: Upgraded to use record-specific headers for accurate setup reflection.
  * Phase 1510: Integrated In-Place Header Setup Mode for Quick View management.
+ * Phase 1805: Integrated UserPermissions for functional lockdown.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -132,10 +133,11 @@ export function RegistryCard({
     setLocalRemark(String(record.rawRow.remarks || ''));
   }, [record.rawRow.remarks]);
 
+  const perms = userProfile?.permissions;
   const isVerificationMode = appSettings?.appMode === 'verification';
   const isAdminMode = appSettings?.appMode === 'management';
   const isSystemAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
-  const canEditBase = isAdminMode || isVerificationMode;
+  const canEditBase = (isAdminMode || isVerificationMode) && perms?.func_edit_asset;
 
   const activeHeaders = useMemo(() => {
     const folderHeaders = record.headers || [];
@@ -176,18 +178,27 @@ export function RegistryCard({
 
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
 
+  const menuOptions = [
+    { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() }
+  ];
+
+  if (perms?.func_edit_asset || isSystemAdmin) {
+    menuOptions.push({ label: 'Edit Record', icon: Edit3, onClick: () => onInspect(record.id) });
+  }
+
+  if (isSystemAdmin && perms?.func_edit_headers) {
+    menuOptions.push({ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) });
+  }
+
+  menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
+  menuOptions.push({ label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onClick: () => onToggleSelect?.(record.id) });
+
+  if (perms?.func_delete_asset || isSystemAdmin) {
+    menuOptions.push({ label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true });
+  }
+
   return (
-    <TactileMenu
-      title="Asset Shortcuts"
-      options={[
-        { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() },
-        { label: 'Edit Record', icon: Edit3, onClick: () => onInspect(record.id) },
-        ...(isSystemAdmin ? [{ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) }] : []),
-        { label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) },
-        { label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onClick: () => onToggleSelect?.(record.id) },
-        { label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true }
-      ]}
-    >
+    <TactileMenu title="Asset Shortcuts" options={menuOptions}>
       <Card 
         className={cn(
           "bg-card border-2 rounded-xl overflow-hidden transition-all relative group h-full flex flex-col shadow-xl",
@@ -300,7 +311,7 @@ export function RegistryCard({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-7 px-4 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 text-primary border border-primary/20 hover:bg-primary/10">
-                      <PlusCircle className="h-3 w-3" /> Add technical Field
+                      <PlusCircle className="h-3.5 w-3.5" /> Add technical Field
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56 bg-card border-border shadow-3xl">

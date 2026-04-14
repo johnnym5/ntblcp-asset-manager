@@ -10,7 +10,7 @@ import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import { FirebaseAuthService } from '@/services/firebase/auth';
 import { storage } from '@/offline/storage';
-import type { AuthorizedUser, UserRole } from '@/types/domain';
+import type { AuthorizedUser, UserRole, UserPermissions } from '@/types/domain';
 
 export interface LocalUserProfile {
   id: string; 
@@ -25,6 +25,7 @@ export interface LocalUserProfile {
   assignedZone?: string;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  permissions?: UserPermissions;
 }
 
 interface AuthContextType {
@@ -38,6 +39,50 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const defaultPermissions: UserPermissions = {
+  page_dashboard: true,
+  page_registry: true,
+  page_groups: true,
+  page_reports: true,
+  page_alerts: true,
+  page_audit_log: true,
+  page_sync_queue: true,
+  page_users: false,
+  page_infrastructure: false,
+  page_database: false,
+  page_settings: true,
+  func_add_asset: true,
+  func_edit_asset: true,
+  func_delete_asset: false,
+  func_import: false,
+  func_batch_edit: false,
+  func_edit_headers: false,
+  func_revert: false,
+  func_approve: false,
+};
+
+const superAdminPermissions: UserPermissions = {
+  page_dashboard: true,
+  page_registry: true,
+  page_groups: true,
+  page_reports: true,
+  page_alerts: true,
+  page_audit_log: true,
+  page_sync_queue: true,
+  page_users: true,
+  page_infrastructure: true,
+  page_database: true,
+  page_settings: true,
+  func_add_asset: true,
+  func_edit_asset: true,
+  func_delete_asset: true,
+  func_import: true,
+  func_batch_edit: true,
+  func_edit_headers: true,
+  func_revert: true,
+  func_approve: true,
+};
+
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
@@ -47,7 +92,8 @@ const superAdmin: AuthorizedUser = {
   isAdmin: true,
   role: 'SUPERADMIN',
   canAddAssets: true,
-  canEditAssets: true
+  canEditAssets: true,
+  permissions: superAdminPermissions
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -80,10 +126,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isZonalAdmin: authorizedUser.isZonalAdmin,
             assignedZone: authorizedUser.assignedZone,
             role: authorizedUser.role,
-            // Hardened Admin Derivation
             isAdmin: isUserAdmin,
             canAddAssets: authorizedUser.canAddAssets || isUserAdmin,
             canEditAssets: authorizedUser.canEditAssets || isUserAdmin,
+            permissions: authorizedUser.permissions || (isUserAdmin ? superAdminPermissions : defaultPermissions)
           };
           setUserProfile(mergedProfile);
           setProfileSetupComplete(true);
@@ -127,6 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         role: user.role,
         canAddAssets: user.canAddAssets || isUserAdmin,
         canEditAssets: user.canEditAssets || isUserAdmin,
+        permissions: user.permissions || (isUserAdmin ? superAdminPermissions : defaultPermissions)
       };
       
       sessionStorage.setItem('assetain-fresh-login', 'true');
@@ -134,7 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      await manualDownload();
+      await manualDownload([state]);
       
     } catch (e) {
       console.error("Auth: Login failed", e);

@@ -2,9 +2,10 @@
  * @fileOverview RBAC (Role-Based Access Control) Engine.
  * Phase 181: Implemented Deterministic Fuzzy Matching for scope enforcement.
  * Phase 182: Unrestricted access for Administrative tiers.
+ * Phase 183: Integrated granular UserPermissions pulse.
  */
 
-import type { AuthorizedUser, Asset, UserRole } from '@/types/domain';
+import type { AuthorizedUser, Asset, UserRole, UserPermissions } from '@/types/domain';
 import { LocationEngine } from '@/services/location-engine';
 import { getFuzzySignature } from '@/lib/utils';
 
@@ -14,10 +15,40 @@ import { getFuzzySignature } from '@/lib/utils';
 export function hasPermission(user: AuthorizedUser, action: string): boolean {
   const role = user.role as UserRole;
 
-  // Global Administrative Bypass: Admins and SuperAdmins have full functional access
-  if (role === 'SUPERADMIN' || role === 'ADMIN' || user.isAdmin) {
+  // 1. Global Administrative Bypass: SuperAdmins have full functional access
+  if (role === 'SUPERADMIN' || (user.isAdmin && user.role === 'SUPERADMIN')) {
     return true;
   }
+
+  // 2. Check Granular Permissions if available
+  if (user.permissions) {
+    const p = user.permissions;
+    switch (action) {
+      case 'VIEW_DASHBOARD': return p.page_dashboard;
+      case 'VIEW_REGISTRY': return p.page_registry;
+      case 'VIEW_GROUPS': return p.page_groups;
+      case 'VIEW_REPORTS': return p.page_reports;
+      case 'VIEW_ALERTS': return p.page_alerts;
+      case 'VIEW_HISTORY': return p.page_audit_log;
+      case 'VIEW_SYNC': return p.page_sync_queue;
+      case 'VIEW_PERSONNEL': return p.page_users;
+      case 'VIEW_INFRASTRUCTURE': return p.page_infrastructure;
+      case 'VIEW_DATABASE': return p.page_database;
+      case 'VIEW_SETTINGS': return p.page_settings;
+      
+      case 'ADD_ASSET': return p.func_add_asset;
+      case 'EDIT_ASSET': return p.func_edit_asset;
+      case 'DELETE_ASSET': return p.func_delete_asset;
+      case 'IMPORT_RECORDS': return p.func_import;
+      case 'BATCH_EDIT': return p.func_batch_edit;
+      case 'EDIT_HEADERS': return p.func_edit_headers;
+      case 'REVERT_CHANGES': return p.func_revert;
+      case 'ADJUDICATE_REQUESTS': return p.func_approve;
+    }
+  }
+
+  // 3. Fallback Legacy Role Checks
+  if (user.isAdmin || role === 'ADMIN') return true;
 
   switch (action) {
     case 'IMPORT_RECORDS':
@@ -27,6 +58,7 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
       return role === 'MANAGER' || !!user.isZonalAdmin;
 
     case 'VIEW_REGISTRY':
+    case 'VIEW_DASHBOARD':
     case 'VERIFY_ASSET':
     case 'EXPORT_REPORTS':
       return true;

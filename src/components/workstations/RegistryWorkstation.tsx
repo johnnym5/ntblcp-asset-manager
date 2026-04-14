@@ -6,6 +6,7 @@
  * Phase 1520: Separated Card Setup Mode from Profile Setup Mode.
  * Phase 1525: Resolved optionsMap ReferenceError by implementing deterministic value discovery.
  * Phase 1530: Implemented unified handleUpdateHeader logic for in-place folder setup.
+ * Phase 1805: Integrated UserPermissions for functional lockdown.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -149,8 +150,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin || userProfile?.isAdmin;
-  const canEdit = isAdmin || !!userProfile?.canEditAssets;
+  const perms = userProfile?.permissions;
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const canEdit = perms?.func_edit_asset || isAdmin;
   const isVerificationMode = appSettings?.appMode === 'verification';
   
   const mergedSheetDefinitions = useMemo(() => {
@@ -494,19 +496,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
-              {isQuickViewSetupActive && (
+              {isQuickViewSetupActive && perms?.func_edit_headers && (
                 <Button onClick={handleSaveGlobalHeaders} disabled={isProcessing} className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl animate-in fade-in zoom-in-95">
                   {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Commit Arrangement
                 </Button>
               )}
-              {showList && isAdmin && (
+              {showList && (
                 <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => { setSelectedAssetIdForEdit(null); setIsFormOpen(true); }} className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm">
-                    <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Asset</span>
-                  </Button>
-                  {viewMode === 'grid' && (
+                  {perms?.func_add_asset && (
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedAssetIdForEdit(null); setIsFormOpen(true); }} className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm">
+                      <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add Asset</span>
+                    </Button>
+                  )}
+                  {viewMode === 'grid' && perms?.func_edit_headers && (
                     <Button variant="outline" size="sm" onClick={() => setIsQuickViewSetupActive(!isQuickViewSetupActive)} className={cn("h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 gap-2 shadow-sm transition-all", isQuickViewSetupActive ? "bg-primary text-black border-primary" : "bg-muted/50 border-border/40")}>
-                      <Wrench className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{isQuickViewSetupActive ? 'Exit Setup' : 'Setup Card Layout'}</span>
+                      <Wrench className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{isQuickViewSetupActive ? 'Exit Setup' : 'Setup Layout'}</span>
                     </Button>
                   )}
                 </div>
@@ -545,14 +549,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           {!showList ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
               {categories.map(cat => (
-                <TactileMenu key={cat} title="Folder Actions" options={[{ label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) }, { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); } }, { label: 'Folder Setup', icon: Wrench, onClick: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } } }, { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true }] : [])]}>
+                <TactileMenu key={cat} title="Folder Actions" options={[{ label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) }, { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); }, disabled: !perms?.func_import }, { label: 'Folder Setup', icon: Wrench, onClick: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } }, disabled: !perms?.func_edit_headers }, { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true, disabled: !perms?.func_delete_asset }] : [])]}>
                   <Card onClick={() => handleExploreFolder(cat)} className={cn("bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer min-h-[220px] flex flex-col justify-between", selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border")}>
                     <div>
                       <div className="flex justify-between items-start mb-6">
                         <div className="p-2.5 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform"><LayoutGrid className="h-5 w-5 text-primary" /></div>
                         <Checkbox checked={selectedCategories.includes(cat)} onCheckedChange={(c) => { setSelectedCategories(!!c ? [...selectedCategories, cat] : selectedCategories.filter(x => x !== cat)); }} className="h-5 w-5 rounded-lg border-border" onClick={e => e.stopPropagation()} />
                       </div>
-                      <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-tight mb-4 line-clamp-3 overflow-hidden" title={cat}>{cat}</h3>
+                      <h3 className="text-[11px] font-black uppercase text-foreground tracking-tight leading-none mb-4 line-clamp-3 overflow-hidden" title={cat}>{cat}</h3>
                     </div>
                     <div className="space-y-4">
                       <div className="flex items-baseline gap-2"><p className="text-3xl font-black tracking-tighter text-foreground leading-none">{groupStats[cat]?.total || 0}</p><p className="text-[8px] font-black uppercase text-primary tracking-[0.2em]">RECORDS</p></div>
@@ -594,7 +598,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h3 className="text-xl font-black uppercase text-foreground leading-none">Asset Profile</h3>
                 </div>
                 <div className="flex items-center gap-3">
-                  {isHeaderEditingMode && isAdmin && (
+                  {isHeaderEditingMode && perms?.func_edit_headers && (
                     <Button onClick={handleSaveGlobalHeaders} disabled={isProcessing} className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
                       {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save Arrangement
                     </Button>
@@ -624,7 +628,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         {isSelectionBarVisible && (
           <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-[calc(100vw-1rem)] sm:w-auto bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0"><div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Records</span></div>
-            <ScrollArea className="flex-1 overflow-hidden"><div className="flex items-center gap-2 px-4 py-1">{showList && selectedAssetIds.size === 1 ? ((canEdit || isVerificationMode) && <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>) : (canEdit && <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Update</Button>)}<Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button><Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Clear</Button></div><ScrollBar orientation="horizontal" className="invisible" /></ScrollArea>
+            <ScrollArea className="flex-1 overflow-hidden"><div className="flex items-center gap-2 px-4 py-1">{showList && selectedAssetIds.size === 1 ? ((canEdit || isVerificationMode) && <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>) : (canEdit && <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Update</Button>)}<Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button>{isAdmin && perms?.func_delete_asset && <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Clear</Button>}</div><ScrollBar orientation="horizontal" className="invisible" /></ScrollArea>
             <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-muted-foreground hover:text-foreground rounded-xl transition-colors"><X className="h-5 w-5" /></button>
           </motion.div>
         )}
