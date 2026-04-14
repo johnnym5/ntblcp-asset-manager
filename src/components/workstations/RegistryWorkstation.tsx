@@ -7,6 +7,7 @@
  * Phase 1916: Limited grid to 5 columns max for improved card detail visibility.
  * Phase 1917: Hardened transformation pulse to reflect Folder Setup changes instantly.
  * Phase 1918: Resolved infinite render loop by removing redundant state synchronization.
+ * Phase 1919: Fixed Filter Hub property mismatch and missing options map.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -819,17 +820,18 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         isOpen={isSortOpen} 
         onOpenChange={setIsSortOpen} 
         headers={activeFolderHeaders} 
-        sortKey={sortKey} 
-        sortDir={sortDir} 
-        onSortChange={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
+        sortBy={sortKey} 
+        sortDirection={sortDir} 
+        onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
       />
 
       <FilterDrawer 
         isOpen={isFilterOpen}
         onOpenChange={setIsFilterOpen}
         headers={activeFolderHeaders}
-        filters={filters}
-        onFiltersChange={setFilters}
+        activeFilters={filters}
+        onUpdateFilters={setFilters}
+        optionsMap={optionsMap}
       />
 
       <ImportScannerDialog 
@@ -871,7 +873,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          onSave={(newDef) => {
+          originalSheetName={originalSheetName}
+          onSave={(orig, newDef, all) => {
             const grant = appSettings?.grants.find(g => g.sheetDefinitions[originalSheetName || ''] || g.sheetDefinitions[newDef.name]);
             if (!grant) return;
 

@@ -5,6 +5,7 @@
  * Phase 155: Enhanced with Empty State and Value Discovery logging.
  * Phase 156: Converted to centered Dialog pop-up window.
  * Phase 157: Optimized to use dynamic folder headers for filtering precision.
+ * Phase 158: Hardened hasAnyOptions logic with null-safety check.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -76,7 +77,7 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
   };
 
   const hasAnyOptions = useMemo(() => 
-    Object.values(optionsMap).some(opts => opts.length > 0), 
+    Object.values(optionsMap || {}).some(opts => opts && opts.length > 0), 
     [optionsMap]
   );
 
