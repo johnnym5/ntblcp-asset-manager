@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset Profile - Detailed Technical View.
  * Phase 1914: Simplified terminology (Profile, Setup, Changes).
+ * Phase 1925: Integrated 'Setup Mode' with Remove/Hide controls.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -26,7 +27,8 @@ import {
   CheckCircle2,
   XCircle,
   Database,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -61,13 +63,17 @@ const DetailField = ({
   const [localLabel, setLocalLabel] = useState(label);
   const hasLabelChanges = localLabel !== label;
 
+  useEffect(() => {
+    setLocalLabel(label);
+  }, [label]);
+
   return (
     <div className={cn(
       "p-4 flex flex-col gap-1 transition-all border-b border-border/40 last:border-0",
       isEditing ? "bg-primary/[0.03] border-primary/10" : "hover:bg-primary/[0.01]"
     )}>
       {isEditing && header && (
-        <div className="flex items-center gap-3 mb-2 animate-in slide-in-from-top-1 duration-300">
+        <div className="flex items-center justify-between mb-2 animate-in slide-in-from-top-1 duration-300">
           <TooltipProvider>
             <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md p-1 px-2 rounded-lg border border-primary/20 shadow-sm">
               <Tooltip><TooltipTrigger asChild><Checkbox checked={header.table} onCheckedChange={() => onToggleFlag?.('table')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">List View</TooltipContent></Tooltip>
@@ -75,6 +81,19 @@ const DetailField = ({
               <Tooltip><TooltipTrigger asChild><Checkbox checked={header.inChecklist} onCheckedChange={() => onToggleFlag?.('inChecklist')} className="h-3.5 w-3.5" /></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Checklist</TooltipContent></Tooltip>
             </div>
           </TooltipProvider>
+          
+          {!header.locked && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => onToggleFlag?.('quickView')}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="text-[8px] font-black uppercase">Hide from Card</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       )}
 

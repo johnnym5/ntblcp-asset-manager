@@ -7,10 +7,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck, Save, Trash2, Tag, MapPin, Building } from 'lucide-react';
+import { Check, Globe, CloudOff, Maximize2, CheckCircle2, XCircle, Edit3, FolderOpen, ShieldCheck, Save, Trash2, Tag, MapPin, Building, Columns } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ interface RegistryCardProps {
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   onToggleExpand?: () => void;
+  onManageLabels?: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
   densityMode?: 'compact' | 'comfortable' | 'expanded';
 }
@@ -86,10 +88,12 @@ export function RegistryCard({
   selected, 
   onToggleSelect, 
   onToggleExpand,
+  onManageLabels,
   onQuickUpdate,
   densityMode = 'comfortable'
 }: RegistryCardProps) {
   const { appSettings } = useAppState();
+  const { userProfile } = useAuth();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
   useEffect(() => {
@@ -97,8 +101,9 @@ export function RegistryCard({
   }, [record.rawRow.remarks]);
 
   const isVerificationMode = appSettings?.appMode === 'verification';
-  const isAdmin = appSettings?.appMode === 'management';
-  const canEditBase = isAdmin || isVerificationMode;
+  const isAdminMode = appSettings?.appMode === 'management';
+  const isSystemAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const canEditBase = isAdminMode || isVerificationMode;
 
   // Deterministic 7-header slice derived from the record's source headers
   const activeHeaders = useMemo(() => {
@@ -140,6 +145,7 @@ export function RegistryCard({
       options={[
         { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() },
         { label: 'Edit Record', icon: Edit3, onClick: () => onInspect(record.id) },
+        ...(isSystemAdmin ? [{ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) }] : []),
         { label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) },
         { label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onClick: () => onToggleSelect?.(record.id) },
         { label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true }

@@ -33,7 +33,8 @@ import {
   FolderOpen,
   FileDown,
   ArrowRight,
-  FileUp
+  FileUp,
+  PlusCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -285,6 +286,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const handleToggleExpand = (id: string) => {
     setExpandedAssetId(expandedAssetId === id ? null : id);
     setIsHeaderEditingMode(false);
+  };
+
+  const handleManageLabels = (id: string) => {
+    setExpandedAssetId(id);
+    setIsHeaderEditingMode(true);
   };
 
   const handleEditAsset = (id: string) => {
@@ -684,6 +690,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         selected={selectedAssetIds.has(asset.id)} 
                         onToggleSelect={handleToggleSelect} 
                         onToggleExpand={() => handleToggleExpand(asset.id)}
+                        onManageLabels={handleManageLabels}
                         onQuickUpdate={handleQuickUpdate}
                       />
                     </motion.div>
@@ -715,14 +722,30 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
                 <div className="flex items-center gap-3">
                   {isHeaderEditingMode && isAdmin && (
-                    <Button 
-                      onClick={handleSaveGlobalHeaders}
-                      disabled={isProcessing}
-                      className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
-                    >
-                      {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                      Save Labels
-                    </Button>
+                    <>
+                      <Button 
+                        onClick={() => {
+                          const cat = selectedCategories[0];
+                          if (cat && mergedSheetDefinitions[cat]) {
+                            setSelectedSheetDef(mergedSheetDefinitions[cat]);
+                            setOriginalSheetName(cat);
+                            setIsColumnSheetOpen(true);
+                          }
+                        }}
+                        variant="outline"
+                        className="h-10 px-4 rounded-xl border-primary/20 text-primary font-black uppercase text-[10px] gap-2"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5" /> Add Field
+                      </Button>
+                      <Button 
+                        onClick={handleSaveGlobalHeaders}
+                        disabled={isProcessing}
+                        className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"
+                      >
+                        {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        Save Labels
+                      </Button>
+                    </>
                   )}
                   {isAdmin && (
                     <Button 
