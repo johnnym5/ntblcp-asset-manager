@@ -4,6 +4,7 @@
  * Phase 810: Hardened for independent folder templates and fuzzy property mapping.
  * Phase 811: Optimized transformAssetToRecord to handle Chassis/Engine for vehicles.
  * Phase 812: Added Guidance Dictionary for field explanations.
+ * Phase 813: Added LGA to default headers and ensured core property resolution.
  */
 
 import type { Asset } from "@/types/domain";
@@ -28,6 +29,7 @@ export function normalizeHeaderName(name: string): string {
   if (n === "model number" || n === "model numbers" || n === "model no") return "modelNumber";
   if (n.includes("chasis no") || n.includes("chassis no")) return "chassisNo";
   if (n.includes("engine no")) return "engineNo";
+  if (n.includes("lga")) return "lga";
   if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "purchaseDate";
   if (n.includes("useful life")) return "usefulLifeYears";
 
@@ -90,6 +92,14 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
     example: "Lagos State or Abuja Zonal Store"
   },
   { 
+    rawName: "LGA", 
+    displayName: "LGA", 
+    normalizedName: "lga", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location",
+    guidance: "The Local Government Area associated with the facility.",
+    example: "Ikeja, Alimosho, etc."
+  },
+  { 
     rawName: "Condition", 
     displayName: "Condition", 
     normalizedName: "condition", 
@@ -141,6 +151,7 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "serialNumber": rawValue = asset.serialNumber; break;
       case "chassisNo": rawValue = asset.chassisNo; break;
       case "engineNo": rawValue = asset.engineNo; break;
+      case "lga": rawValue = asset.lga; break;
       case "category": rawValue = asset.category; break;
       case "condition": rawValue = asset.condition; break;
       case "manufacturer": rawValue = asset.manufacturer; break;

@@ -4,6 +4,7 @@
  * @fileOverview Asset List Hub - Main Management Page.
  * Phase 1914: Updated with simple terminology (List, Folders, Setup).
  * Phase 1915: Integrated Tactile Menus for Folder Cards.
+ * Phase 1916: Limited grid to 5 columns max for improved card detail visibility.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -143,7 +144,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
   
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
-  const [projectToDelete, setProjectToDelete] = useState<Grant | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<any>(null);
   const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
   // Single Sheet Import State
@@ -691,7 +692,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
           ) : (
             <div className="flex flex-col h-full">
-              <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-10" : ""}>
+              <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 pb-10" : ""}>
                 <AnimatePresence mode="popLayout">
                   {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
