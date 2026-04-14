@@ -3,6 +3,7 @@
 /**
  * @fileOverview Asset List Hub - Main Management Page.
  * Phase 1914: Updated with simple terminology (List, Folders, Setup).
+ * Phase 1915: Integrated Tactile Menus for Folder Cards.
  */
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
@@ -139,7 +140,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
+  const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+  
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Grant | null>(null);
+  const [isProjectDeleteOpen, setIsProjectDeleteOpen] = useState(false);
 
+  // Single Sheet Import State
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
 

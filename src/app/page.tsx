@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Dashboard Command Hub.
  * Phase 1913: Updated with simplified terminology (Hub, Assets, History).
+ * Phase 1915: Integrated System-Wide Tactile Menus for Logo, Sync, and Bell.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -149,9 +150,6 @@ export default function SPAHub() {
     if (profileSetupComplete && sessionStorage.getItem('assetain-fresh-login') === 'true') setIsWelcomeOpen(true);
   }, [profileSetupComplete]);
 
-  const syncLongPress = useLongPress(() => setIsSyncStatusOpen(true));
-  const bellLongPress = useLongPress(() => setActiveView('AUDIT_LOG'));
-
   const jumpOptions = useMemo(() => {
     const base = [
       { label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
@@ -223,30 +221,15 @@ export default function SPAHub() {
           <AnimatePresence>
             {(activeView !== 'DASHBOARD' || selectedCategories.length > 0) && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-                <TactileMenu 
-                  title="Main Menu"
-                  options={[
-                    { label: 'Dashboard', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') },
-                    { label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') },
-                    { label: 'Folders', icon: LayoutGrid, onClick: () => { setActiveView('GROUPS'); } },
-                    { label: 'Reports', icon: FileText, onClick: () => setActiveView('REPORTS') },
-                    { label: 'Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') },
-                    { label: 'History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
-                    ...(isAdmin ? [
-                      { label: 'Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') }
-                    ] : [])
-                  ]}
-                >
-                  <button onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse shadow-sm">
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                </TactileMenu>
+                <button onClick={goBack} className="h-9 w-9 flex items-center justify-center bg-muted/50 rounded-xl text-foreground/40 hover:text-primary transition-all border border-border tactile-pulse shadow-sm">
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
 
           <TactileMenu 
-            title="Switch View"
+            title="Switch Hub"
             options={jumpOptions}
           >
             <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-3 p-1.5 bg-primary/10 rounded-xl hover:bg-primary/20 transition-all text-primary tactile-pulse">
@@ -292,11 +275,19 @@ export default function SPAHub() {
                 <button onClick={() => { setIsMobileSearchOpen(false); }}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
               </motion.div>
             ) : (
-              <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
-                <Search className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
-                <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
-              </button>
+              <TactileMenu
+                title="Search Controls"
+                options={[
+                  { label: 'Open Palette', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
+                  { label: 'Filter Search', icon: Filter, onClick: () => setActiveView('REGISTRY') }
+                ]}
+              >
+                <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
+                  <Search className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-left flex-1 truncate">Search assets...</span>
+                  <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-muted px-2 font-mono text-[9px] font-medium opacity-60 ml-2 group-hover:bg-primary/10 group-hover:text-primary">⌘K</kbd>
+                </button>
+              </TactileMenu>
             )}
           </AnimatePresence>
         </div>
@@ -325,38 +316,51 @@ export default function SPAHub() {
             </TooltipProvider>
           )}
 
-          <div 
-            {...syncLongPress}
-            onContextMenu={(e) => { e.preventDefault(); setIsSyncStatusOpen(true); }}
-            className={cn(
-              "flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer transition-all",
-              isSyncing && "bg-primary/10 border-primary/30 px-3"
-            )}
+          <TactileMenu
+            title="Sync Protocol"
+            options={[
+              { label: 'Sync Workspace', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
+              { label: 'Download Pulse', icon: Download, onClick: handleManualDownloadWithFeedback, disabled: !isOnline },
+              { label: 'Upload Pulse', icon: Upload, onClick: handleManualUploadWithFeedback, disabled: !isOnline },
+              ...(isSuperAdmin ? [{ label: 'Force Reconcile', icon: RefreshCw, onClick: refreshRegistry }] : [])
+            ]}
           >
-            {isSyncing ? (
-              <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
-              </div>
-            ) : (
-              <>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get from Cloud</TooltipContent></Tooltip></TooltipProvider>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
-              </>
-            )}
-          </div>
+            <div 
+              className={cn(
+                "flex items-center bg-muted/30 p-1 rounded-xl border border-border shadow-inner cursor-pointer transition-all",
+                isSyncing && "bg-primary/10 border-primary/30 px-3"
+              )}
+            >
+              {isSyncing ? (
+                <div className="flex items-center gap-2 py-1.5 min-w-[100px] justify-center">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  <span className="text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">Syncing...</span>
+                </div>
+              ) : (
+                <>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualDownloadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get from Cloud</TooltipContent></Tooltip></TooltipProvider>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleManualUploadWithFeedback} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save to Cloud</TooltipContent></Tooltip></TooltipProvider>
+                </>
+              )}
+            </div>
+          </TactileMenu>
 
-          <div className="relative">
+          <TactileMenu
+            title="Alert Ledger"
+            options={[
+              { label: 'View All Notifications', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
+              { label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
+              { label: 'Clear Pulse', icon: Trash2, onClick: clearAll, destructive: true }
+            ]}
+          >
             <button 
-              {...bellLongPress}
               onClick={() => setIsNotificationsOpen(true)} 
-              onContextMenu={(e) => { e.preventDefault(); setActiveView('AUDIT_LOG'); }}
               className="p-2 sm:p-2.5 bg-muted rounded-xl text-foreground/40 hover:text-foreground transition-all relative"
             >
               <Bell className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
               {unreadCount > 0 && <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-background" />}
             </button>
-          </div>
+          </TactileMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

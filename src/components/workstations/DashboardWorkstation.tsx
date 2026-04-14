@@ -3,6 +3,7 @@
 /**
  * @fileOverview Dashboard Center - Registry Overview.
  * Phase 1913: Simplified terminology (Hub, History, Updates).
+ * Phase 1915: Integrated Tactile Menus for Sample Cards.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -34,7 +35,9 @@ import {
   GitPullRequest,
   Terminal,
   Database,
-  Upload
+  Upload,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -106,7 +109,7 @@ export function DashboardWorkstation() {
       const catFuzzy = getFuzzySignature(a.category);
       const isVehicle = catFuzzy.includes('motor') || catFuzzy.includes('vehicle');
       
-      const meta = a.metadata || {};
+      const meta = (a.metadata as any) || {};
       
       const hasChassis = (!!a.chassisNo && a.chassisNo !== 'N/A') || 
                         Object.keys(meta).some(k => getFuzzySignature(k) === 'chassisno' && meta[k]);
@@ -211,29 +214,38 @@ export function DashboardWorkstation() {
                     else if (swipe > swipeThreshold) setGlanceIndex(p => (p - 1 + glanceAssets.length) % glanceAssets.length);
                   }}
                 >
-                  <Card 
-                    onClick={() => handleInspect(glanceAssets[glanceIndex].id)}
-                    className="rounded-[2rem] border-2 border-border/40 bg-card p-6 shadow-xl h-[200px] flex flex-col justify-center relative cursor-pointer hover:border-primary/20 transition-all"
+                  <TactileMenu
+                    title="Quick Action"
+                    options={[
+                      { label: 'Inspect Profile', icon: Eye, onClick: () => handleInspect(glanceAssets[glanceIndex].id) },
+                      { label: 'Edit Record', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
+                      { label: 'Refresh Sample', icon: RefreshCw, onClick: handleRefreshRandom }
+                    ]}
                   >
-                    <div className="absolute top-3 right-3 z-20">
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleRefreshRandom(); }} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-6 relative z-10">
-                      <div className="p-5 bg-muted/30 rounded-2xl border-2 border-border/40 shrink-0 shadow-inner"><LayoutGrid className="h-10 w-10 text-primary/40" /></div>
-                      <div className="space-y-3 flex-1 min-w-0">
-                        <div className="space-y-0.5">
-                          <span className="text-[8px] font-black uppercase text-primary tracking-widest">Sample View</span>
-                          <h4 className="text-lg font-black uppercase text-foreground truncate">{glanceAssets[glanceIndex].description}</h4>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge className={cn("h-5 px-3 text-[7px] font-black uppercase border-none", glanceAssets[glanceIndex].status === 'VERIFIED' ? "bg-green-600" : "bg-orange-600")}>{glanceAssets[glanceIndex].status}</Badge>
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{glanceAssets[glanceIndex].location}</span>
+                    <Card 
+                      onClick={() => handleInspect(glanceAssets[glanceIndex].id)}
+                      className="rounded-[2rem] border-2 border-border/40 bg-card p-6 shadow-xl h-[200px] flex flex-col justify-center relative cursor-pointer hover:border-primary/20 transition-all"
+                    >
+                      <div className="absolute top-3 right-3 z-20">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleRefreshRandom(); }} className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-6 relative z-10">
+                        <div className="p-5 bg-muted/30 rounded-2xl border-2 border-border/40 shrink-0 shadow-inner"><LayoutGrid className="h-10 w-10 text-primary/40" /></div>
+                        <div className="space-y-3 flex-1 min-w-0">
+                          <div className="space-y-0.5">
+                            <span className="text-[8px] font-black uppercase text-primary tracking-widest">Sample View</span>
+                            <h4 className="text-lg font-black uppercase text-foreground truncate">{glanceAssets[glanceIndex].description}</h4>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={cn("h-5 px-3 text-[7px] font-black uppercase border-none", glanceAssets[glanceIndex].status === 'VERIFIED' ? "bg-green-600" : "bg-orange-600")}>{glanceAssets[glanceIndex].status}</Badge>
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{glanceAssets[glanceIndex].location}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </TactileMenu>
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -260,30 +272,39 @@ export function DashboardWorkstation() {
                     else if (swipe > swipeThreshold) setIssueIndex(p => (p - 1 + issueAssets.length) % issueAssets.length);
                   }}
                 >
-                  <Card 
-                    onClick={() => handleInspect(issueAssets[issueIndex].id)}
-                    className="rounded-[2rem] border-2 border-red-500/20 bg-red-500/[0.02] p-6 shadow-xl h-[200px] flex flex-col justify-center relative cursor-pointer hover:border-red-500/40 transition-all"
+                  <TactileMenu
+                    title="Audit Action"
+                    options={[
+                      { label: 'Review Issue', icon: FileWarning, onClick: () => handleInspect(issueAssets[issueIndex].id) },
+                      { label: 'Fix Record', icon: Edit3, onClick: () => setActiveView('REGISTRY') },
+                      { label: 'Clear Flag', icon: ShieldCheck, onClick: () => {} }
+                    ]}
                   >
-                    <div className="absolute top-3 right-3 z-20">
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleRefreshRandom(); }} className="h-8 w-8 rounded-full hover:bg-red-500/10 text-red-600">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-6 relative z-10">
-                      <div className="p-5 bg-white rounded-2xl border-2 border-red-500/10 shrink-0 shadow-inner">
-                        <Activity className="h-10 w-10 text-red-600" />
+                    <Card 
+                      onClick={() => handleInspect(issueAssets[issueIndex].id)}
+                      className="rounded-[2rem] border-2 border-red-500/20 bg-red-500/[0.02] p-6 shadow-xl h-[200px] flex flex-col justify-center relative cursor-pointer hover:border-red-500/40 transition-all"
+                    >
+                      <div className="absolute top-3 right-3 z-20">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleRefreshRandom(); }} className="h-8 w-8 rounded-full hover:bg-red-500/10 text-red-600">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                      <div className="space-y-3 flex-1 min-w-0">
-                        <h4 className="text-lg font-black uppercase text-foreground truncate leading-none">{issueAssets[issueIndex].description}</h4>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {(issueAssets[issueIndex] as any).activeIssues.map((issue: string, i: number) => (
-                            <Badge key={i} variant="outline" className="text-[7px] font-black uppercase border-red-500/20 text-red-600 bg-red-500/5">{issue}</Badge>
-                          ))}
+                      <div className="flex items-center gap-6 relative z-10">
+                        <div className="p-5 bg-white rounded-2xl border-2 border-red-500/10 shrink-0 shadow-inner">
+                          <Activity className="h-10 w-10 text-red-600" />
                         </div>
-                        <p className="text-[8px] font-bold text-muted-foreground uppercase truncate opacity-60">{issueAssets[issueIndex].location} • {issueAssets[issueIndex].category}</p>
+                        <div className="space-y-3 flex-1 min-w-0">
+                          <h4 className="text-lg font-black uppercase text-foreground truncate leading-none">{issueAssets[issueIndex].description}</h4>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(issueAssets[issueIndex] as any).activeIssues.map((issue: string, i: number) => (
+                              <Badge key={i} variant="outline" className="text-[7px] font-black uppercase border-red-500/20 text-red-600 bg-red-500/5">{issue}</Badge>
+                            ))}
+                          </div>
+                          <p className="text-[8px] font-bold text-muted-foreground uppercase truncate opacity-60">{issueAssets[issueIndex].location} • {issueAssets[issueIndex].category}</p>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
+                    </Card>
+                  </TactileMenu>
                 </motion.div>
               ) : (
                 <div className="h-[200px] flex items-center justify-center border-2 border-dashed border-border/40 rounded-[2rem] opacity-20">

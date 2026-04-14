@@ -3,6 +3,7 @@
 /**
  * @fileOverview User Management Directory.
  * Phase 1600: Zonal Admin scoping. Filters users by zonal states.
+ * Phase 1610: Integrated Tactile Menu for User Rows.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -15,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon, KeyRound, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AuthorizedUser } from '@/types/domain';
 import { UserEditForm } from './user-edit-form';
@@ -32,6 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn, getFuzzySignature } from '@/lib/utils';
 import { NIGERIAN_ZONES } from '@/lib/constants';
+import { TactileMenu } from '@/components/TactileMenu';
 
 interface UserManagementProps {
   users: AuthorizedUser[];
@@ -52,19 +54,16 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
   const filteredUsers = useMemo(() => {
     if (isSuperAdmin) return users;
     
-    // Zonal Admin Scope Logic
     if (isZonalAdmin && assignedZone) {
       const zonalStates = NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES] || [];
       const zonalStatesFuzzy = zonalStates.map(s => getFuzzySignature(s));
       
       return users.filter(u => {
-        // Zonal admins see themselves and users who have AT LEAST ONE state within their zone
         if (u.loginName === adminProfile.loginName) return true;
         return u.states.some(s => zonalStatesFuzzy.includes(getFuzzySignature(s)));
       });
     }
 
-    // Standard admins see everyone
     return users;
   }, [users, isSuperAdmin, isZonalAdmin, assignedZone, adminProfile]);
 
@@ -131,11 +130,21 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
           <TableBody>
             {filteredUsers.map(user => (
               <TableRow key={user.loginName} className="group hover:bg-primary/[0.02] border-b last:border-0 transition-colors">
-                <TableCell className="py-4 pl-6">
-                  <div className="flex flex-col">
-                    <span className="font-black text-xs uppercase text-foreground">{user.displayName}</span>
-                    <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">ID: {user.loginName}</span>
-                  </div>
+                <TableCell className="py-4 pl-6 p-0">
+                  <TactileMenu
+                    title="User Shortcuts"
+                    className="w-full h-full py-4 pl-6"
+                    options={[
+                      { label: 'Edit Profile', icon: Edit, onClick: () => handleEditUser(user) },
+                      { label: 'Copy Email', icon: Mail, onClick: () => navigator.clipboard.writeText(user.email) },
+                      { label: 'Purge Identity', icon: Trash2, onClick: () => setUserToDelete(user), destructive: true, disabled: adminProfile?.loginName === user.loginName }
+                    ]}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-black text-xs uppercase text-foreground">{user.displayName}</span>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">ID: {user.loginName}</span>
+                    </div>
+                  </TactileMenu>
                 </TableCell>
                 <TableCell className="py-4">
                   <Badge variant="outline" className={cn(
