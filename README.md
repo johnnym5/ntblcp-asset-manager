@@ -11,6 +11,8 @@ Assetain uses a triple-layer storage architecture to ensure maximum resilience:
 2.  **Shadow Mirror**: A real-time standby replica providing high-availability failover.
 3.  **Local Storage**: Device-level encrypted persistence allowing for seamless offline work.
 
+*Note: The platform features a hyper-optimized UI/UX design, engineered to seamlessly adapt to any screen size—from mobile field devices to command-center desktop monitors, ensuring an exceptional, responsive aesthetic everywhere.*
+
 ---
 
 ## 🖥 Workstation Breakdown

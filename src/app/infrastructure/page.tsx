@@ -433,7 +433,7 @@ export default function InfrastructurePage() {
               </div>
               <h4 className="text-sm font-black uppercase tracking-tight">Redundancy Protocol</h4>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic opacity-70">
-                Registry flow uses a strictly synchronous "Dual-Commit" pulse. Every modification to the Cloud Authority is instantly mirrored to the Shadow Standby (RTDB).
+                Registry flow uses a strictly synchronous &quot;Dual-Commit&quot; pulse. Every modification to the Cloud Authority is instantly mirrored to the Shadow Standby (RTDB).
               </p>
             </Card>
 

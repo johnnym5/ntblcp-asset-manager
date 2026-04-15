@@ -59,7 +59,7 @@ export const FirestoreService = {
     
     const fetchChunk = async (q: any) => {
       const snap = await getDocs(q);
-      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
+      return snap.docs.map(d => ({ ...(d.data() as Record<string, unknown>), id: d.id } as Asset));
     };
 
     try {

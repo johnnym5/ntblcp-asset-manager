@@ -21,7 +21,7 @@ import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from './ui/scroll-area';
-import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning } from 'lucide-react';
+import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning, CheckCircle2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 interface TravelReportDialogProps {

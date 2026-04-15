@@ -170,7 +170,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                       <h4 className="text-lg font-black uppercase tracking-tight">{item.term}</h4>
                     </div>
                     <div className="space-y-3 pl-1">
-                      <p className="text-sm font-medium text-foreground italic leading-relaxed">"{item.definition}"</p>
+                      <p className="text-sm font-medium text-foreground italic leading-relaxed">&quot;{item.definition}&quot;</p>
                       <div className="flex items-center gap-2 text-[9px] font-black uppercase text-primary bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/10 w-fit">
                         Example: {item.example}
                       </div>

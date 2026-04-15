@@ -43,13 +43,13 @@ export const LocationEngine = {
     );
     
     if (stateMatch) {
-      return this.pulse(raw, stateMatch, 'HIGH', 'MATCHED');
+      return this._pulse(raw, stateMatch, 'HIGH', 'MATCHED');
     }
 
     // 2. Try Fuzzy Capital Match (Handles Uyo, Ikeja, etc)
     const capitalMatch = NIGERIAN_GEO_DATA.find(s => getFuzzySignature(s.capital) === fuzzyInput);
     if (capitalMatch) {
-      return this.pulse(raw, capitalMatch, 'HIGH', 'MATCHED');
+      return this._pulse(raw, capitalMatch, 'HIGH', 'MATCHED');
     }
 
     // 3. Containment Match (e.g., "Lagos Store" -> Lagos)
@@ -59,7 +59,7 @@ export const LocationEngine = {
     });
     
     if (partialMatch) {
-      return this.pulse(raw, partialMatch, 'MEDIUM', 'PARTIAL');
+      return this._pulse(raw, partialMatch, 'MEDIUM', 'PARTIAL');
     }
 
     // 4. Fallback: Title Case for display
@@ -73,7 +73,7 @@ export const LocationEngine = {
     };
   },
 
-  private pulse(raw: string, state: StateInfo, confidence: MatchConfidence, status: LocationMatchStatus): LocationPulse {
+  _pulse(raw: string, state: StateInfo, confidence: MatchConfidence, status: LocationMatchStatus): LocationPulse {
     return {
       raw,
       normalized: state.name,

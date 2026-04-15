@@ -271,11 +271,11 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     }
   };
 
-  if (userProfile?.role !== 'SUPERADMIN') return null;
-
   const nodeData = useMemo(() => {
     try { return JSON.parse(jsonValue); } catch (e) { return {}; }
   }, [jsonValue]);
+
+  if (userProfile?.role !== 'SUPERADMIN') return null;
 
   return (
     <div className={cn("space-y-10 animate-in fade-in duration-700", !isEmbedded && "max-w-7xl mx-auto pb-40")}>

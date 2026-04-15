@@ -16,7 +16,8 @@ import {
   AlertCircle, 
   RefreshCw,
   Search,
-  Database
+  Database,
+  Loader2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { REGISTRY_MAPPING_CONTRACT } from '@/parser/contracts/mapping';
@@ -144,7 +145,7 @@ export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperP
             <div className="space-y-1">
               <h5 className="text-xs font-black uppercase tracking-tight">Engineering Hint</h5>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                All unmapped columns are automatically sequestered into the record's metadata pulse. You will never lose source data during the ingestion traversal.
+                All unmapped columns are automatically sequestered into the record&apos;s metadata pulse. You will never lose source data during the ingestion traversal.
               </p>
             </div>
           </div>

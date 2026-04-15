@@ -95,3 +95,15 @@ export interface ImportRunSummary {
   sectionBreakdown: Record<string, number>;
   groups: GroupImportContainer[];
 }
+
+export interface WorkbookProfile {
+  id: string;
+  grantKey: string;
+  workbookMatchHints: string[];
+  sheetNameHints: string[];
+  titlePatterns: string[];
+  sectionPatterns: string[];
+  primaryHeaderSignature: string[];
+  secondaryHeaderSignatures: string[][];
+  headerAliases: Record<string, string>;
+}

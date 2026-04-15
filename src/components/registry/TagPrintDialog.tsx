@@ -134,7 +134,7 @@ export function TagPrintDialog({ isOpen, onOpenChange, records }: TagPrintDialog
         <div className="p-8 bg-muted/20 border-t flex items-center justify-between gap-4 print:hidden">
           <div className="flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase italic max-w-sm">
             <Info className="h-4 w-4 text-primary shrink-0" />
-            <p>Ensure your printer is set to "Background Graphics" and "High Resolution" for deterministic tag pulses.</p>
+            <p>Ensure your printer is set to &quot;Background Graphics&quot; and &quot;High Resolution&quot; for deterministic tag pulses.</p>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">

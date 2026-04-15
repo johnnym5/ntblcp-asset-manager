@@ -2,7 +2,7 @@
  * @fileOverview Types for the Virtual Database Management System.
  */
 
-import type { StorageLayer } from './domain';
+export type { StorageLayer } from './domain';
 
 export type NodeType = 'COLLECTION' | 'DOCUMENT' | 'RECORD' | 'DATABASE' | 'SYSTEM';
 

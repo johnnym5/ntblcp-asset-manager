@@ -34,7 +34,7 @@ export default function Error({
         </CardHeader>
         <CardContent className="space-y-8 p-8">
           <p className="text-center text-muted-foreground text-sm font-medium leading-relaxed italic opacity-60">
-            "An unexpected error occurred in the application. Please try refreshing the page."
+            &quot;An unexpected error occurred in the application. Please try refreshing the page.&quot;
           </p>
           
           <div className="relative group">

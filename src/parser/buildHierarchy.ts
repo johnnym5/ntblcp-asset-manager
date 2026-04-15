@@ -17,6 +17,14 @@ export function parseSheetToAssets(
   existingAssets: Asset[] = []
 ): Asset[] {
   const engine = new ParserEngine(sourceFileName, existingAssets);
-  const result = engine.parseWorkbook(sheetName, sheetData);
-  return result.assets as unknown as Asset[];
+  
+  // Phase 1: Discover structural groups
+  const groups = engine.discoverGroups(sheetName, sheetData);
+  if (groups.length === 0) return [];
+  
+  // Phase 2: Ingest data from discovered groups
+  const containers = engine.ingestGroups(sheetName, sheetData, groups);
+  
+  // Flatten all parsed assets
+  return containers.flatMap(c => c.assets) as unknown as Asset[];
 }

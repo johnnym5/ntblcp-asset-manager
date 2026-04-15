@@ -20,7 +20,7 @@ export default function GlobalError({
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-black uppercase tracking-tighter">Critical Failure</h1>
-            <p className="text-sm text-white/60 font-medium italic">"Registry terminal protocol interrupted by a global exception."</p>
+            <p className="text-sm text-white/60 font-medium italic">&quot;Registry terminal protocol interrupted by a global exception.&quot;</p>
           </div>
           <div className="p-6 bg-black/40 rounded-2xl border border-white/5 font-mono text-[10px] text-left opacity-80 overflow-hidden">
             {error.message}

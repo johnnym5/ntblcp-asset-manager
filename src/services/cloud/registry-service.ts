@@ -46,9 +46,9 @@ export class RegistryService {
   static async batchSync(assets: Asset[]): Promise<void> {
     if (!db) throw new Error("Cloud Database Offline");
     
-    const batch = writeBatch(db);
+    const batch = writeBatch(db!);
     assets.forEach(asset => {
-      const docRef = doc(db, this.collectionName, asset.id);
+      const docRef = doc(db!, this.collectionName, asset.id);
       batch.set(docRef, asset, { merge: true });
     });
     

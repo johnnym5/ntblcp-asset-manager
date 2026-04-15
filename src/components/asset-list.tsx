@@ -1451,7 +1451,7 @@ export default function AssetList() {
                     <FolderSearch className="mx-auto h-12 w-12" />
                     <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
                     {searchTerm ? (
-                        <p className="mt-2 text-sm">Your search for "{searchTerm}" did not match any assets.</p>
+                        <p className="mt-2 text-sm">Your search for &quot;{searchTerm}&quot; did not match any assets.</p>
                     ) : (
                         <p className="mt-2 text-sm">Import a file or add an asset to get started.</p>
                     )}
@@ -1498,7 +1498,7 @@ export default function AssetList() {
          <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Delete all assets in '{categoryToDelete}'?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete all assets in &apos;{categoryToDelete}&apos;?</AlertDialogTitle>
                     <AlertDialogDescription>
                       This will permanently delete all assets from this category on your local device and from the cloud database. This action cannot be undone.
                     </AlertDialogDescription>

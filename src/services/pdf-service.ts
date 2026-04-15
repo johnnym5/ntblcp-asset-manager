@@ -59,7 +59,7 @@ export const PdfService = {
         ['Condition State', asset.condition || 'UNASSESSED'],
         ['Verification Status', asset.status],
         ['Source Row', String(asset.importMetadata?.rowNumber || 'MANUAL')],
-        ['GPS Coordinates', asset.geotag ? `${asset.geotag.lat.toFixed(4)}, ${asset.geotag.lng.toFixed(4)}` : 'NOT ANCHORED']
+        ['GPS Coordinates', (asset.metadata?.geotag as any) ? `${(asset.metadata.geotag as any).lat?.toFixed(4)}, ${(asset.metadata.geotag as any).lng?.toFixed(4)}` : 'NOT ANCHORED']
       ],
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
@@ -72,13 +72,13 @@ export const PdfService = {
     let evidenceY = finalY + 15;
 
     // A. Asset Photo
-    if (asset.photoUrl || asset.photoDataUri) {
+    const photoUrl = (asset.metadata?.photoUrl as string) || (asset.metadata?.photoDataUri as string);
+    if (photoUrl) {
       doc.setFont('helvetica', 'bold');
       doc.text('VERIFIED VISUAL EVIDENCE', 15, evidenceY);
       try {
-        const imgUrl = asset.photoUrl || asset.photoDataUri;
-        if (imgUrl) {
-          doc.addImage(imgUrl, 'JPEG', 15, evidenceY + 5, 80, 60);
+        if (photoUrl) {
+          doc.addImage(photoUrl, 'JPEG', 15, evidenceY + 5, 80, 60);
           doc.rect(15, evidenceY + 5, 80, 60, 'S');
         }
       } catch (e) {
@@ -88,12 +88,12 @@ export const PdfService = {
     }
 
     // B. Custodian Signature
-    if (asset.signatureUrl || asset.signatureDataUri) {
+    const sigUrl = (asset.metadata?.signatureUrl as string) || (asset.metadata?.signatureDataUri as string);
+    if (sigUrl) {
       const sigX = 115;
       doc.setFont('helvetica', 'bold');
       doc.text('CUSTODIAN SIGNATURE', sigX, evidenceY);
       try {
-        const sigUrl = asset.signatureUrl || asset.signatureDataUri;
         if (sigUrl) {
           doc.addImage(sigUrl, 'PNG', sigX, evidenceY + 5, 80, 25);
           doc.line(sigX, evidenceY + 30, sigX + 80, evidenceY + 30); // Sign line

@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { firebaseConfig as staticConfig } from "@/firebase/config";
 
 /**
@@ -36,6 +37,7 @@ let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
 let auth: Auth | undefined;
 let rtdb: Database | undefined;
+let storage: FirebaseStorage | undefined;
 
 if (typeof window !== 'undefined') {
   if (isConfigValid) {
@@ -62,8 +64,9 @@ if (typeof window !== 'undefined') {
         });
       }
 
-      // 3. Initialize Auth & RTDB
+      // 3. Initialize Auth, Storage & RTDB
       auth = getAuth(app);
+      storage = getStorage(app);
       if (isRtdbConfigValid) {
         rtdb = getDatabase(app);
       }
@@ -73,4 +76,4 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export { app, db, auth, rtdb };
+export { app, db, auth, rtdb, storage };
