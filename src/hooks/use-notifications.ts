@@ -1,7 +1,8 @@
-
 "use client"
 
 import * as React from "react"
+
+export type NotificationVariant = "default" | "destructive" | "success";
 
 export type Notification = {
   id: string
@@ -9,8 +10,10 @@ export type Notification = {
   description?: React.ReactNode
   date: Date
   read: boolean
-  variant?: "default" | "destructive"
+  variant?: NotificationVariant
   action?: React.ReactNode
+  assetId?: string; // Metadata for forensic jumps
+  targetView?: string; // Target workstation for navigation
 }
 
 const actionTypes = {
@@ -23,7 +26,6 @@ const actionTypes = {
 const NOTIFICATIONS_STORAGE_KEY = "assetain-notifications";
 
 let count = 0
-// A more robust ID generator for persistent notifications
 function genId() {
   count = (count + 1) % 1000;
   return `${new Date().getTime()}-${count}`;
@@ -38,32 +40,31 @@ type Action =
 
 interface State {
   notifications: Notification[]
+  lastAddedId: string | null
 }
 
 const listeners: Array<(state: State) => void> = []
 
-// Safely initialize state from localStorage
 let memoryState: State = (() => {
     if (typeof window === 'undefined') {
-        return { notifications: [] };
+        return { notifications: [], lastAddedId: null };
     }
     try {
         const stored = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
         if (stored) {
             const parsedState = JSON.parse(stored);
-            // Revive date objects from string format
             if (Array.isArray(parsedState.notifications)) {
               parsedState.notifications = parsedState.notifications.map((n: any) => ({
                   ...n,
                   date: new Date(n.date)
               }));
             }
-            return parsedState;
+            return { ...parsedState, lastAddedId: null };
         }
     } catch (e) {
         console.error("Failed to load notifications from storage", e);
     }
-    return { notifications: [] };
+    return { notifications: [], lastAddedId: null };
 })();
 
 
@@ -72,10 +73,7 @@ function dispatch(action: Action) {
   
   if (typeof window !== 'undefined') {
     try {
-        // Create a serializable version of the state by omitting the 'action' property, 
-        // which can be a non-serializable React component.
         const serializableState = {
-            ...memoryState,
             notifications: memoryState.notifications.map(({ action, ...rest }) => rest),
         };
         localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(serializableState));
@@ -95,6 +93,7 @@ const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         notifications: [action.notification, ...state.notifications].slice(0, 50),
+        lastAddedId: action.notification.id
       }
     case "MARK_ALL_AS_READ":
       return {
@@ -105,6 +104,7 @@ const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         notifications: [],
+        lastAddedId: null
       }
     case "REMOVE_NOTIFICATION":
       return {

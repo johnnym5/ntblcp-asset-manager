@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * @fileOverview TravelReportDialog - High-Fidelity Word Document Generator.
+ * Phase 46: Consolidated modes and added automated statistical tables per category.
+ */
+
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
@@ -15,357 +20,301 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
-} from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import type { Asset } from '@/lib/types';
-
+import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning } from 'lucide-react';
+import { Badge } from './ui/badge';
 
 interface TravelReportDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ReportInput = ({ label, id, value, onChange }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void }) => (
-    <div className="space-y-1.5">
-        <Label htmlFor={id} className="font-semibold">{label}</Label>
-        <Textarea id={id} value={value} onChange={onChange} className="min-h-[100px] text-sm" />
+const ReportInput = ({ label, id, value, onChange, placeholder }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void, placeholder?: string }) => (
+    <div className="space-y-2">
+        <Label htmlFor={id} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <Info className="h-3 w-3 text-primary" /> {label}
+        </Label>
+        <Textarea 
+            id={id} 
+            value={value} 
+            onChange={onChange} 
+            placeholder={placeholder}
+            className="min-h-[100px] text-xs font-medium rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 focus:ring-0 shadow-inner p-4 resize-none" 
+        />
     </div>
 );
 
 const defaultActivities = [
-  "Physical verification of all assets in the state.",
-  "On-the-spot-assessment of the assets condition.",
-  "Proper documentation of the verified assets.",
-  "Proper documentation of the unverified assets.",
-  "Syncing of all the data into the server."
+  "Physical verification of all assets in the state registry.",
+  "On-the-spot assessment of assets physical and operational condition.",
+  "Cross-referencing manufacturer serials with the cloud database.",
+  "Verification of asset tag IDs and placement accuracy.",
+  "Documentation of unverified or missing assets for management review.",
+  "Real-time synchronization of field findings to the cloud workstation."
 ].join('\n');
-
-const defaultObservations = "";
-
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets, offlineAssets, dataSource, globalStateFilter, activeGrantId } = useAppState();
+  const { assets, appSettings } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
   const [objectives, setObjectives] = useState('');
   const [activities, setActivities] = useState(defaultActivities);
   const [approvedBy, setApprovedBy] = useState('');
-  
-  const [observations, setObservations] = useState(defaultObservations);
+  const [observations, setObservations] = useState('');
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const activeProject = useMemo(() => {
+    return appSettings?.grants.find(g => g.id === appSettings.activeGrantId)?.name || 'Registry';
+  }, [appSettings]);
+
+  const stats = useMemo(() => {
+    const verified = assets.filter(a => a.status === 'VERIFIED');
+    const total = assets.length;
+    
+    // Group by category for the automated table
+    const categories = Array.from(new Set(assets.map(a => a.category)));
+    const breakdown = categories.map(cat => {
+      const catAssets = assets.filter(a => a.category === cat);
+      const catVerified = catAssets.filter(a => a.status === 'VERIFIED').length;
+      const conditions = {
+        good: catAssets.filter(a => a.conditionGroup === 'Good').length,
+        bad: catAssets.filter(a => a.conditionGroup === 'Bad').length,
+        stolen: catAssets.filter(a => a.conditionGroup === 'Stolen').length,
+        obsolete: catAssets.filter(a => a.conditionGroup === 'Obsolete').length,
+        unsalvageable: catAssets.filter(a => a.conditionGroup === 'Unsalvageable').length
+      };
+      return {
+        name: cat,
+        total: catAssets.length,
+        verified: catVerified,
+        unverified: catAssets.length - catVerified,
+        conditions
+      };
+    });
+
+    return {
+        total,
+        verifiedCount: verified.length,
+        unverifiedCount: total - verified.length,
+        percentage: total > 0 ? Math.round((verified.length / total) * 100) : 0,
+        breakdown
+    };
+  }, [assets]);
 
   useEffect(() => {
     if (isOpen) {
-      setReportState(globalStateFilter || userProfile?.states[0] || '');
+      const initialState = userProfile?.state || 'Global';
+      setReportState(initialState);
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      setObjectives('To conduct physical verification of assets in the state.');
+      setObjectives(`To conduct mandatory physical asset verification and condition assessment for the ${activeProject} registry in ${initialState}.`);
       setActivities(defaultActivities);
-      setObservations(defaultObservations);
-      setApprovedBy('');
-      setChallenges('');
-      setRecommendations('');
+      setObservations(`Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`);
+      setChallenges("Internet connectivity in remote LGAs was intermittent.\nDifficulty accessing locked storage rooms in certain facilities.");
+      setRecommendations("Immediate replacement of obsolete equipment identified.\nImprove security protocols in facility stores with reported losses.");
     }
-  }, [isOpen, userProfile, globalStateFilter]);
-
-  const activeAssets = useMemo(() => {
-    return dataSource === 'cloud' ? assets : offlineAssets;
-  }, [dataSource, assets, offlineAssets]);
-
-  const reportAssets = useMemo(() => {
-    if (!reportState || !activeGrantId) return [];
-    
-    // 1. Project Restriction: Filter only by active grant
-    let projectAssets = activeAssets.filter(asset => asset.grantId === activeGrantId);
-
-    // 2. User/Regional Restriction: Non-admins only see authorized states
-    if (userProfile && !userProfile.isAdmin) {
-        projectAssets = projectAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            return userProfile.states.some(state => {
-                const lowerState = state.toLowerCase().trim();
-                const capitalCity = NIGERIAN_STATE_CAPITALS[state]?.toLowerCase().trim();
-                return assetLocation.startsWith(lowerState) || (capitalCity && assetLocation.startsWith(capitalCity));
-            });
-        });
-    }
-
-    if (reportState === 'All Locations') return projectAssets;
-    
-    const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(reportState.toLowerCase());
-
-    if (isZonalStore) {
-        const lowerCaseZone = reportState.toLowerCase();
-        return projectAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-        });
-    }
-
-    const lowerCaseFilter = reportState.toLowerCase().trim();
-    const capitalCity = NIGERIAN_STATE_CAPITALS[reportState]?.toLowerCase().trim();
-    
-    return projectAssets.filter(asset => {
-      const assetLocation = (asset.location || "").toLowerCase().trim();
-      const matchesState = assetLocation.startsWith(lowerCaseFilter);
-      const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-      return matchesState || matchesCapital || (SPECIAL_LOCATIONS.includes(reportState) && assetLocation.includes(lowerCaseFilter));
-    });
-  }, [activeAssets, reportState, activeGrantId, userProfile]);
-
-  const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
-  const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
-  const assetsWithRemarks = reportAssets.filter(asset => asset.remarks && asset.remarks.trim() !== '');
+  }, [isOpen, userProfile, stats, activeProject]);
 
   const generateWordDocument = async () => {
-    const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
-    const { saveAs } = await import('file-saver');
+    setIsGenerating(true);
+    try {
+        const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType, VerticalAlign } = await import('docx');
+        const { saveAs } = await import('file-saver');
 
-    const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
+        const cellStyles = { 
+          borders: { 
+            top: { style: BorderStyle.SINGLE, size: 1 }, 
+            bottom: { style: BorderStyle.SINGLE, size: 1 }, 
+            left: { style: BorderStyle.SINGLE, size: 1 }, 
+            right: { style: BorderStyle.SINGLE, size: 1 } 
+          },
+          verticalAlign: VerticalAlign.CENTER
+        };
 
-    const createBulletedParagraphs = (text: string) => {
-        return text.split('\n').filter(line => line.trim() !== '').map(line => {
-            return new Paragraph({
-                text: line.startsWith('- ') ? line.substring(2) : line,
-                bullet: { level: 0 },
-                style: "default-bullet-style",
+        const createBulletedParagraphs = (text: string) => {
+            return text.split('\n').filter(line => line.trim() !== '').map(line => {
+                return new Paragraph({
+                    text: line.startsWith('- ') ? line.substring(2) : line,
+                    bullet: { level: 0 },
+                    style: "default-bullet-style",
+                });
             });
-        });
-    };
-    
-    const tableHeader = new TableRow({
-        children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S/N", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset ID Code", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Description", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Remark/Comment", bold: true })]})], ...cellStyles }),
-        ],
-    });
-
-    const remarksRows = assetsWithRemarks.map((asset, index) => new TableRow({
-        children: [
-            new TableCell({ children: [new Paragraph(String(asset.sn || index + 1))], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.assetIdCode || '')], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.description || '')], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.remarks || '')], ...cellStyles }),
-        ],
-    }));
-    
-    const remarksTable = new Table({
-        rows: [tableHeader, ...remarksRows],
-        width: { size: 100, type: WidthType.PERCENTAGE },
-    });
-    
-    const summaryParagraph = reportState === 'All Locations' 
-    ? new Paragraph({
-        children: [
-            new TextRun("This is a compilation of all assets in all locations. Out of a total of "),
-            new TextRun({ text: `${reportAssets.length} assets`, bold: true }),
-            new TextRun(", "),
-            new TextRun({ text: `${verifiedAssets.length} were verified`, bold: true, color: "008000" }), // Green
-            new TextRun(" and "),
-            new TextRun({ text: `${unverifiedAssetsCount} were unverified.`, bold: true, color: "FF0000" }), // Red
-        ],
-      })
-    : new Paragraph({
-        children: [
-            new TextRun("On my asset verification visit to "),
-            new TextRun({ text: reportState, bold: true }),
-            new TextRun(", out of a total of "),
-            new TextRun({ text: `${reportAssets.length} assets`, bold: true }),
-            new TextRun(", "),
-            new TextRun({ text: `${verifiedAssets.length} were verified`, bold: true, color: "008000" }), // Green
-            new TextRun(" and "),
-            new TextRun({ text: `${unverifiedAssetsCount} were unverified.`, bold: true, color: "FF0000" }), // Red
-        ],
-    });
-
-    const verifiedAssetsByCategory = verifiedAssets.reduce((acc, asset) => {
-        const category = asset.category || 'Uncategorized';
-        acc[category] = (acc[category] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    const categorySummaryText = Object.entries(verifiedAssetsByCategory)
-        .map(([category, count]) => `${count} ${category.replace(/-C19RM/g, '').replace(/_|-/g, ' ')}`)
-        .join(', ');
-
-    const detailedSummaryParagraph = new Paragraph({
-        children: [
-            new TextRun("Out of the "),
-            new TextRun({ text: `${verifiedAssets.length} verified assets`, bold: true, color: "008000" }),
-            new TextRun(", I verified: "),
-            new TextRun({ text: categorySummaryText || 'none', bold: true }),
-            new TextRun("."),
-        ],
-    });
-
-    const doc = new Document({
-        styles: {
-            paragraphStyles: [{
-                id: "default-bullet-style",
-                name: "Default Bullet Style",
-                basedOn: "Normal",
-                next: "Normal",
-                run: {
-                    size: 22, // 11pt
-                },
-                paragraph: {
-                    indent: { left: 720, hanging: 360 }, // 0.5 inch indent, 0.25 inch hanging
-                },
-            }]
-        },
-        sections: [{
+        };
+        
+        // 1. STATISTICAL BREAKDOWN TABLE
+        const statsHeader = new TableRow({
             children: [
-                new Paragraph({ text: "ASSETAIN", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
-                new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
-                new Paragraph(" "),
-                new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
-                new Paragraph({ text: `STATE VISITED:\t\t${reportState}` }),
-                new Paragraph({ text: `NAME OF OFFICER ON THE TRAVEL:\t${userProfile?.displayName}` }),
-                new Paragraph(" "),
-                new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
-                summaryParagraph,
-                new Paragraph(" "),
-                detailedSummaryParagraph,
-                new Paragraph(" "),
-                new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(objectives),
-                new Paragraph(" "),
-                new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(activities),
-                new Paragraph(" "),
-                new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
-                 ...createBulletedParagraphs(observations),
-                 new Paragraph(" "),
-                new Paragraph({ text: "CHALLENGES:", heading: HeadingLevel.HEADING_3 }),
-                 ...createBulletedParagraphs(challenges),
-                 new Paragraph(" "),
-                new Paragraph({ text: "RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
-                 ...createBulletedParagraphs(recommendations),
-                 new Paragraph(" "),
-                new Paragraph({ text: "ASSETS WITH REMARKS:", heading: HeadingLevel.HEADING_3 }),
-                remarksRows.length > 0 ? remarksTable : new Paragraph("No assets with remarks were found for this location."),
-                new Paragraph(" "),
-                new Paragraph(" "),
-                new Paragraph({ text: `Prepared by: ${userProfile?.displayName}` }),
-                 new Paragraph(" "),
-                new Paragraph({ text: `Approved by: ${approvedBy}` }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ASSET FOLDER", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "TOTAL", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "VERIFIED", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "UNVERIFIED", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "GOOD", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CRITICAL", bold: true, size: 18 })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "STOLEN", bold: true, size: 18 })]})], ...cellStyles }),
             ],
-        }],
-    });
+        });
 
-    Packer.toBlob(doc).then(blob => {
-        saveAs(blob, `Travel-Report-${reportState}-${userProfile?.displayName}.docx`);
-    });
+        const statsRows = stats.breakdown.map((row) => new TableRow({
+            children: [
+                new TableCell({ children: [new Paragraph({ text: row.name, style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.total), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.verified), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.unverified), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.good), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.bad + row.conditions.unsalvageable), style: "Normal" })], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ text: String(row.conditions.stolen), style: "Normal" })], ...cellStyles }),
+            ],
+        }));
+
+        const summaryTable = new Table({
+            rows: [statsHeader, ...statsRows],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+        });
+
+        const doc = new Document({
+            styles: {
+                paragraphStyles: [{
+                    id: "default-bullet-style",
+                    name: "Default Bullet Style",
+                    basedOn: "Normal",
+                    next: "Normal",
+                    run: { size: 22 },
+                    paragraph: { indent: { left: 720, hanging: 360 } },
+                }]
+            },
+            sections: [{
+                children: [
+                    new Paragraph({ text: "ASSETAIN REGISTRY INTELLIGENCE", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: "OFFICIAL ASSET VERIFICATION REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: `DATE OF REPORT:\t\t${travelDate}` }),
+                    new Paragraph({ text: `REGION VISITED:\t\t${reportState}` }),
+                    new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "1. EXECUTIVE SUMMARY", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({
+                        children: [
+                            new TextRun("Mandatory physical audit conducted for "),
+                            new TextRun({ text: activeProject, bold: true }),
+                            new TextRun(" in "),
+                            new TextRun({ text: reportState, bold: true }),
+                            new TextRun(". Total registry scope: "),
+                            new TextRun({ text: `${stats.total} assets`, bold: true }),
+                            new TextRun(". Current coverage: "),
+                            new TextRun({ text: `${stats.verifiedCount} verified (${stats.percentage}%)`, bold: true, color: "008000" }),
+                            new TextRun(" and "),
+                            new TextRun({ text: `${stats.unverifiedCount} pending.`, bold: true, color: "FF0000" }),
+                        ],
+                    }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "2. FOLDER-WISE STATISTICAL BREAKDOWN", heading: HeadingLevel.HEADING_3 }),
+                    summaryTable,
+                    new Paragraph(" "),
+                    new Paragraph({ text: "3. AUDIT OBJECTIVES", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(objectives),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "4. ACTIVITIES PERFORMED", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(activities),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "5. KEY FINDINGS & EXCEPTIONS", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(observations),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "6. CHALLENGES & RECOMMENDATIONS", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(challenges),
+                    ...createBulletedParagraphs(recommendations),
+                    new Paragraph(" "),
+                    new Paragraph(" "),
+                    new Paragraph({ text: `Report Authored by: ${userProfile?.displayName}` }),
+                    new Paragraph({ text: `Approved by: ${approvedBy || '____________________'}` }),
+                ],
+            }],
+        });
+
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `Assetain-Executive-Report-${reportState.replace(/\s+/g, '_')}.docx`);
+        onOpenChange(false);
+    } catch (e) {
+        console.error("Report generation failure", e);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Travel Report Generator</DialogTitle>
-          <DialogDescription>
-            Fill in the details below to generate a Word document report for your trip. This report only includes data from the active project.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="max-h-[70vh] p-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pr-4">
-                {/* Input Form */}
-                <div className="space-y-4">
+      <DialogContent className="max-w-4xl flex flex-col h-[90vh] overflow-hidden p-0 border-primary/10 rounded-3xl bg-background shadow-2xl">
+        <div className="p-8 pb-4 bg-muted/20 border-b">
+            <DialogHeader>
+                <div className="flex items-center justify-between">
+                    <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
+                        <PlaneTakeoff className="text-primary h-8 w-8" /> Travel Report Builder
+                    </DialogTitle>
+                    <Badge variant="outline" className="h-9 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
+                        Coverage: {stats.percentage}%
+                    </Badge>
+                </div>
+                <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+                    Automated executive summary with per-folder condition analytics.
+                </DialogDescription>
+            </DialogHeader>
+        </div>
+
+        <ScrollArea className="flex-1 bg-background">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+                <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-1.5">
-                            <Label htmlFor="officerName">Officer's Name</Label>
-                            <Input id="officerName" value={userProfile?.displayName || ''} readOnly disabled />
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Auditor Identity</Label>
+                            <Input value={userProfile?.displayName || ''} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
-                        {userProfile?.isAdmin ? (
-                            <div className="space-y-1.5">
-                                <Label htmlFor="reportState">State for Report</Label>
-                                <Select onValueChange={setReportState} value={reportState}>
-                                    <SelectTrigger><SelectValue placeholder="Select a location..." /></SelectTrigger>
-                                    <SelectContent>
-                                          <SelectItem value="All Locations">All Locations</SelectItem>
-                                          <SelectSeparator />
-                                          <SelectGroup>
-                                              <SelectLabel>Special Locations</SelectLabel>
-                                              {SPECIAL_LOCATIONS.map((loc) => (
-                                                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                              ))}
-                                          </SelectGroup>
-                                          <SelectSeparator />
-                                          <SelectGroup>
-                                              <SelectLabel>Zonal Stores</SelectLabel>
-                                              {ZONAL_STORES.map((zone) => (
-                                                  <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                                              ))}
-                                          </SelectGroup>
-                                          <SelectSeparator />
-                                          <SelectGroup>
-                                              <SelectLabel>States</SelectLabel>
-                                              {NIGERIAN_STATES.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
-                                          </SelectGroup>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ) : (userProfile?.states && userProfile.states.length > 1 ? (
-                             <div className="space-y-1.5">
-                                <Label htmlFor="reportState">State for Report</Label>
-                                <Select onValueChange={setReportState} value={reportState}>
-                                    <SelectTrigger><SelectValue placeholder="Select a location..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {userProfile.states.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ) : (
-                             <div className="space-y-1.5">
-                                <Label htmlFor="reportState">State Visited</Label>
-                                <Input id="reportState" value={reportState} readOnly disabled />
-                            </div>
-                        ))}
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Scope</Label>
+                            <Input value={reportState} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
+                        </div>
                     </div>
-                     <div className="space-y-1.5">
-                        <Label htmlFor="travelDate">Date of Travel (e.g., 2nd-4th December 2024)</Label>
-                        <Input id="travelDate" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} />
-                    </div>
-
-                    <p className="p-4 bg-muted rounded-md text-sm">
-                        {reportState === 'All Locations'
-                        ? <>A compilation of all assets in all locations. Out of <span className="font-bold">{reportAssets.length}</span> total assets in the active project, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
-                        : <>On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets in the active project, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
-                        }
-                    </p>
-                    <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
-                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
-                </div>
-
-                <div className="space-y-4">
-                    <ReportInput label="Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
-                    <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
-                    <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
-                    
                     <div className="space-y-1.5">
-                        <Label htmlFor="approvedBy" className="font-semibold">Approved By</Label>
-                        <Input id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} />
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Audit Period</Label>
+                        <Input value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className="rounded-xl font-bold text-xs border-2" />
+                    </div>
+                    <ReportInput label="Audit Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
+                    <ReportInput label="Field Activities" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
+                </div>
+                <div className="space-y-6">
+                    <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Registry Pulse Snapshot
+                        </h4>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div className="flex flex-col">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Total Folders</span>
+                                <span className="text-lg font-black">{stats.breakdown.length}</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Verified Records</span>
+                                <span className="text-lg font-black text-green-600">{stats.verifiedCount}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <ReportInput label="Detailed Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
+                    <ReportInput label="Challenges & Recommendations" id="recommendations" value={challenges + "\n" + recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Approving Manager</Label>
+                        <Input value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Manager name..." className="rounded-xl border-2 font-bold text-xs" />
                     </div>
                 </div>
             </div>
         </ScrollArea>
-        <DialogFooter>
-          <Button onClick={generateWordDocument} disabled={reportAssets.length === 0}>Export to Word</Button>
-        </DialogFooter>
+
+        <div className="p-8 bg-muted/20 border-t flex items-center justify-between">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Cancel</Button>
+          <Button onClick={generateWordDocument} disabled={isGenerating || stats.total === 0} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 min-w-[280px]">
+            {isGenerating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+            Generate Executive Report
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

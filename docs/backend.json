@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "Asset": {
+      "title": "Asset",
+      "description": "Deterministic registry record representing a physical asset.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "grantId": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["VERIFIED", "UNVERIFIED", "DISCREPANCY"] },
+        "condition": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "assetIdCode": { "type": "string" },
+        "lastModified": { "type": "string", "format": "date-time" },
+        "lastModifiedBy": { "type": "string" },
+        "importMetadata": {
+          "type": "object",
+          "properties": {
+            "sourceFile": { "type": "string" },
+            "sheetName": { "type": "string" },
+            "rowNumber": { "type": "number" }
+          }
+        }
+      }
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global governance and project orchestration settings.",
+      "type": "object",
+      "properties": {
+        "activeGrantId": { "type": "string" },
+        "appMode": { "type": "string", "enum": ["management", "verification"] },
+        "lockAssetList": { "type": "boolean" },
+        "readAuthority": { "type": "string", "enum": ["FIRESTORE", "RTDB"] }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["anonymous", "password"]
+  },
+  "firestore": {
+    "/assets/{assetId}": {
+      "schema": { "$ref": "#/backend/entities/Asset" },
+      "description": "Primary registry storage."
+    },
+    "/config/settings": {
+      "schema": { "$ref": "#/backend/entities/AppSettings" },
+      "description": "Governance configuration."
+    }
+  }
+}

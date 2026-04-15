@@ -1,589 +1,324 @@
-
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+/**
+ * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
+ * Phase 1600: Integrated navigation controls & Swipe actions.
+ * Phase 1601: Implemented unlimited loop logic.
+ */
+
+import React, { useMemo, useState } from 'react';
 import { 
-    FileWarning, 
-    History, 
-    BarChart2, 
-    CalendarClock, 
-    ChevronsUpDown, 
-    PlusCircle, 
-    AlertTriangle, 
-    CheckCircle2, 
-    PieChart, 
-    Sparkles, 
-    User, 
-    Search, 
-    Tag, 
-    MapPin, 
-    RefreshCw, 
-    ChevronLeft, 
-    ChevronRight,
-    ClipboardCheck,
-    AlertCircle,
-    Hash,
-    MessageSquare,
+    Fingerprint,
+    Tag,
+    SearchCode,
+    Info,
+    Truck,
     Activity,
-    Wrench
+    ShieldCheck,
+    Wrench,
+    AlertCircle,
+    Box,
+    Trash2,
+    MessageSquare,
+    ClipboardCheck,
+    ChevronLeft,
+    ChevronRight,
+    ArrowRight,
+    CheckCircle2
 } from 'lucide-react';
-import type { Asset } from '@/lib/types';
-import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { useAuth } from '@/contexts/auth-context';
-import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/constants';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
-    const cardContent = (
-        <Card className={cn("transition-all duration-300 w-full overflow-hidden h-full flex flex-col", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30 shadow-sm")}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
-                <div className={cn("p-2 rounded-full", isActive ? "bg-primary/20" : "bg-muted")}>
-                    {icon}
-                </div>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold tracking-tight">{value}</div>
-                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 min-h-[2.5rem] leading-tight flex-1">
-                    {description}
-                </p>
-                {onAction && (
-                     <div className={cn("text-[10px] font-bold mt-2 transition-colors uppercase tracking-widest", isActive ? "text-primary" : "text-primary/70")}>
-                        {actionLabel || "View Details"}
-                     </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-
-    if (onAction) {
-        return <button onClick={onAction} className="text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl w-full h-full block">{cardContent}</button>;
-    }
-    return cardContent;
-};
-
-interface Insight {
-    text: string;
-    icon: React.ReactNode;
+interface PulseData {
+    id: string;
+    label: string;
+    description: string;
+    count: number;
+    icon: any;
     color: string;
-    subtext?: string;
-    asset?: Asset;
+    token: string;
+    variant: 'default' | 'destructive' | 'warning' | 'success' | 'blue';
+    visible?: boolean;
 }
 
 export function AssetSummaryDashboard() {
     const { 
-        assets, 
-        offlineAssets, 
-        dataSource, 
-        setMissingFieldFilter, 
-        missingFieldFilter, 
-        appSettings, 
-        dateFilter, 
-        setDateFilter, 
-        globalStateFilter, 
-        conditionFilter, 
-        setConditionFilter, 
-        activeGrantId, 
-        setAssetToView,
-        setSelectedStatuses,
-        selectedStatuses
+        filteredAssets,
+        setActiveView,
+        appSettings,
+        setSearchTerm
     } = useAppState();
-    const { userProfile } = useAuth();
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeView, setActiveTab] = useState<'stats' | 'progress'>('stats');
-    const [insightIndex, setInsightIndex] = useState(0);
-    const [refreshKey, setRefreshKey] = useState(0);
-    
-    const summaryAssets = useMemo(() => {
-        const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
-        
-        // Filter by active project — include assets that match OR have no grantId set (common with imports)
-        let filtered = activeAssets.filter(a => 
-            !activeGrantId || !a.grantId || a.grantId === activeGrantId
-        );
 
-        if (globalStateFilter && globalStateFilter !== 'All') {
-            const isZone = ZONAL_STORES.includes(globalStateFilter);
+    const [scrollIndex, setScrollIndex] = useState(0);
+    const mode = appSettings?.appMode || 'management';
 
-            if (isZone) {
-                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-                filtered = filtered.filter(asset => {
-                    const assetLocation = (asset.location || "").toLowerCase().trim();
-                    return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
-                });
-            } else if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
-                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-                filtered = filtered.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
-            } else {
-                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-                const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
-                filtered = filtered.filter(asset => {
-                    const assetLocation = (asset.location || "").toLowerCase().trim();
-                    const matchesState = assetLocation.startsWith(lowerCaseFilter);
-                    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-                    return matchesState || matchesCapital;
-                });
-            }
-        }
-        return filtered;
-    }, [assets, offlineAssets, dataSource, globalStateFilter, activeGrantId]);
-
-
-    const categoryStats = useMemo(() => {
-        if (!appSettings || !appSettings.grants) return [];
-        const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
-        const sheetDefinitions = activeGrant?.sheetDefinitions || {};
-
-        const categories = Object.keys(sheetDefinitions).filter(cat => !sheetDefinitions[cat].isHidden);
-        
-        return categories.map(cat => {
-            const catAssets = summaryAssets.filter(a => a.category === cat);
-            const verified = catAssets.filter(a => a.verifiedStatus === 'Verified').length;
-            const total = catAssets.length;
-            const percentage = total > 0 ? (verified / total) * 100 : 0;
-            return { name: cat, verified, total, percentage };
-        }).sort((a, b) => b.total - a.total);
-    }, [summaryAssets, appSettings, activeGrantId]);
-
-    const insightsPool = useMemo(() => {
-        const pool: Insight[] = [];
-
-        // 1. Random Recently Modified Asset
-        const recentlyModified = [...summaryAssets]
-            .filter(a => a.lastModified)
-            .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime())
-            .slice(0, 10);
-        
-        if (recentlyModified.length > 0) {
-            const randomAsset = recentlyModified[Math.floor(Math.random() * recentlyModified.length)];
-            pool.push({
-                text: `"${randomAsset.description || 'Record'}" was recently updated.`,
-                icon: <History className="h-5 w-5" />,
-                color: "text-green-500",
-                subtext: `Modified by ${randomAsset.lastModifiedBy || 'System'} ${formatDistanceToNow(new Date(randomAsset.lastModified!), { addSuffix: true })}.`,
-                asset: randomAsset
-            });
-        }
-
-        // 2. Random Asset Missing ID
-        const missingIds = summaryAssets.filter(a => !a.assetIdCode);
-        if (missingIds.length > 0) {
-            const randomAsset = missingIds[Math.floor(Math.random() * missingIds.length)];
-            pool.push({
-                text: `"${randomAsset.description || 'Asset'}" is missing its Asset ID Code.`,
-                icon: <Tag className="h-5 w-5" />,
-                color: "text-orange-500",
-                subtext: `Data Quality: Assets without tags are harder to audit in ${randomAsset.location || 'the field'}.`,
-                asset: randomAsset
-            });
-        }
-
-        // 3. Random Asset Missing Assignee
-        const noAssignees = summaryAssets.filter(a => !a.assignee);
-        if (noAssignees.length > 0) {
-            const randomAsset = noAssignees[Math.floor(Math.random() * noAssignees.length)];
-            pool.push({
-                text: `Ownership Gap: "${randomAsset.description || 'Asset'}" has no recorded user.`,
-                icon: <User className="h-5 w-5" />,
-                color: "text-blue-500",
-                subtext: `Current Location: ${randomAsset.location || 'Unknown'}. Click to view details.`,
-                asset: randomAsset
-            });
-        }
-
-        // 4. Random Bad Condition Asset
-        const badConditions = summaryAssets.filter(a => a.condition && a.condition.toLowerCase().includes('bad'));
-        if (badConditions.length > 0) {
-            const randomAsset = badConditions[Math.floor(Math.random() * badConditions.length)];
-            pool.push({
-                text: `Maintenance Alert: "${randomAsset.description}" is in bad condition.`,
-                icon: <AlertTriangle className="h-5 w-5" />,
-                color: "text-destructive",
-                subtext: `Reported Condition: ${randomAsset.condition}. Needs immediate assessment.`,
-                asset: randomAsset
-            });
-        }
-
-        // 5. Audit Check: Assets with missing manufacturer info
-        const noManuf = summaryAssets.filter(a => !a.manufacturer);
-        if (noManuf.length > 0) {
-            const randomAsset = noManuf[Math.floor(Math.random() * noManuf.length)];
-            pool.push({
-                text: `Missing Data: "${randomAsset.description}" has no Manufacturer listed.`,
-                icon: <Search className="h-5 w-5" />,
-                color: "text-indigo-500",
-                subtext: "Action: Fill in missing manufacturer details to improve database accuracy.",
-                asset: randomAsset
-            });
-        }
-
-        // 6. Verification Progress
-        const pending = summaryAssets.filter(a => a.verifiedStatus !== 'Verified').length;
-        if (pending > 0) {
-            pool.push({
-                text: `Verification Pulse: ${pending} assets in ${globalStateFilter === 'All' ? 'the project' : globalStateFilter} are pending verification.`,
-                icon: <PieChart className="h-5 w-5" />,
-                color: "text-primary",
-                subtext: "Action: Use the 'Unverified' filter to clear the queue."
-            });
-        }
-
-        // 7. Category Insight
-        const laggingCategories = categoryStats.filter(c => c.percentage < 100);
-        if (laggingCategories.length > 0) {
-            const randomCat = laggingCategories[Math.floor(Math.random() * laggingCategories.length)];
-            pool.push({
-                text: `Focus Area: The "${randomCat.name}" category is only ${randomCat.percentage.toFixed(0)}% verified.`,
-                icon: <BarChart2 className="h-5 w-5" />,
-                color: "text-purple-500",
-                subtext: `${randomCat.total - randomCat.verified} items remaining in this inventory list.`
-            });
-        }
-
-        if (pool.length === 0) {
-            pool.push({
-                text: "Your asset database is in perfect shape! No critical issues detected.",
-                icon: <Sparkles className="h-5 w-5" />,
-                color: "text-green-500"
-            });
-        }
-
-        return pool;
-    }, [summaryAssets, categoryStats, globalStateFilter, refreshKey]);
-
-    useEffect(() => {
-        if (activeView === 'progress' && insightsPool.length > 1) {
-            const timer = setInterval(() => {
-                setInsightIndex(prev => (prev + 1) % insightsPool.length);
-            }, 5000);
-            return () => clearInterval(timer);
-        }
-    }, [activeView, insightsPool.length, refreshKey]);
-
-    const summary = useMemo(() => {
-        const total = summaryAssets.length;
-        const verified = summaryAssets.filter(a => a.verifiedStatus === 'Verified').length;
-        return {
-          total,
-          verified,
-          unverified: total - verified,
-          unusable: summaryAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
-          needsRepair: summaryAssets.filter(a => a.condition && ['Bad condition', 'F2: Major repairs required-poor condition', 'Used but in poor condition'].includes(a.condition)).length,
-          withoutAssetId: summaryAssets.filter(a => !a.assetIdCode?.trim()).length,
-          withoutSerial: summaryAssets.filter(a => !a.serialNumber?.trim()).length,
-          withDiscrepancy: summaryAssets.filter(a => a.verifiedStatus === 'Discrepancy').length,
-          modifiedToday: summaryAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
-          newThisWeek: summaryAssets.filter(a => a.lastModified && !a.previousState && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
-          withRemarks: summaryAssets.filter(a => a.remarks?.trim()).length,
+    const pulses = useMemo((): PulseData[] => {
+        const assets = filteredAssets;
+        const isVehicle = (a: any) => {
+            const cat = (a.category || '').toLowerCase();
+            return cat.includes('motor') || cat.includes('vehicle');
         };
-    }, [summaryAssets]);
-    
-    const handleFilterClick = (field: keyof Asset | '') => {
-        resetAllFilters();
-        if (missingFieldFilter === field) {
-            setMissingFieldFilter('');
-        } else {
-            setMissingFieldFilter(field);
-        }
+
+        const list: PulseData[] = [
+            {
+                id: 'missing-id',
+                label: 'Asset ID Gaps',
+                description: 'Assets lacking a unique system tag or barcode ID.',
+                count: assets.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '').length,
+                icon: Fingerprint,
+                color: 'bg-orange-600',
+                token: 'MISSING_ID',
+                variant: 'warning'
+            },
+            {
+                id: 'missing-sn',
+                label: 'S/N Gaps',
+                description: 'Assets without a primary short serial number.',
+                count: assets.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '').length,
+                icon: Tag,
+                color: 'bg-orange-500',
+                token: 'MISSING_SN',
+                variant: 'warning'
+            },
+            {
+                id: 'missing-serial',
+                label: 'Serial No Gaps',
+                description: 'Non-vehicle items missing manufacturer serials.',
+                count: assets.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A')).length,
+                icon: SearchCode,
+                color: 'bg-orange-400',
+                token: 'MISSING_SERIAL',
+                variant: 'warning'
+            },
+            {
+                id: 'missing-model',
+                label: 'Model No Gaps',
+                description: 'Equipment items missing specific model identification.',
+                count: assets.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A')).length,
+                icon: Info,
+                color: 'bg-amber-500',
+                token: 'MISSING_MODEL',
+                variant: 'warning'
+            },
+            {
+                id: 'missing-chassis',
+                label: 'Chassis No Gaps',
+                description: 'Vehicles/Motorbikes missing structural chassis pulses.',
+                count: assets.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A')).length,
+                icon: Truck,
+                color: 'bg-red-500',
+                token: 'MISSING_CHASSIS',
+                variant: 'destructive'
+            },
+            {
+                id: 'missing-engine',
+                label: 'Engine No Gaps',
+                description: 'Vehicles/Motorbikes missing engine ID pulses.',
+                count: assets.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A')).length,
+                icon: Activity,
+                color: 'bg-red-600',
+                token: 'MISSING_ENGINE',
+                variant: 'destructive'
+            },
+            {
+                id: 'cond-good',
+                label: 'Optimal Assets',
+                description: 'Assets verified in new or good condition.',
+                count: assets.filter(a => a.conditionGroup === 'Good').length,
+                icon: ShieldCheck,
+                color: 'bg-green-600',
+                token: 'CONDITION_GOOD',
+                variant: 'success'
+            },
+            {
+                id: 'cond-bad',
+                label: 'Critical Condition',
+                description: 'Assets in poor condition requiring repair or replacement.',
+                count: assets.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || '')).length,
+                icon: Wrench,
+                color: 'bg-orange-600',
+                token: 'CONDITION_BAD',
+                variant: 'warning'
+            },
+            {
+                id: 'cond-stolen',
+                label: 'Stolen Pulses',
+                description: 'Confirmed physical losses from regional sites.',
+                count: assets.filter(a => a.condition === 'Stolen').length,
+                icon: AlertCircle,
+                color: 'bg-red-700',
+                token: 'CONDITION_STOLEN',
+                variant: 'destructive'
+            },
+            {
+                id: 'cond-obsolete',
+                label: 'Obsolete Registry',
+                description: 'Assets that have reached the end of operational life.',
+                count: assets.filter(a => a.condition === 'Obsolete').length,
+                icon: Box,
+                color: 'bg-muted-foreground',
+                token: 'CONDITION_OBSOLETE',
+                variant: 'default'
+            },
+            {
+                id: 'cond-unsalvageable',
+                label: 'Unsalvageable',
+                description: 'Burnt or destroyed items ready for write-off.',
+                count: assets.filter(a => ['Unsalvageable', 'Burnt'].includes(a.condition || '')).length,
+                icon: Trash2,
+                color: 'bg-red-900',
+                token: 'CONDITION_UNSALVAGEABLE',
+                variant: 'destructive'
+            },
+            {
+                id: 'with-remarks',
+                label: 'Field Remarks',
+                description: 'Records containing specific auditor observations.',
+                count: assets.filter(a => !!a.remarks && a.remarks.trim() !== '').length,
+                icon: MessageSquare,
+                color: 'bg-blue-600',
+                token: 'WITH_REMARKS',
+                variant: 'blue'
+            },
+            {
+                id: 'pending-verify',
+                label: 'Pending Assessment',
+                description: 'Assets awaiting field verification pulse.',
+                count: assets.filter(a => a.status === 'UNVERIFIED').length,
+                icon: ClipboardCheck,
+                color: 'bg-blue-500',
+                token: 'STATUS_UNVERIFIED',
+                variant: 'blue',
+                visible: mode === 'verification'
+            }
+        ];
+
+        return list.filter(p => p.visible !== false);
+    }, [filteredAssets, mode]);
+
+    const navigateTo = (token: string) => {
+        setSearchTerm(token);
+        setActiveView('REGISTRY');
     };
 
-    // Special handler for "Field Feedback" — shows assets that HAVE remarks (opposite of missing filter)
-    const { setSearchTerm } = useAppState();
-    const handleRemarksClick = () => {
-        resetAllFilters();
-        // Toggle: if already searching for remarks, clear; otherwise search for any asset with remarks
-        // We use the missingFieldFilter with a special sentinel value to track this
-        if (missingFieldFilter === 'remarks') {
-            setMissingFieldFilter('');
-        } else {
-            setMissingFieldFilter('remarks');
-        }
-    };
+    const nextPulse = () => setScrollIndex(i => (i + 1) % pulses.length);
+    const prevPulse = () => setScrollIndex(i => (i - 1 + pulses.length) % pulses.length);
 
-    const handleDateFilterClick = (filter: 'today' | 'week' | 'new-week') => {
-        resetAllFilters();
-        if (dateFilter === filter) {
-            setDateFilter(null);
-        } else {
-            setDateFilter(filter);
-        }
-    };
+    const activePulse = pulses[scrollIndex];
+    if (!activePulse) return null;
 
-    const handleConditionFilterClick = (conditions: string[]) => {
-        resetAllFilters();
-        if (JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditions.sort())) {
-            setConditionFilter([]);
-        } else {
-            setConditionFilter(conditions);
-        }
-    };
-
-    const handleStatusFilterClick = (status: 'Verified' | 'Unverified' | 'Discrepancy') => {
-        resetAllFilters();
-        if (selectedStatuses.includes(status)) {
-            setSelectedStatuses([]);
-        } else {
-            setSelectedStatuses([status]);
-        }
-    };
-
-    const resetAllFilters = () => {
-        setMissingFieldFilter('');
-        setDateFilter(null);
-        setConditionFilter([]);
-        setSelectedStatuses([]);
-    }
-
-    const handleInsightClick = (insight: Insight) => {
-        if (insight.asset) {
-            setAssetToView(insight.asset);
-        }
-    };
-
-    const handleNextInsight = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setInsightIndex(prev => (prev + 1) % insightsPool.length);
-    };
-
-    const handlePrevInsight = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setInsightIndex(prev => (prev - 1 + insightsPool.length) % insightsPool.length);
-    };
-
-    const handleRefreshInsights = (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        setRefreshKey(prev => prev + 1);
-        setInsightIndex(0);
-    };
-
-    const conditionGroups = {
-        unusable: ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'],
-        repair: ['Bad condition', 'F2: Major repairs required-poor condition', 'Used but in poor condition'],
-    };
-
-    if (!appSettings) return null;
+    const isNominal = activePulse.count === 0;
+    const swipeConfidenceThreshold = 10000;
+    const swipePower = (offset: number, velocity: number) => Math.abs(offset) * velocity;
 
     return (
-        <Collapsible
-            open={isOpen}
-            onOpenChange={setIsOpen}
-            className="w-full max-w-full overflow-hidden"
-        >
-            <CollapsibleTrigger asChild>
-                <div className='flex items-center justify-between p-4 rounded-xl bg-card/80 border shadow-lg backdrop-blur-md mb-2 cursor-pointer hover:bg-card/100 transition-colors group/header'>
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-primary/10 rounded-lg group-hover/header:bg-primary/20 transition-colors">
-                            <BarChart2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold tracking-tight">Inventory Pulse</h3>
-                            <p className="text-xs text-muted-foreground">Real-time status of {globalStateFilter === 'All' ? 'global' : globalStateFilter} assets</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                        <div className="hidden sm:flex bg-muted p-1 rounded-lg mr-2">
-                            <Button 
-                                variant={activeView === 'stats' ? 'secondary' : 'ghost'} 
-                                size="sm" 
-                                className="h-7 text-xs px-3 rounded-md"
-                                onClick={(e) => { e.stopPropagation(); setActiveTab('stats'); }}
-                            >
-                                Key Stats
-                            </Button>
-                            <Button 
-                                variant={activeView === 'progress' ? 'secondary' : 'ghost'} 
-                                size="sm" 
-                                className="h-7 text-xs px-3 rounded-md"
-                                onClick={(e) => { e.stopPropagation(); setActiveTab('progress'); }}
-                            >
-                                Asset Insights
-                            </Button>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full pointer-events-none">
-                            <ChevronsUpDown className="h-4 w-4" />
-                        </Button>
-                    </div>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20"><Activity className="h-4 w-4 text-primary" /></div>
+                    <h3 className="text-[10px] font-black uppercase text-foreground/60 tracking-[0.2em]">Inventory Pulse</h3>
                 </div>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
-                <div className="py-2">
-                    {activeView === 'stats' ? (
-                        <div className="w-full">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-4 pt-2">
-                                {/* 1. Verification Progress */}
-                                <StatCard
-                                    title="Verification Coverage"
-                                    value={`${summary.total > 0 ? Math.round((summary.verified / summary.total) * 100) : 0}%`}
-                                    description={`Showing ${summary.verified} verified items out of ${summary.total} assets in this scope.`}
-                                    icon={<ClipboardCheck className="h-4 w-4 text-green-500" />}
-                                    onAction={() => handleStatusFilterClick('Verified')}
-                                    isActive={selectedStatuses.includes('Verified')}
-                                />
+            </div>
 
-                                {/* 2. Pending Action */}
-                                <StatCard
-                                    title="Pending Action"
-                                    value={summary.unverified}
-                                    description="Assets currently marked as unverified and requiring field inspection."
-                                    icon={<Activity className="h-4 w-4 text-primary" />}
-                                    onAction={() => handleStatusFilterClick('Unverified')}
-                                    isActive={selectedStatuses.includes('Unverified')}
-                                />
-
-                                {/* 3. Missing ID (Data Quality) */}
-                                <StatCard
-                                    title="Missing Asset ID"
-                                    value={summary.withoutAssetId}
-                                    description="Assets lacking a unique tag or system ID code. Crucial for audits."
-                                    icon={<Tag className="h-4 w-4 text-orange-500" />}
-                                    onAction={() => handleFilterClick('assetIdCode')}
-                                    isActive={missingFieldFilter === 'assetIdCode'}
-                                />
-
-                                {/* 4. Missing Serial (Data Quality) */}
-                                <StatCard
-                                    title="Missing Serials"
-                                    value={summary.withoutSerial}
-                                    description="Items missing manufacturer serial numbers. Risk for identification."
-                                    icon={<Hash className="h-4 w-4 text-blue-500" />}
-                                    onAction={() => handleFilterClick('serialNumber')}
-                                    isActive={missingFieldFilter === 'serialNumber'}
-                                />
-
-                                {/* 5. Critical Health */}
-                                <StatCard
-                                    title="Critical Condition"
-                                    value={summary.unusable}
-                                    description="Assets reported as stolen, burnt, or unsalvageable."
-                                    icon={<AlertCircle className="h-4 w-4 text-destructive" />}
-                                    onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
-                                    isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
-                                />
-
-                                {/* 6. Needs Maintenance */}
-                                <StatCard
-                                    title="Maintenance Alert"
-                                    value={summary.needsRepair}
-                                    description="Assets in poor or bad condition requiring technical assessment."
-                                    icon={<Wrench className="h-4 w-4 text-orange-600" />}
-                                    onAction={() => handleConditionFilterClick(conditionGroups.repair)}
-                                    isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.repair.sort())}
-                                />
-
-                                {/* 7. Discrepancies */}
-                                <StatCard
-                                    title="Audit Exceptions"
-                                    value={summary.withDiscrepancy}
-                                    description="Records where field data conflicts with previous system information."
-                                    icon={<FileWarning className="h-4 w-4 text-destructive" />}
-                                    onAction={() => handleStatusFilterClick('Discrepancy')}
-                                    isActive={selectedStatuses.includes('Discrepancy')}
-                                />
-
-                                {/* 8. Field Remarks */}
-                                <StatCard
-                                    title="Field Feedback"
-                                    value={summary.withRemarks}
-                                    description="Assets containing specific comments or remarks from field officers."
-                                    icon={<MessageSquare className="h-4 w-4 text-teal-500" />}
-                                    onAction={() => handleFilterClick('remarks')}
-                                    isActive={missingFieldFilter === 'remarks'}
-                                />
-
-                                {/* 9. Modified Today */}
-                                <StatCard
-                                    title="Modified Today"
-                                    value={summary.modifiedToday}
-                                    description="Updates or creations performed in the last 24 hours."
-                                    icon={<CalendarClock className="h-4 w-4 text-primary" />}
-                                    onAction={() => handleDateFilterClick('today')}
-                                    isActive={dateFilter === 'today'}
-                                />
-
-                                {/* 10. Fresh Records */}
-                                <StatCard
-                                    title="New In-Flow"
-                                    value={summary.newThisWeek}
-                                    description="Fresh records newly registered in the system this week."
-                                    icon={<PlusCircle className="h-4 w-4 text-green-500" />}
-                                    onAction={() => handleDateFilterClick('new-week')}
-                                    isActive={dateFilter === 'new-week'}
-                                />
+            <div className="relative group min-h-[280px]">
+                <AnimatePresence mode="wait">
+                    <motion.div 
+                        key={`${activePulse.id}-${pulses.length}`}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        drag="x"
+                        dragConstraints={{ left: 0, right: 0 }}
+                        dragElastic={1}
+                        onDragEnd={(e, { offset, velocity }) => {
+                            const swipe = swipePower(offset.x, velocity.x);
+                            if (swipe < -swipeConfidenceThreshold) nextPulse();
+                            else if (swipe > swipeConfidenceThreshold) prevPulse();
+                        }}
+                        className="h-full"
+                    >
+                        <Card className={cn(
+                            "h-full rounded-[3rem] border-2 transition-all p-10 flex flex-col justify-between relative overflow-hidden shadow-3xl",
+                            isNominal ? "bg-green-500/[0.03] border-green-500/20" :
+                            activePulse.variant === 'destructive' ? "bg-red-500/[0.03] border-red-500/20" :
+                            activePulse.variant === 'warning' ? "bg-amber-500/[0.03] border-amber-500/20" :
+                            activePulse.variant === 'success' ? "bg-green-500/[0.03] border-green-500/20" :
+                            activePulse.variant === 'blue' ? "bg-blue-500/[0.03] border-blue-500/20" :
+                            "bg-card border-border/40"
+                        )}>
+                            <div className="absolute top-0 right-0 p-12 opacity-5">
+                                {React.createElement(activePulse.icon, { className: "h-40 w-40" })}
                             </div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                            <Card className="min-h-[180px] flex flex-col justify-center bg-primary/5 border-dashed border-primary/20 relative group/insight">
-                                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover/insight:opacity-100 transition-opacity">
-                                    <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80" onClick={handleRefreshInsights}>
-                                        <RefreshCw className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <CardContent className="pt-8">
-                                    <AnimatePresence mode="wait">
-                                        <motion.div
-                                            key={`${refreshKey}-${insightIndex}`}
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -20 }}
-                                            transition={{ duration: 0.3 }}
-                                            className={cn("flex flex-col items-center text-center gap-4 cursor-pointer px-4 sm:px-12", insightsPool[insightIndex].asset && "hover:opacity-80")}
-                                            onClick={() => handleInsightClick(insightsPool[insightIndex])}
-                                        >
-                                            <div className={cn("p-4 rounded-full bg-background shadow-lg border", insightsPool[insightIndex].color)}>
-                                                {insightsPool[insightIndex].icon}
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h4 className="text-lg sm:text-xl font-bold tracking-tight">
-                                                    {insightsPool[insightIndex].text}
-                                                </h4>
-                                                {insightsPool[insightIndex].subtext && (
-                                                    <p className="text-sm text-muted-foreground italic">
-                                                        {insightsPool[insightIndex].subtext}
-                                                    </p>
-                                                )}
-                                                {insightsPool[insightIndex].asset && (
-                                                    <div className="flex items-center justify-center gap-2 mt-2">
-                                                        <Badge variant="outline" className="text-[10px] uppercase font-bold">
-                                                            <MapPin className="h-2 w-2 mr-1"/> {insightsPool[insightIndex].asset.location}
-                                                        </Badge>
-                                                        <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Click to Inspect</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    </AnimatePresence>
-                                    
-                                    <div className="flex items-center justify-center gap-4 mt-8">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handlePrevInsight}>
-                                            <ChevronLeft className="h-5 w-5" />
-                                        </Button>
-                                        <div className="flex justify-center gap-1.5 overflow-hidden">
-                                            {insightsPool.map((_, i) => (
-                                                <button 
-                                                    key={i} 
-                                                    onClick={(e) => { e.stopPropagation(); setInsightIndex(i); }}
-                                                    className={cn("h-1.5 rounded-full transition-all", i === insightIndex ? "w-8 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30")}
-                                                />
-                                            ))}
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handleNextInsight}>
-                                            <ChevronRight className="h-5 w-5" />
-                                        </Button>
+
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="flex items-center gap-6">
+                                    <div className={cn(
+                                        "p-5 rounded-[1.5rem] shadow-inner transition-colors", 
+                                        isNominal ? "bg-green-600" : activePulse.color
+                                    )}>
+                                        {React.createElement(isNominal ? CheckCircle2 : activePulse.icon, { className: "h-8 w-8 text-white" })}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-                </div>
-            </CollapsibleContent>
-        </Collapsible>
-    )
+                                    <div className="space-y-1">
+                                        <h4 className="text-3xl font-black uppercase text-foreground tracking-tighter leading-none">{activePulse.label}</h4>
+                                        <p className="text-xs font-medium text-muted-foreground italic max-w-sm">{activePulse.description}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className={cn(
+                                        "text-6xl font-black tracking-tighter leading-none transition-colors",
+                                        isNominal ? "text-green-600" :
+                                        activePulse.variant === 'destructive' ? "text-red-600" :
+                                        activePulse.variant === 'warning' ? "text-amber-600" :
+                                        activePulse.variant === 'success' ? "text-green-600" :
+                                        activePulse.variant === 'blue' ? "text-blue-600" :
+                                        "text-foreground"
+                                    )}>
+                                        {activePulse.count}
+                                    </span>
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground opacity-40 mt-2">Current Pulse</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-10 border-t border-dashed border-border/40 relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <Badge variant="outline" className={cn(
+                                        "h-8 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest",
+                                        isNominal ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-border/40 bg-muted/20"
+                                    )}>
+                                        {scrollIndex + 1} / {pulses.length}
+                                    </Badge>
+                                </div>
+                                <Button 
+                                    onClick={() => navigateTo(activePulse.token)}
+                                    disabled={isNominal}
+                                    className={cn(
+                                        "h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 gap-3",
+                                        isNominal ? "bg-muted text-muted-foreground opacity-40 cursor-not-allowed" :
+                                        activePulse.variant === 'destructive' ? "bg-red-600 text-white" :
+                                        activePulse.variant === 'warning' ? "bg-amber-600 text-white" :
+                                        "bg-primary text-black"
+                                    )}
+                                >
+                                    {isNominal ? 'Fidelity Perfect' : 'Inspect Sub-Registry'} 
+                                    {!isNominal && <ArrowRight className="h-4 w-4" />}
+                                </Button>
+                            </div>
+
+                            {/* Integrated Carousel Arrows */}
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="outline" size="icon" onClick={prevPulse} className="h-10 w-10 rounded-full border-2 bg-background/80 backdrop-blur-md"><ChevronLeft className="h-5 w-5" /></Button>
+                            </div>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="outline" size="icon" onClick={nextPulse} className="h-10 w-10 rounded-full border-2 bg-background/80 backdrop-blur-md"><ChevronRight className="h-5 w-5" /></Button>
+                            </div>
+                        </Card>
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        </div>
+    );
 }

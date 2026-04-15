@@ -1,379 +1,577 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-  type Dispatch,
-  type SetStateAction,
-  useEffect,
-  useCallback,
-} from 'react';
-import type { OptionType } from '@/components/asset-filter-sheet';
-import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
-import { updateSettings as updateSettingsFS, getSettings as getSettingsFS } from '@/lib/firestore';
-import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
-import { firebaseConfig } from '@/lib/firebase';
+/**
+ * @fileOverview AppStateContext - Central SPA Orchestrator.
+ * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
+ * Phase 1911: Added Deep Equality parity check to skip redundant updates.
+ * Phase 1912: Implementation of Location-Scoped Cloud Pull.
+ * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
+ */
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { storage } from '@/offline/storage';
+import { processSyncQueue } from '@/offline/sync';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { db } from '@/lib/firebase';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
+import { LocationEngine } from '@/services/location-engine';
+import { getFuzzySignature, sanitizeSearch } from '@/lib/utils';
+import type { 
+  Asset, 
+  AppSettings, 
+  DataSource, 
+  AuthorityNode, 
+  WorkstationView, 
+  OptionType, 
+  SyncSummary,
+  SyncStrategy
+} from '@/types/domain';
+import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
-import { v4 as uuidv4 } from 'uuid';
-import { NIGERIAN_STATES } from '@/lib/constants';
-import { assetMatchesGlobalFilter } from '@/lib/utils';
-import { logger } from '@/lib/logger';
-
-export interface SortConfig {
-  key: keyof import('@/lib/types').Asset;
-  direction: 'asc' | 'desc';
-}
-
-export interface DataActions {
-  onImport?: () => void;
-  onScanAndImport?: () => void;
-  onExport?: () => void;
-  onAddAsset?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
-  isImporting?: boolean;
-}
+import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 
 interface AppStateContextType {
   assets: Asset[];
-  setAssets: Dispatch<SetStateAction<Asset[]>>;
-  offlineAssets: Asset[];
-  setOfflineAssets: Dispatch<SetStateAction<Asset[]>>;
+  filteredAssets: Asset[];
+  sandboxAssets: Asset[];
+  dataSource: DataSource;
+  setDataSource: (source: DataSource) => void;
   isOnline: boolean;
-  setIsOnline: Dispatch<SetStateAction<boolean>>;
+  setIsOnline: (status: boolean) => void;
   searchTerm: string;
-  setSearchTerm: Dispatch<SetStateAction<string>>;
-  globalStateFilter: string;
-  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
-  itemsPerPage: number;
-  setItemsPerPage: Dispatch<SetStateAction<number>>;
-  dataSource: 'cloud' | 'local_locked';
-  setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
+  setSearchTerm: (term: string) => void;
+  isSyncing: boolean;
+  appSettings: AppSettings | null;
+  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
+  settingsLoaded: boolean;
+  isHydrated: boolean;
+  activeGrantIds: string[];
+  activeView: WorkstationView;
+  setActiveView: (view: WorkstationView) => void;
+  refreshRegistry: () => Promise<void>;
+  
+  // Sync High-Fidelity Pulse
+  manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
+  manualUpload: () => Promise<void>;
+  executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
+  syncSummary: SyncSummary | null;
+  isSyncConfirmOpen: boolean;
+  setIsSyncConfirmOpen: (open: boolean) => void;
 
-  // Filters
+  setReadAuthority: (node: AuthorityNode) => Promise<void>;
+  
+  headers: RegistryHeader[];
+  setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
+  sortKey: string;
+  setSortKey: Dispatch<SetStateAction<string>>;
+  sortDir: 'asc' | 'desc';
+  setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
+
   selectedLocations: string[];
   setSelectedLocations: Dispatch<SetStateAction<string[]>>;
   selectedAssignees: string[];
   setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
   selectedStatuses: string[];
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedConditions: string[];
+  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
-  dateFilter: 'today' | 'week' | 'new-week' | null;
-  setDateFilter: Dispatch<SetStateAction<'today' | 'week' | 'new-week' | null>>;
-  conditionFilter: string[];
-  setConditionFilter: Dispatch<SetStateAction<string[]>>;
 
-  // Filter Options
   locationOptions: OptionType[];
-  setLocationOptions: Dispatch<SetStateAction<OptionType[]>>;
   assigneeOptions: OptionType[];
-  setAssigneeOptions: Dispatch<SetStateAction<OptionType[]>>;
-  statusOptions: OptionType[];
-  setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
   conditionOptions: OptionType[];
-  setConditionOptions: Dispatch<SetStateAction<OptionType[]>>;
+  statusOptions: OptionType[];
+  categoryOptions: OptionType[];
 
-  // Sorting
-  sortConfig: SortConfig | null;
-  setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
+  isFilterOpen: boolean;
+  setIsFilterOpen: (open: boolean) => void;
+  isSortOpen: boolean;
+  setIsSortOpen: (open: boolean) => void;
+  filters: HeaderFilter[];
+  setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
 
-  // App Settings
-  appSettings: AppSettings | null;
-  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
-  settingsLoaded: boolean;
-  activeGrantId: string | null;
-  setActiveGrantId: Dispatch<SetStateAction<string | null>>;
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
 
-  // Sync Settings
-  manualDownloadTrigger: number;
-  setManualDownloadTrigger: Dispatch<SetStateAction<number>>;
-  manualUploadTrigger: number;
-  setManualUploadTrigger: Dispatch<SetStateAction<number>>;
-  isSyncing: boolean;
-  setIsSyncing: Dispatch<SetStateAction<boolean>>;
+  selectedCategory: string | null;
+  selectedCategories: string[];
+  setSelectedCategories: (cats: string[]) => void;
+  setSelectedCategory: (cat: string | null) => void;
+  isExplored: boolean;
+  setIsExplored: (val: boolean) => void;
+  itemsPerPage: number | 'all';
+  setItemsPerPage: (val: number | 'all') => void;
+  goBack: () => void;
+  activeFilterCount: number;
 
-  // First Time Setup
-  firstTimeSetupStatus: 'idle' | 'syncing' | 'complete';
-  setFirstTimeSetupStatus: Dispatch<SetStateAction<'idle' | 'syncing' | 'complete'>>;
-
-  // Cross-component communication
-  assetToView: Asset | null;
-  setAssetToView: Dispatch<SetStateAction<Asset | null>>;
-  isSettingsOpen: boolean;
-  setIsSettingsOpen: Dispatch<SetStateAction<boolean>>;
-  initialSettingsTab: string;
-  setInitialSettingsTab: Dispatch<SetStateAction<string>>;
-  dataActions: DataActions;
-  setDataActions: Dispatch<SetStateAction<DataActions>>;
-
-  // Project Switch
-  showProjectSwitchDialog: boolean;
-  setShowProjectSwitchDialog: Dispatch<SetStateAction<boolean>>;
-
-  // Active Database
-  activeDatabase: 'firestore' | 'rtdb';
-  setActiveDatabase: Dispatch<SetStateAction<'firestore' | 'rtdb'>>;
-
-  // Asset Actions
-  onRevertAsset: (assetId: string) => Promise<void>;
-  setOnRevertAsset: Dispatch<SetStateAction<(assetId: string) => Promise<void>>>;
+  groupsViewMode: 'category' | 'condition';
+  setGroupsViewMode: Dispatch<SetStateAction<'category' | 'condition'>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-export const AppStateProvider = ({ children }: { children: ReactNode }) => {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('assetain-online-status');
-      return savedStatus ? JSON.parse(savedStatus) : true;
+function ViewParamSync({ activeView, setActiveViewStatus }: { activeView: WorkstationView, setActiveViewStatus: (v: WorkstationView) => void }) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const v = searchParams?.get('v');
+    if (v) {
+      const matched = v.toUpperCase() as WorkstationView;
+      if (matched !== activeView) setActiveViewStatus(matched);
     }
-    return true;
-  });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [globalStateFilter, setGlobalStateFilter] = useState('All');
-  const [itemsPerPage, setItemsPerPage] = useState(25);
+  }, [searchParams, activeView, setActiveViewStatus]);
+  return null;
+}
 
+export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
+  const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
+  const [isOnline, setIsOnlineStatus] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
+  const [groupsViewMode, setGroupsViewMode] = useState<'category' | 'condition'>('category');
+  
+  // Sync Governance State
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
+
+  const [headers, setHeaders] = useState<RegistryHeader[]>(
+    DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[]
+  );
+  
+  const [sortKey, setSortKey] = useState<string>('sn');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'new-week' | null>(null);
-  const [conditionFilter, setConditionFilter] = useState<string[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [filters, setFilters] = useState<HeaderFilter[]>([]);
+  const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
+  const [isExplored, setIsExplored] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
-  const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
-  const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
-  const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
-  const [conditionOptions, setConditionOptions] = useState<OptionType[]>([]);
+  const activeGrantIds = useMemo(() => appSettings?.activeGrantIds || [], [appSettings]);
 
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>({
-    key: 'sn',
-    direction: 'asc',
-  });
-
-  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [activeGrantId, activeGrantIdSet] = useState<string | null>(null);
-
-  const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
-  const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [firstTimeSetupStatus, setFirstTimeSetupStatus] = useState<'idle' | 'syncing' | 'complete'>('idle');
-
-  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>(
-    'cloud'
-  );
-  const [assetToView, setAssetToView] = useState<Asset | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [initialSettingsTab, setInitialSettingsTab] = useState('general');
-  const [dataActions, setDataActions] = useState<DataActions>({});
-
-  const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
-    useState(false);
-  
-  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
-    'firestore'
-  );
-
-  const [onRevertAsset, setOnRevertAsset] = useState<
-    (assetId: string) => Promise<void>
-  >(() => async () => {});
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('assetain-online-status', JSON.stringify(isOnline));
-    
-    const handleBrowserConnectivityChange = () => {
-        setIsOnline(navigator.onLine);
-        // Automatic queue replay is removed here per user request for strictly manual sync
-    };
-    window.addEventListener('online', handleBrowserConnectivityChange);
-    window.addEventListener('offline', handleBrowserConnectivityChange);
-
-    return () => {
-      window.removeEventListener('online', handleBrowserConnectivityChange);
-      window.removeEventListener('offline', handleBrowserConnectivityChange);
-    };
-  }, [isOnline]);
-  
-  const migrateSettings = useCallback(async (settings: AppSettings | null): Promise<AppSettings | null> => {
-      if (settings && !(settings as any).grants) {
-        const grantId = 'default-grant';
-        const defaultGrant: Grant = {
-            id: grantId,
-            name: 'Default Project',
-            sheetDefinitions: (settings as any).sheetDefinitions || {},
-        };
-        const migratedSettings: AppSettings = {
-            ...settings,
-            grants: [defaultGrant],
-            activeGrantId: grantId,
-        };
-        delete (migratedSettings as any).sheetDefinitions;
-        await saveLocalSettings(migratedSettings);
-        return migratedSettings;
-      }
-      return settings;
-  }, []);
-  
-  useEffect(() => {
-    const initializeSettings = async () => {
-        let settings: AppSettings | null = await getLocalSettings();
-
-        if (!settings && navigator.onLine) {
-            try {
-                let cloudSettings = await getSettingsFS(); 
-                if (!cloudSettings) {
-                    cloudSettings = await getSettingsRTDB();
-                }
-                
-                if (cloudSettings) {
-                    settings = cloudSettings;
-                    await saveLocalSettings(settings);
-                }
-            } catch (e) {
-                logger.error("Failed to fetch settings from cloud", e);
-            }
-        }
-        
-        if (settings) {
-            settings = await migrateSettings(settings);
-        }
-
-        if (!settings) {
-            const grantId = uuidv4();
-            const defaultGrant: Grant = {
-                id: grantId,
-                name: 'Default Project',
-                sheetDefinitions: {},
-            };
-
-            const defaultUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
-                loginName: state.toLowerCase().replace(/[\s-]/g, ''),
-                displayName: `${state} User`,
-                states: [state],
-                isAdmin: false,
-                canAddAssets: true,
-                canEditAssets: true,
-                isGuest: false,
-                password: 'password',
-            }));
-            
-            const newSettings: AppSettings = {
-                grants: [defaultGrant],
-                activeGrantId: grantId,
-                authorizedUsers: defaultUsers,
-                lockAssetList: false,
-                appMode: 'verification',
-                lastModified: new Date().toISOString(),
-            };
-
-            settings = newSettings;
-            await saveLocalSettings(settings);
-            
-            if (navigator.onLine) {
-                await Promise.allSettled([
-                    updateSettingsRTDB(settings),
-                    updateSettingsFS(settings)
-                ]);
-            }
-        }
-
-        setAppSettings(settings);
-        if (settings?.activeGrantId) {
-            activeGrantIdSet(settings.activeGrantId);
-        }
-        
-        setActiveDatabase('firestore');
+  const refreshRegistry = useCallback(async () => {
+    try {
+      const [localAssets, localSandbox, localSettings] = await Promise.all([
+        storage.getAssets(), 
+        storage.getSandbox(), 
+        storage.getSettings()
+      ]);
+      
+      if (localSettings) {
+        setAppSettings(localSettings);
         setSettingsLoaded(true);
+        if (localSettings.globalHeaders && localSettings.globalHeaders.length > 0) {
+          setHeaders(localSettings.globalHeaders);
+        }
+      }
+      
+      // Hardened fallback for active grants during fresh initialization
+      const currentGrantIds = (localSettings?.activeGrantIds && localSettings.activeGrantIds.length > 0)
+        ? localSettings.activeGrantIds 
+        : (localSettings?.grants.map(g => g.id) || []);
+
+      const filtered = (localAssets || []).filter(a => {
+        if (currentGrantIds.length === 0) return true; // Show everything if no grants defined yet
+        if (!currentGrantIds.includes(a.grantId)) return false;
+        
+        const grant = localSettings?.grants.find(g => g.id === a.grantId);
+        // If sheet list is empty, default to true to avoid hiding newly synced data
+        if (!grant || grant.enabledSheets.length === 0) return true;
+        return grant.enabledSheets.includes(a.category);
+      });
+        
+      setAssets(DiscrepancyEngine.scan(filtered));
+      setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
+    } catch (e) { 
+      console.error("Registry Refresh Error:", e); 
+    }
+  }, []);
+
+  useEffect(() => { 
+    setIsHydrated(true);
+    const savedStatus = localStorage.getItem('assetain-online-status');
+    if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
+    else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
+  }, []);
+
+  useEffect(() => { if (isHydrated) refreshRegistry(); }, [isHydrated, refreshRegistry]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    const handleOnline = () => { if (!isOnline) setIsOnlineStatus(true); };
+    const handleOffline = () => { if (isOnline) setIsOnlineStatus(false); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
+  }, [isHydrated, isOnline]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    storage.getSettings().then(local => {
+      if (local) { 
+        setAppSettings(local); 
+        setSettingsLoaded(true); 
+        if (local.globalHeaders && local.globalHeaders.length > 0) setHeaders(local.globalHeaders);
+      }
+    });
+    if (db && isOnline) {
+      const unsubscribe = onSnapshot(doc(db, 'config', 'settings'), (snapshot) => {
+        if (snapshot.exists()) {
+          const remoteSettings = snapshot.data() as AppSettings;
+          setAppSettings(remoteSettings);
+          if (remoteSettings.globalHeaders && remoteSettings.globalHeaders.length > 0) {
+            setHeaders(remoteSettings.globalHeaders);
+          }
+          storage.saveSettings(remoteSettings);
+          setSettingsLoaded(true);
+        } else setSettingsLoaded(true);
+      });
+      return () => unsubscribe();
+    }
+  }, [isHydrated, isOnline]);
+
+  const filteredAssets = useMemo(() => {
+    const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+    if (!appSettings) return [];
+
+    let results = [...source];
+
+    if (selectedLocations.length > 0) {
+      const selectedFuzzy = selectedLocations.map(l => getFuzzySignature(l));
+      results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.location)));
+    }
+
+    if (selectedAssignees.length > 0) {
+      const selectedFuzzy = selectedAssignees.map(a => getFuzzySignature(a));
+      results = results.filter(a => selectedFuzzy.includes(getFuzzySignature(a.custodian)));
+    }
+
+    if (selectedCategories.length > 0) {
+      results = results.filter(a => selectedCategories.includes(a.category));
+    }
+
+    if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
+    if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
+    if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
+
+    if (searchTerm) {
+      if (searchTerm === 'MISSING_ID') {
+        results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
+      } else if (searchTerm === 'MISSING_SN') {
+        results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
+      } else if (searchTerm === 'CONDITION_BAD') {
+        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
+      } else if (searchTerm === 'STATUS_UNVERIFIED') {
+        results = results.filter(a => a.status === 'UNVERIFIED');
+      } else {
+        const fuzzySearch = getFuzzySignature(searchTerm);
+        results = results.filter(a => {
+          const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
+          return getFuzzySignature(hay).includes(fuzzySearch);
+        });
+      }
+    }
+
+    if (filters.length > 0) {
+      filters.forEach(filter => {
+        const header = headers.find(h => h.id === filter.headerId);
+        if (!header) return;
+        results = results.filter(asset => {
+          let val = "";
+          switch(header.normalizedName) {
+            case "location": val = asset.location; break;
+            case "condition": val = asset.condition; break;
+            case "status": val = asset.status; break;
+            case "asset_class": val = asset.category; break;
+            default: val = String((asset.metadata as any)?.[header.rawName] || "");
+          }
+          if (filter.operator === 'in') {
+            const allowed = (filter.value as string[]) || [];
+            return allowed.includes(val);
+          }
+          return true;
+        });
+      });
+    }
+
+    if (sortKey) {
+      const activeHeader = headers.find(h => h.id === sortKey);
+      if (activeHeader) {
+        results.sort((a, b) => {
+          const getVal = (item: Asset) => {
+            switch(activeHeader.normalizedName) {
+              case "sn": return item.sn || "";
+              case "asset_description": return item.description || "";
+              case "asset_id_code": return item.assetIdCode || "";
+              case "location": return item.location || "";
+              case "condition": return item.condition || "";
+              default: return String((item.metadata as any)?.[activeHeader.rawName] || "");
+            }
+          };
+          const valA = String(getVal(a));
+          const valB = String(getVal(b));
+          return sortDir === 'asc' ? valA.localeCompare(valB, undefined, { numeric: true }) : valB.localeCompare(valA, undefined, { numeric: true });
+        });
+      }
+    }
+
+    return results;
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, filters, appSettings]);
+
+  const locationOptions = useMemo(() => {
+    const map = new Map<string, { label: string, count: number }>();
+    assets.forEach(a => { 
+      const norm = LocationEngine.normalize(a.location);
+      const fuzzy = getFuzzySignature(norm.normalized);
+      const existing = map.get(fuzzy);
+      if (existing) existing.count++;
+      else map.set(fuzzy, { label: norm.normalized, count: 1 });
+    });
+    return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const assigneeOptions = useMemo(() => {
+    const map = new Map<string, { label: string, count: number }>();
+    assets.forEach(a => { 
+      const display = (a.custodian || 'Unassigned').trim().replace(/\b\w/g, l => l.toUpperCase());
+      const fuzzy = getFuzzySignature(display);
+      const existing = map.get(fuzzy);
+      if (existing) existing.count++;
+      else map.set(fuzzy, { label: display, count: 1 });
+    });
+    return Array.from(map.values()).map(v => ({ label: v.label, value: v.label, count: v.count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { counts.set(a.category, (counts.get(a.category) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { counts.set(a.condition, (counts.get(a.condition) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const statusOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => { counts.set(a.status, (counts.get(a.status) || 0) + 1); });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  /**
+   * Deep Parity Check Logic.
+   */
+  const areAssetsIdentical = useCallback((local: Asset, remote: Asset): boolean => {
+    const keysToIgnore = ['syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'updateCount', 'unseenUpdateFields', 'importMetadata'];
     
-    initializeSettings();
-  }, [migrateSettings]);
-  
-  // removed wrapper function
-  const value = {
-    assets,
-    setAssets,
-    offlineAssets,
-    setOfflineAssets,
-    isOnline,
-    setIsOnline,
-    searchTerm,
-    setSearchTerm,
-    globalStateFilter,
-    setGlobalStateFilter,
-    itemsPerPage,
-    setItemsPerPage,
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
-    missingFieldFilter,
-    setMissingFieldFilter,
-    dateFilter,
-    setDateFilter,
-    conditionFilter,
-    setConditionFilter,
-    locationOptions,
-    setLocationOptions,
-    assigneeOptions,
-    setAssigneeOptions,
-    statusOptions,
-    setStatusOptions,
-    conditionOptions,
-    setConditionOptions,
-    sortConfig,
-    setSortConfig,
-    appSettings,
-    setAppSettings,
-    settingsLoaded,
-    activeGrantId,
-    setActiveGrantId: activeGrantIdSet,
-    manualDownloadTrigger,
-    setManualDownloadTrigger,
-    manualUploadTrigger,
-    setManualUploadTrigger,
-    isSyncing,
-    setIsSyncing,
-    firstTimeSetupStatus,
-    setFirstTimeSetupStatus,
-    dataSource,
-    setDataSource,
-    assetToView,
-    setAssetToView,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    initialSettingsTab,
-    setInitialSettingsTab,
-    dataActions,
-    setDataActions,
-    showProjectSwitchDialog,
-    setShowProjectSwitchDialog,
-    activeDatabase,
-    setActiveDatabase,
-    onRevertAsset,
-    setOnRevertAsset,
+    const localClean = Object.keys(local)
+      .filter(k => !keysToIgnore.includes(k))
+      .reduce((obj, key) => ({ ...obj, [key]: (local as any)[key] }), {});
+      
+    const remoteClean = Object.keys(remote)
+      .filter(k => !keysToIgnore.includes(k))
+      .reduce((obj, key) => ({ ...obj, [key]: (remote as any)[key] }), {});
+
+    return JSON.stringify(localClean) === JSON.stringify(remoteClean);
+  }, []);
+
+  // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
+  const manualDownload = useCallback(async (stateScopes?: string[]): Promise<SyncSummary | null> => {
+    if (!isOnline) return null;
+    setIsSyncing(true);
+    addNotification({ title: "Scanning Cloud Authority...", description: "Reconciling timestamps for global parity." });
+    
+    try {
+      const currentGrantIds = (appSettings?.activeGrantIds && appSettings.activeGrantIds.length > 0)
+        ? appSettings.activeGrantIds 
+        : (appSettings?.grants.map(g => g.id) || []);
+      
+      if (currentGrantIds.length === 0) {
+        setIsSyncing(false);
+        return null;
+      }
+
+      let allRemoteAssets: Asset[] = [];
+      for (const gid of currentGrantIds) {
+        const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
+        allRemoteAssets = [...allRemoteAssets, ...projectAssets];
+      }
+
+      const filteredRemote = allRemoteAssets.filter(a => {
+        const grant = appSettings?.grants.find(g => g.id === a.grantId);
+        // Fallback: If onboarding, assume all sheets enabled
+        if (!grant || grant.enabledSheets.length === 0) return true;
+        return grant.enabledSheets.includes(a.category);
+      });
+
+      const localAssets = await storage.getAssets();
+      const localMap = new Map(localAssets.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
+
+      const newItems: Asset[] = [];
+      const existingItems: Asset[] = [];
+      const autoUpdateItems: Asset[] = [];
+
+      filteredRemote.forEach(remote => {
+        const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
+        const local = localMap.get(id);
+        
+        if (!local) {
+          newItems.push(remote);
+        } else {
+          if (!areAssetsIdentical(local, remote)) {
+            const remoteTime = new Date(remote.lastModified).getTime();
+            const localTime = new Date(local.lastModified).getTime();
+            
+            if (remoteTime > localTime) {
+              autoUpdateItems.push(remote);
+            } else if (localTime > remoteTime && local.syncStatus === 'local') {
+              existingItems.push(remote);
+            }
+          }
+        }
+      });
+
+      const totalCount = newItems.length + autoUpdateItems.length + existingItems.length;
+      if (totalCount === 0) {
+        addNotification({ title: "Parity Confirmed", description: "Your regional registry is in sync with the cloud." });
+        setIsSyncing(false);
+        return null;
+      }
+
+      const summary: SyncSummary = { 
+        type: 'DOWNLOAD', 
+        newItems: [...newItems, ...autoUpdateItems], 
+        existingItems, 
+        totalCount 
+      };
+      
+      setSyncSummary(summary);
+      setIsSyncConfirmOpen(true);
+      return summary;
+    } catch (e) {
+      addNotification({ title: "Sync Scan Failed", variant: "destructive" });
+      return null;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline, appSettings, areAssetsIdentical]);
+
+  const manualUpload = useCallback(async () => {
+    if (!isOnline) return;
+    setIsSyncing(true);
+    try {
+      const queue = await storage.getQueue();
+      const pending = queue.filter(q => q.status === 'PENDING');
+      
+      if (pending.length === 0) {
+        addNotification({ title: "Local Store Synchronized", description: "Zero modifications pending upload." });
+        setIsSyncing(false);
+        return;
+      }
+
+      setSyncSummary({ 
+        type: 'UPLOAD', 
+        newItems: pending.map(q => q.payload as any), 
+        existingItems: [],
+        totalCount: pending.length 
+      });
+      setIsSyncConfirmOpen(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline]);
+
+  const executeSync = async (strategy: SyncStrategy, overrideSummary?: SyncSummary) => {
+    const activeSummary = overrideSummary || syncSummary;
+    if (!activeSummary) return;
+    
+    setIsSyncing(true);
+    setIsSyncConfirmOpen(false);
+
+    try {
+      if (activeSummary.type === 'DOWNLOAD') {
+        const local = await storage.getAssets();
+        const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
+
+        let nextAssets = [...local];
+        
+        activeSummary.newItems.forEach(item => {
+          const id = getFuzzySignature(item.assetIdCode || item.serialNumber || item.id);
+          const existing = localMap.get(id);
+          if (existing) {
+            nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...item, syncStatus: 'synced' } : a);
+          } else {
+            nextAssets.push({ ...item, syncStatus: 'synced' });
+          }
+        });
+
+        if (strategy === 'UPDATE' && activeSummary.existingItems.length > 0) {
+          activeSummary.existingItems.forEach(remote => {
+            const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
+            nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...remote, syncStatus: 'synced' } : a);
+          });
+        }
+
+        await storage.saveAssets(nextAssets);
+        addNotification({ title: "Registry Parity Established", description: `Processed ${activeSummary.totalCount} record pulses.`, variant: "success" });
+      } else {
+        await processSyncQueue();
+      }
+      await refreshRegistry();
+    } catch (e) {
+      addNotification({ title: "Sync Execution Failure", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+      setSyncSummary(null);
+    }
   };
 
   return (
-    <AppStateContext.Provider value={value}>
+    <AppStateContext.Provider value={{
+      assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
+      searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
+      activeGrantIds, activeView, setActiveView: setActiveViewStatus,
+      refreshRegistry, manualDownload, manualUpload, executeSync, syncSummary, isSyncConfirmOpen, setIsSyncConfirmOpen,
+      setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
+      headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
+      locationOptions, assigneeOptions, conditionOptions, statusOptions, categoryOptions,
+      isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
+      isCommandPaletteOpen, setIsCommandPaletteOpen,
+      selectedCategory: selectedCategories.length === 1 ? selectedCategories[0] : null,
+      selectedCategories, setSelectedCategories: (cats) => { setSelectedCategoriesStatus(cats); if (cats.length > 0) setActiveViewStatus('REGISTRY'); },
+      setSelectedCategory: (cat) => { setSelectedCategoriesStatus(cat ? [cat] : []); if (cat) setActiveViewStatus('REGISTRY'); },
+      isExplored, setIsExplored,
+      itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
+      activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0) + filters.length,
+      groupsViewMode, setGroupsViewMode
+    }}>
+      <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}
     </AppStateContext.Provider>
   );
 };
 
-export const useAppState = (): AppStateContextType => {
+export const useAppState = () => {
   const context = useContext(AppStateContext);
-  if (context === undefined) {
-    throw new Error('useAppState must be used within an AppStateProvider');
-  }
+  if (context === undefined) throw new Error('useAppState must be used within AppStateProvider');
   return context;
 };

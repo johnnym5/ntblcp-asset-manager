@@ -1,29 +1,20 @@
 /**
- * @fileOverview Centralized logging utility for Assetain.
- * Integrated with the Monitoring Service for production tracking.
+ * @fileOverview Centralized Logging & Traceability Utility.
  */
 
 import { monitoring } from "./monitoring";
 
 export const logger = {
-  log: (...args: unknown[]) => {
+  info: (message: string, context?: any) => {
     if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log(...args);
+      console.log(`[INFO] ${message}`, context || '');
     }
   },
-  warn: (...args: unknown[]) => {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.warn(...args);
-    }
+  warn: (message: string, context?: any) => {
+    console.warn(`[WARN] ${message}`, context || '');
   },
   error: (message: string, error?: any, context?: any) => {
-    // Log to console for local debugging
-    // eslint-disable-next-line no-console
     console.error(`[ERROR] ${message}`, error);
-
-    // Automatically report to high-level monitoring
     monitoring.trackError(error || new Error(message), {
       message,
       ...context

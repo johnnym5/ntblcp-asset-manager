@@ -1,45 +1,17 @@
 rules_version = '2';
-
-/**
- * ASSETAIN CUSTOM REGISTRY RULES v3.0
- * 
- * This configuration supports the custom local authentication system.
- * Access control is managed at the application level via regional scoping.
- */
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- PERMISSIVE COLLECTIONS ---
-    
-    // Allow read/write for assets to support regional synchronization
-    match /assets/{assetId=**} {
-      allow read, write: if true;
-    }
-
-    // Allow access to config for application bootstrapping and user registry
-    match /config/{document=**} {
-      allow read, write: if true;
-    }
-
-    // --- PROTECTED COLLECTIONS ---
-
-    // Projects & Grants
-    match /projects/{document=**} {
-      allow read, write: if true;
-    }
-
-    // Activity Logs / Audit Trails
-    match /activity_log/{logId=**} {
-      allow read: if true;
-      allow create: if true;
-      // Logs remain immutable for audit integrity
-      allow update, delete: if false;
-    }
-
-    // Default Deny: All other access is forbidden
+    /**
+     * ASSETAIN GLOBAL ACCESS PULSE
+     * 
+     * Operational Philosophy:
+     * Logic-based security and Role-Based Access Control (RBAC) are enforced
+     * strictly within the application code. These rules provide unrestricted 
+     * cloud access to support the decentralized, high-availability 
+     * synchronization required for field asset management.
+     */
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
