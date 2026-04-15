@@ -177,7 +177,7 @@ export default function HomeHub() {
   };
 
   return (
-    <div className={cn("flex flex-col h-screen overflow-hidden bg-background selection:bg-primary/20", modeClass)}>
+    <div className={cn("flex flex-col min-h-screen bg-background selection:bg-primary/20", modeClass)}>
       <CommandPalette />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />

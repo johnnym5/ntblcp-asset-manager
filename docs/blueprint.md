@@ -9,6 +9,8 @@
 - Cross platform Data Import/Export: Provide import and export functionality between excel, google sheets, and any data captured via the UI, along with its metadata, files, photos, attachments and conditions notes.
 - Automatic Online/Offline Switch: Provide Auto-Switch User Interface capabilities. When offline the application shows `Locally Saved Assets`, whereas when there is a connection available the application switches to `Online Assets` view. Show connection state using toasts.
 
+> Note: The current implementation supports offline-first asset registry management, Excel import/export, and Firebase sync. AI/OCR and Google Sheets integration remain roadmap enhancements.
+
 ## Style Guidelines:
 
 - Primary color: Navy blue (#2E3192) to convey stability and trust in managing assets.
