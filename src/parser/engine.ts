@@ -8,6 +8,7 @@
  * Phase 1301: Implemented Selective Header Skipping.
  * Phase 1302: Added explicit LGA mapping pulse to prevent data gaps.
  * Phase 1303: Expanded mapping to include Assignee, Supplier, PV No, and GRN No.
+ * Phase 1304: Synchronized with resilient normalization from registry-utils.
  */
 
 import { v4 as uuidv4 } from 'uuid';
