@@ -2,6 +2,7 @@
  * @fileOverview StructurePreview - Strict Template Visualization Layer.
  * Phase 1205: Added indicator for Template matching status.
  * Phase 1206: Integrated Header Exclusion Toggles.
+ * Phase 1207: Resolved Nested Button error by converting cards to semantic divs.
  */
 
 import React from 'react';
@@ -171,14 +172,21 @@ export function StructurePreview({
                       {group.headerSet.map((header, hIdx) => {
                         const isExcluded = exclusions.has(header);
                         return (
-                          <button 
+                          <div 
                             key={`${group.id}-${hIdx}`}
-                            onClick={() => onToggleHeader(group.id, header)}
-                            disabled={!isSelected}
+                            role="button"
+                            tabIndex={isSelected ? 0 : -1}
+                            onClick={() => isSelected && onToggleHeader(group.id, header)}
+                            onKeyDown={(e) => {
+                              if (isSelected && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                onToggleHeader(group.id, header);
+                              }
+                            }}
                             className={cn(
-                              "flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl border transition-all shadow-inner text-left group/col relative overflow-hidden",
-                              !isSelected ? "opacity-20 grayscale" : 
-                              isExcluded ? "bg-white/[0.01] border-white/5 opacity-40" : "bg-white/[0.03] border-white/10 hover:border-primary/40 shadow-xl"
+                              "flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl border transition-all shadow-inner text-left group/col relative overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                              !isSelected ? "opacity-20 grayscale cursor-not-allowed" : 
+                              isExcluded ? "bg-white/[0.01] border-white/5 opacity-40 cursor-pointer" : "bg-white/[0.03] border-white/10 hover:border-primary/40 shadow-xl cursor-pointer"
                             )}
                           >
                             {isSelected && !isExcluded && (
@@ -193,8 +201,9 @@ export function StructurePreview({
                               <Checkbox 
                                 checked={!isExcluded} 
                                 disabled={!isSelected}
-                                onCheckedChange={() => onToggleHeader(group.id, header)}
-                                className="h-4 w-4 rounded-md border-white/20 data-[state=checked]:bg-primary"
+                                onCheckedChange={() => {}} // Controlled by parent div click
+                                tabIndex={-1}
+                                className="h-4 w-4 rounded-md border-white/20 data-[state=checked]:bg-primary pointer-events-none"
                               />
                             </div>
                             <p className={cn(
@@ -203,7 +212,7 @@ export function StructurePreview({
                             )} title={header}>
                               {header || 'EMPTY'}
                             </p>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
