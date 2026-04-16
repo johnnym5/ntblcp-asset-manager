@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Import Center - Excel Data Setup.
- * Phase 1914: Updated with simple terminology (Import, Scan, Groups).
- * Phase 1915: Integrated Selective Header Toggling.
+ * Phase 1916: Expanded group summary to handle unmatched sheets clearly.
  */
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -112,6 +111,8 @@ export function ImportWorkstation() {
 
       setWorkbookData(wbData);
       setDiscoveredGroups(allGroups);
+      
+      // Auto-select ONLY matched groups to encourage setup of others
       setSelectedIds(new Set(allGroups.filter(g => g.isTemplateMatched).map(g => g.id)));
 
       setTimeout(() => {
@@ -136,7 +137,7 @@ export function ImportWorkstation() {
   };
 
   const handleCreateTemplate = async (group: DiscoveredGroup) => {
-    const targetGrantId = activeGrantIds[0];
+    const targetGrantId = activeGrantIds[0] || appSettings?.grants[0]?.id;
     if (!targetGrantId || !appSettings) return;
 
     setIsProcessing(true);
@@ -238,7 +239,7 @@ export function ImportWorkstation() {
   };
 
   const handleCommit = async () => {
-    const targetGrantId = activeGrantIds[0];
+    const targetGrantId = activeGrantIds[0] || appSettings?.grants[0]?.id;
     if (!targetGrantId || !appSettings) return;
 
     setIsProcessing(true);
@@ -313,8 +314,8 @@ export function ImportWorkstation() {
                 <div className="p-6 rounded-3xl bg-orange-500/5 border-2 border-dashed border-orange-500/20 flex items-start gap-6 mb-10">
                   <div className="p-3 bg-orange-500 rounded-xl"><FileWarning className="h-6 w-6 text-black" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-black uppercase text-orange-600">New Folders Found</h4>
-                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found {unrecognizedCount} folders that need a setup. Please define them before importing data.</p>
+                    <h4 className="text-base font-black uppercase text-orange-600">{unrecognizedCount} New Folders Detected</h4>
+                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found folders that are not yet defined in your settings. Please use "Define as Template" to map their columns before importing.</p>
                   </div>
                 </div>
               )}

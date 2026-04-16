@@ -4,11 +4,7 @@
  * @fileOverview Integrated Structural Parser Engine.
  * Enforces strict Row 1 (Name) / Row 2 (Header) discovery.
  * Integrates Template Matching to prevent unmapped asset imports.
- * Phase 1300: Aligned normalization keys to camelCase for schema compliance.
- * Phase 1301: Implemented Selective Header Skipping.
- * Phase 1302: Added explicit LGA mapping pulse to prevent data gaps.
- * Phase 1303: Expanded mapping to include Assignee, Supplier, PV No, and GRN No.
- * Phase 1304: Synchronized with resilient normalization from registry-utils.
+ * Phase 1305: Implemented Sheet-Level Fallback Discovery for TB Register parity.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -39,18 +35,18 @@ export class ParserEngine {
 
   /**
    * Identifies structural blocks using Row 1 (Name) and Row 2 (Header) pattern.
+   * Includes fallback for sheets that start directly with headers.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
-    if (!data || data.length < 2) return [];
+    if (!data || data.length === 0) return [];
 
     const discovered: DiscoveredGroup[] = [];
     
-    // We strictly look for the Name -> Header -> Data pattern
+    // Phase 1: Structured Block Search (Name -> Header -> Data)
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const type = classifyRow(row);
 
-      // Rule: If we find a standalone title (Row 1), assume the next row is the Header (Row 2)
       if (type === 'GROUP_HEADER') {
         const groupName = String(row[0] || '').trim();
         const headerRow = data[i + 1];
@@ -59,7 +55,6 @@ export class ParserEngine {
           const signature = this.registerTemplate(headerRow, 'real_template');
           const tpl = this.templates.get(signature)!;
           
-          // Check if this group already exists in our Template settings
           const fuzzyName = getFuzzySignature(groupName);
           const isMatched = Object.keys(this.sheetDefinitions).some(k => getFuzzySignature(k) === fuzzyName);
 
@@ -71,7 +66,7 @@ export class ParserEngine {
             headerSetType: 'real_template',
             columnCount: tpl.columnCount,
             rowCount: 0,
-            startRow: i + 2, // Data starts after Header
+            startRow: i + 2,
             endRow: data.length - 1,
             headerStart: i + 1,
             headerEnd: i + 1,
@@ -83,7 +78,6 @@ export class ParserEngine {
             isTemplateMatched: isMatched
           };
 
-          // Find end of this specific group by looking for the next TITLE row or empty row
           for (let j = group.startRow; j < data.length; j++) {
             const nextType = classifyRow(data[j]);
             if (nextType === 'GROUP_HEADER' || nextType === 'EMPTY') {
@@ -98,7 +92,41 @@ export class ParserEngine {
             discovered.push(group);
           }
           
-          i = group.endRow; // Skip to end of this group
+          i = group.endRow;
+        }
+      }
+    }
+
+    // Phase 2: Sheet-Level Fallback (If no internal groups found, scan sheet for headers)
+    if (discovered.length === 0) {
+      for (let i = 0; i < Math.min(data.length, 50); i++) {
+        if (classifyRow(data[i]) === 'SCHEMA_HEADER') {
+          const signature = this.registerTemplate(data[i], 'real_template');
+          const tpl = this.templates.get(signature)!;
+          
+          const fuzzyName = getFuzzySignature(sheetName);
+          const isMatched = Object.keys(this.sheetDefinitions).some(k => getFuzzySignature(k) === fuzzyName);
+
+          discovered.push({
+            id: uuidv4(),
+            groupName: sheetName,
+            headerSet: tpl.rawHeaders,
+            headerSource: 'explicit',
+            headerSetType: 'real_template',
+            columnCount: tpl.columnCount,
+            rowCount: data.length - (i + 1),
+            startRow: i + 1,
+            endRow: data.length - 1,
+            headerStart: i,
+            headerEnd: i,
+            rawText: sheetName,
+            visibleHeaderRow: tpl.rawHeaders,
+            templateId: tpl.id,
+            sheetName: sheetName,
+            workbookName: this.workbookName,
+            isTemplateMatched: isMatched
+          });
+          break;
         }
       }
     }
@@ -145,7 +173,7 @@ export class ParserEngine {
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Template Ingestion',
+      lastModifiedBy: 'System Ingestion',
       importMetadata: { 
         sourceFile: this.workbookName, 
         sheetName: group.sheetName, 
