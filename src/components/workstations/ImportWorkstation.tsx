@@ -3,6 +3,7 @@
 /**
  * @fileOverview Import Center - Excel Data Setup.
  * Phase 1914: Updated with simple terminology (Import, Scan, Groups).
+ * Phase 1915: Integrated Selective Header Toggling.
  */
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -60,6 +61,7 @@ export function ImportWorkstation() {
   const [stagedAssets, setStagedAssets] = useState<ParsedAsset[]>([]);
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
   const [selectedGroupIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [headerExclusions, setHeaderExclusions] = useState<Record<string, Set<string>>>({});
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
   
@@ -122,6 +124,17 @@ export function ImportWorkstation() {
     }
   };
 
+  const handleToggleHeader = (groupId: string, header: string) => {
+    setHeaderExclusions(prev => {
+      const next = { ...prev };
+      const set = new Set(next[groupId] || []);
+      if (set.has(header)) set.delete(header);
+      else set.add(header);
+      next[groupId] = set;
+      return next;
+    });
+  };
+
   const handleCreateTemplate = async (group: DiscoveredGroup) => {
     const targetGrantId = activeGrantIds[0];
     if (!targetGrantId || !appSettings) return;
@@ -178,7 +191,13 @@ export function ImportWorkstation() {
     setProgress(0);
 
     try {
-      const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
+      const selectedGroups = discoveredGroups
+        .filter(g => selectedGroupIds.has(g.id))
+        .map(g => ({
+          ...g,
+          excludedHeaders: headerExclusions[g.id] ? Array.from(headerExclusions[g.id]) : []
+        }));
+
       const groupsBySheet: Record<string, DiscoveredGroup[]> = {};
       selectedGroups.forEach(g => {
         if (!groupsBySheet[g.sheetName]) groupsBySheet[g.sheetName] = [];
@@ -303,6 +322,8 @@ export function ImportWorkstation() {
               <StructurePreview 
                 groups={discoveredGroups} 
                 selectedIds={selectedGroupIds} 
+                excludedHeaders={headerExclusions}
+                onToggleHeader={handleToggleHeader}
                 onToggleId={(id) => {
                   const group = discoveredGroups.find(g => g.id === id);
                   if (group?.isTemplateMatched) {

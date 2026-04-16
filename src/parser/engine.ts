@@ -5,6 +5,7 @@
  * Enforces strict Row 1 (Name) / Row 2 (Header) discovery.
  * Integrates Template Matching to prevent unmapped asset imports.
  * Phase 1300: Aligned normalization keys to camelCase for schema compliance.
+ * Phase 1301: Implemented Selective Header Skipping.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -158,7 +159,14 @@ export class ParserEngine {
       }
     };
 
+    const exclusions = new Set(group.excludedHeaders || []);
+
     tpl.normalizedHeaders.forEach((key, idx) => {
+      const rawHeader = tpl.rawHeaders[idx];
+      
+      // SKIP INGESTION FOR EXCLUDED COLUMNS
+      if (exclusions.has(rawHeader)) return;
+
       const val = row[idx];
       if (val === undefined || val === null) return;
       

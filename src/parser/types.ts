@@ -42,6 +42,7 @@ export interface DiscoveredGroup {
   sheetName: string;
   workbookName: string;
   isTemplateMatched: boolean; // NEW: Track if this group exists in Settings
+  excludedHeaders?: string[]; // NEW: Headers to skip during ingestion
   notes?: string;
 }
 
