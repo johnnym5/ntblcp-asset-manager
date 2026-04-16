@@ -278,6 +278,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return cat.includes('motor') || cat.includes('vehicle');
       };
 
+      const hasMetaVal = (a: Asset, label: string) => {
+        const val = (a.metadata as any)?.[label];
+        return !!val && String(val).trim() !== '' && String(val).trim().toLowerCase() !== 'n/a';
+      };
+
       // ADVANCED LOGIC TOKENS FROM DASHBOARD PULSES
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
@@ -286,11 +291,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       } else if (searchTerm === 'MISSING_SERIAL') {
         results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
       } else if (searchTerm === 'MISSING_MODEL') {
-        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === ''));
+        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A') && !hasMetaVal(a, 'Model Number') && !hasMetaVal(a, 'Model No'));
       } else if (searchTerm === 'MISSING_CHASSIS') {
-        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === ''));
+        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A') && !hasMetaVal(a, 'Chasis no') && !hasMetaVal(a, 'Chassis no'));
       } else if (searchTerm === 'MISSING_ENGINE') {
-        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === ''));
+        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A') && !hasMetaVal(a, 'Engine no'));
       } else if (searchTerm === 'CONDITION_GOOD') {
         results = results.filter(a => a.conditionGroup === 'Good');
       } else if (searchTerm === 'CONDITION_BAD') {
