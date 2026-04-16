@@ -6,6 +6,7 @@
  * Integrates Template Matching to prevent unmapped asset imports.
  * Phase 1300: Aligned normalization keys to camelCase for schema compliance.
  * Phase 1301: Implemented Selective Header Skipping.
+ * Phase 1302: Added explicit LGA mapping pulse to prevent data gaps.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -181,6 +182,7 @@ export class ParserEngine {
         case 'chassisNo': asset.chassisNo = strVal; break;
         case 'engineNo': asset.engineNo = strVal; break;
         case 'location': asset.location = strVal; break;
+        case 'lga': asset.lga = strVal; break;
         case 'custodian': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'modelNumber': asset.modelNumber = strVal; break;
