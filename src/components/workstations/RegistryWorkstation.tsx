@@ -8,6 +8,7 @@
  * Phase 1530: Implemented unified handleUpdateHeader logic for in-place folder setup.
  * Phase 1805: Integrated UserPermissions for functional lockdown.
  * Phase 1990: Implemented handleSyncFolderPulse and handleSyncAssetPulse for contextual sync.
+ * Phase 2000: Added explicit Refresh button to header for manual reconciliation.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -40,7 +41,8 @@ import {
   ArrowRight,
   FileUp,
   PlusCircle,
-  CloudUpload
+  CloudUpload,
+  RefreshCw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -129,7 +131,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  // UI State - initialized from context view mode preference
+  // UI State
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -154,6 +156,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const perms = userProfile?.permissions;
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -518,6 +522,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     } catch (e) { addNotification({ title: "Export Failed", variant: "destructive" }); }
   };
 
+  const handleManualRefreshPulse = async () => {
+    setIsProcessing(true);
+    try {
+      await refreshRegistry();
+      addNotification({ title: "Registry Reconciled", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const isSelectionBarVisible = (showList && selectedAssetIds.size > 0) || (!showList && selectedCategories.length > 0);
 
   return (
@@ -548,6 +562,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={handleManualRefreshPulse} 
+                      disabled={isProcessing}
+                      className="h-10 w-10 rounded-xl border-2 hover:bg-primary/10 text-primary transition-all shadow-sm shrink-0"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-[8px] font-black uppercase">Refresh Register</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {isQuickViewSetupActive && perms?.func_edit_headers && (
                 <Button onClick={handleSaveGlobalHeaders} disabled={isProcessing} className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl animate-in fade-in zoom-in-95">
                   {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Commit Arrangement
@@ -637,7 +668,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       <RegistryCard record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} onInspect={handleEditAsset} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} onToggleExpand={() => handleToggleExpand(asset.id)} onManageLabels={handleManageLabels} onQuickUpdate={handleQuickUpdate} onUpdateHeader={handleUpdateHeader} onSync={handleSyncAssetPulse} isSetupMode={isQuickViewSetupActive} />
                     </motion.div>
                   )) : (
-                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} />
+                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} onSync={handleSyncAssetPulse} />
                   )}
                 </AnimatePresence>
               </div>
