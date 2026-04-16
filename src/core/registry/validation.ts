@@ -43,8 +43,10 @@ export const AssetSchema = z.object({
   engineNo: z.string().optional().default(""),
   supplier: z.string().optional().default(""),
   grnNo: z.string().optional().default(""),
+  pvNo: z.string().optional().default(""),
   pvJvNo: z.string().optional().default(""),
   usefulLifeYears: z.string().optional().default(""),
+  funder: z.string().optional().default(""),
   
   photoDataUri: z.string().optional(),
   photoUrl: z.string().optional(),

@@ -20,8 +20,8 @@ export function normalizeHeaderName(name: string): string {
   
   if (n.includes("purchase price") && (n.includes("naira") || n.includes("(n)") || n.includes("ngn"))) return "value";
   if (n.includes("purchase price") && (n.includes("usd") || n.includes("[usd]"))) return "purchasePriceUsd";
-  if (n.includes("chq no") || n.includes("goods received note")) return "grnNo";
-  if (n.includes("assignee")) return "custodian";
+  if (n.includes("chq no") || n.includes("goods received note") || n.includes("grn no")) return "grnNo";
+  if (n.includes("assignee") || n.includes("auditor")) return "custodian";
   if (n.includes("asset description")) return "description";
   if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers") || n.includes("tag no")) return "assetIdCode";
   if (n.includes("asset class") || n.includes("classification") || n === "category") return "category";
@@ -31,8 +31,13 @@ export function normalizeHeaderName(name: string): string {
   if (n.includes("chasis no") || n.includes("chassis no")) return "chassisNo";
   if (n.includes("engine no")) return "engineNo";
   if (n.includes("lga")) return "lga";
+  if (n.includes("supplier")) return "supplier";
+  if (n.includes("remarks") || n.includes("comment")) return "remarks";
+  if (n.includes("pv no") || n.includes("pv/jv no")) return "pvNo";
   if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "purchaseDate";
   if (n.includes("useful life")) return "usefulLifeYears";
+  if (n.includes("funder")) return "funder";
+  if (n.includes("site")) return "site";
 
   return n
     .replace(/[^a-z0-9]/g, "_")
@@ -99,6 +104,14 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location",
     guidance: "The Local Government Area associated with the facility.",
     example: "Ikeja, Alimosho, etc."
+  },
+  { 
+    rawName: "Assignee", 
+    displayName: "Assignee", 
+    normalizedName: "custodian", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location",
+    guidance: "The officer or facility staff member responsible for the asset.",
+    example: "Dr. Ibrahim or Lab Unit"
   },
   { 
     rawName: "Condition", 
@@ -168,12 +181,18 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "remarks": rawValue = asset.remarks; break;
       case "value": rawValue = asset.value; break;
       case "purchasedate": rawValue = asset.purchaseDate; break;
+      case "supplier": rawValue = asset.supplier; break;
+      case "grnno": rawValue = asset.grnNo; break;
+      case "pvno": rawValue = asset.pvNo; break;
+      case "usefullifeyears": rawValue = asset.usefulLifeYears; break;
+      case "funder": rawValue = asset.funder; break;
+      case "site": rawValue = asset.site; break;
       case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
     }
 
     // 2. Fuzzy Discovery Pulse: If core prop is empty, hunt in metadata
-    const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a";
+    const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a" || String(rawValue).trim() === "---";
     
     if (isEmpty) {
       const meta = asset.metadata || {};

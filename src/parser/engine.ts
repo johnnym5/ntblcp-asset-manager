@@ -7,6 +7,7 @@
  * Phase 1300: Aligned normalization keys to camelCase for schema compliance.
  * Phase 1301: Implemented Selective Header Skipping.
  * Phase 1302: Added explicit LGA mapping pulse to prevent data gaps.
+ * Phase 1303: Expanded mapping to include Assignee, Supplier, PV No, and GRN No.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -186,6 +187,13 @@ export class ParserEngine {
         case 'custodian': asset.custodian = strVal; break;
         case 'manufacturer': asset.manufacturer = strVal; break;
         case 'modelNumber': asset.modelNumber = strVal; break;
+        case 'supplier': asset.supplier = strVal; break;
+        case 'remarks': asset.remarks = strVal; break;
+        case 'grnNo': asset.grnNo = strVal; break;
+        case 'pvNo': asset.pvNo = strVal; break;
+        case 'usefulLifeYears': asset.usefulLifeYears = strVal; break;
+        case 'funder': asset.funder = strVal; break;
+        case 'site': asset.site = strVal; break;
         case 'value': 
           const numericVal = parseFloat(strVal.replace(/[^0-9.]/g, ''));
           asset.value = isNaN(numericVal) ? 0 : numericVal; 

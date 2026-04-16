@@ -187,8 +187,10 @@ export interface Asset {
   supplier?: string;
   remarks?: string;
   grnNo?: string;
+  pvNo?: string;
   pvJvNo?: string;
   usefulLifeYears?: string;
+  funder?: string;
   
   classification?: AssetClassification;
 
