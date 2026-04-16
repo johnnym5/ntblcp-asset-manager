@@ -6,6 +6,7 @@
  * Phase 1911: Added Deep Equality parity check to skip redundant updates.
  * Phase 1912: Implementation of Location-Scoped Cloud Pull.
  * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
+ * Phase 1960: Overhauled filteredAssets logic to support advanced logic tokens from Dashboard Pulses.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -272,15 +273,40 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
+      const isVehicle = (a: Asset) => {
+        const cat = getFuzzySignature(a.category);
+        return cat.includes('motor') || cat.includes('vehicle');
+      };
+
+      // ADVANCED LOGIC TOKENS FROM DASHBOARD PULSES
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
         results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
+      } else if (searchTerm === 'MISSING_SERIAL') {
+        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
+      } else if (searchTerm === 'MISSING_MODEL') {
+        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A' || a.modelNumber.trim() === ''));
+      } else if (searchTerm === 'MISSING_CHASSIS') {
+        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A' || a.chassisNo.trim() === ''));
+      } else if (searchTerm === 'MISSING_ENGINE') {
+        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A' || a.engineNo.trim() === ''));
+      } else if (searchTerm === 'CONDITION_GOOD') {
+        results = results.filter(a => a.conditionGroup === 'Good');
       } else if (searchTerm === 'CONDITION_BAD') {
         results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
+      } else if (searchTerm === 'CONDITION_STOLEN') {
+        results = results.filter(a => a.condition === 'Stolen');
+      } else if (searchTerm === 'CONDITION_OBSOLETE') {
+        results = results.filter(a => a.condition === 'Obsolete');
+      } else if (searchTerm === 'CONDITION_UNSALVAGEABLE') {
+        results = results.filter(a => ['Unsalvageable', 'Burnt'].includes(a.condition || ''));
+      } else if (searchTerm === 'WITH_REMARKS') {
+        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
       } else if (searchTerm === 'STATUS_UNVERIFIED') {
         results = results.filter(a => a.status === 'UNVERIFIED');
       } else {
+        // STANDARD KEYWORD SEARCH
         const fuzzySearch = getFuzzySignature(searchTerm);
         results = results.filter(a => {
           const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
