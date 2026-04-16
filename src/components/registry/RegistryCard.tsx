@@ -2,6 +2,7 @@
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Phase 1915: Removed redundant TooltipProvider.
  * Phase 1950: Removed fixed overlays; Description, Location, and LGA are now toggleable.
+ * Phase 1990: Added onSync prop and Sync Record menu option.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,7 +24,8 @@ import {
   Building, 
   Columns,
   PlusCircle,
-  X
+  X,
+  CloudUpload
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryHeader } from '@/types/registry';
@@ -56,6 +58,7 @@ interface RegistryCardProps {
   onManageLabels?: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
   onUpdateHeader?: (id: string, updates: Partial<RegistryHeader>) => void;
+  onSync?: (id: string) => void;
   densityMode?: 'compact' | 'comfortable' | 'expanded';
   isSetupMode?: boolean;
 }
@@ -134,10 +137,11 @@ export function RegistryCard({
   onManageLabels,
   onQuickUpdate,
   onUpdateHeader,
+  onSync,
   densityMode = 'comfortable',
   isSetupMode = false
 }: RegistryCardProps) {
-  const { appSettings } = useAppState();
+  const { appSettings, isOnline } = useAppState();
   const { userProfile } = useAuth();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
@@ -207,6 +211,10 @@ export function RegistryCard({
 
   if (isSystemAdmin && perms?.func_edit_headers) {
     menuOptions.push({ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) });
+  }
+
+  if (syncStatus === 'local') {
+    menuOptions.push({ label: 'Sync Record', icon: CloudUpload, onClick: () => onSync?.(record.id), disabled: !isOnline });
   }
 
   menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
