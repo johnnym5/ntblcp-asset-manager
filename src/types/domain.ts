@@ -3,6 +3,7 @@
  * Authoritative type definitions for the entire asset management system.
  * Updated Phase 1940: Added missing technical fields to the Asset interface.
  * Updated Phase 1985: Hardened for build with GIS and Evidence parameters.
+ * Updated Phase 1996: Unified optional property parity with validation schema.
  */
 
 import type { RegistryHeader } from './registry';
@@ -136,7 +137,7 @@ export interface AssetDiscrepancy {
 
 export interface Asset {
   id: string;
-  sn?: string; 
+  sn: string; 
   name?: string;
   description: string;
   category: string;
@@ -160,8 +161,8 @@ export interface Asset {
   locationStatus?: LocationMatchStatus;
   
   custodian: string;
-  lga?: string;
-  site?: string;
+  lga: string;
+  site: string;
   
   // State & Assessment
   status: VerificationStatus;
@@ -178,20 +179,20 @@ export interface Asset {
   // Financial & Technical
   purchaseDate?: string;
   value: number;
-  purchasePriceUsd?: number;
+  purchasePriceUsd: number;
   serialNumber: string;
-  assetIdCode?: string;
-  manufacturer?: string;
-  modelNumber?: string;
-  chassisNo?: string;
-  engineNo?: string;
-  supplier?: string;
-  remarks?: string;
-  grnNo?: string;
-  pvNo?: string;
-  pvJvNo?: string;
-  usefulLifeYears?: string;
-  funder?: string;
+  assetIdCode: string;
+  manufacturer: string;
+  modelNumber: string;
+  chassisNo: string;
+  engineNo: string;
+  supplier: string;
+  remarks: string;
+  grnNo: string;
+  pvNo: string;
+  pvJvNo: string;
+  usefulLifeYears: string;
+  funder: string;
   
   classification?: AssetClassification;
 

@@ -136,28 +136,14 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   };
 };
 
-/** Hook to access Firebase Auth instance. */
-export const useAuth = (): Auth => {
-  const { auth } = useFirebase();
-  return auth;
-};
-
-/** Hook to access Firestore instance. */
-export const useFirestore = (): Firestore => {
-  const { firestore } = useFirebase();
-  return firestore;
-};
-
-/** Hook to access Firebase App instance. */
-export const useFirebaseApp = (): FirebaseApp => {
-  const { firebaseApp } = useFirebase();
-  return firebaseApp;
-};
-
 type MemoFirebase <T> = T & {__memo?: boolean};
 
+/**
+ * Standardizes Firebase memoization pulses.
+ */
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  const memoized = useMemo(factory, deps);
+  // Use a stable reference for the memoization call to satisfy the linter during build.
+  const memoized = React.useMemo(() => factory(), deps);
   
   if(typeof memoized !== 'object' || memoized === null) return memoized as T;
   (memoized as MemoFirebase<T>).__memo = true;
