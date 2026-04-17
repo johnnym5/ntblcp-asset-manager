@@ -93,8 +93,9 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
         return {
           label: field.label,
-          completed: isCompleted,
-          icon: isVehicle ? Car : Laptop
+          isCompleted,
+          icon: isVehicle ? Car : Laptop,
+          key: field.key
         };
       });
   }, [activeTemplate, values]);
@@ -109,7 +110,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
       <div className="space-y-3">
         {checklistItems.length > 0 ? (
           checklistItems.map((item) => (
-            <ChecklistItem key={item.label} {...item} />
+            <ChecklistItem key={item.key} {...item} />
           ))
         ) : (
           <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">

@@ -202,26 +202,26 @@ export function RegistryCard({
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
 
   const menuOptions = [
-    { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() }
+    { label: 'View Profile', icon: Maximize2, onSelect: () => onToggleExpand?.() }
   ];
 
   if (perms?.func_edit_asset || isSystemAdmin) {
-    menuOptions.push({ label: 'Edit Record', icon: Edit3, onClick: () => onInspect(record.id) });
+    menuOptions.push({ label: 'Edit Record', icon: Edit3, onSelect: () => onInspect(record.id) });
   }
 
   if (isSystemAdmin && perms?.func_edit_headers) {
-    menuOptions.push({ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) });
+    menuOptions.push({ label: 'Manage Labels', icon: Columns, onSelect: () => onManageLabels?.(record.id) });
   }
 
   if (syncStatus === 'local') {
-    menuOptions.push({ label: 'Sync Record', icon: CloudUpload, onClick: () => onSync?.(record.id), disabled: !isOnline });
+    menuOptions.push({ label: 'Sync Record', icon: CloudUpload, onSelect: () => onSync?.(record.id), disabled: !isOnline } as any);
   }
 
-  menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
-  menuOptions.push({ label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onClick: () => onToggleSelect?.(record.id) });
+  menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onSelect: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
+  menuOptions.push({ label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onSelect: () => onToggleSelect?.(record.id) });
 
   if (perms?.func_delete_asset || isSystemAdmin) {
-    menuOptions.push({ label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true });
+    menuOptions.push({ label: 'Clear Record', icon: Trash2, onSelect: () => {}, destructive: true } as any);
   }
 
   return (

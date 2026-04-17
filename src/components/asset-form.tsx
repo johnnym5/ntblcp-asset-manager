@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -60,6 +60,7 @@ interface AssetFormProps {
   onOpenChange: (open: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
+  onQuickSave?: (assetId: string, data: any) => Promise<void>;
   isReadOnly: boolean;
 }
 
@@ -72,7 +73,7 @@ export default function AssetForm({
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { activeGrantId, appSettings, headers: globalHeaders } = useAppState();
+  const { activeGrantIds, appSettings, headers: globalHeaders } = useAppState();
   
   const form = useForm<Asset>({
     resolver: zodResolver(AssetSchema),
@@ -84,7 +85,7 @@ export default function AssetForm({
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const currentTemplate = useMemo(() => {
-    const category = asset?.category || form.watch('category');
+    const category = asset?.category || form.getValues('category');
     if (!category || !appSettings) return null;
     const grant = appSettings.grants.find(g => 
       Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(category))
@@ -99,9 +100,10 @@ export default function AssetForm({
       if (asset) {
         form.reset(asset);
       } else {
+        const defaultGrantId = activeGrantIds[0] || (appSettings?.grants[0]?.id) || '';
         form.reset({
           id: crypto.randomUUID(),
-          grantId: activeGrantId || '',
+          grantId: defaultGrantId,
           status: 'UNVERIFIED',
           condition: 'New',
           conditionGroup: 'Good',
@@ -117,13 +119,18 @@ export default function AssetForm({
           metadata: {},
           conditionHistory: [],
           discrepancies: [],
-          updateCount: 0
-        } as Asset);
+          updateCount: 0,
+          section: 'General',
+          subsection: 'Base Register',
+          assetFamily: 'Uncategorized',
+          overallFidelityScore: 100,
+          unseenUpdateFields: []
+        } as unknown as Asset);
       }
     }
-  }, [isOpen, asset, form, userProfile, activeGrantId]);
+  }, [isOpen, asset, form, userProfile, activeGrantIds, appSettings]);
 
-  const onSubmit = async (data: Asset) => {
+  const onSubmit: SubmitHandler<Asset> = async (data) => {
     setIsSaving(true);
     try {
         const nextGroup = getCanonicalGroup(data.condition);
@@ -138,8 +145,8 @@ export default function AssetForm({
         if (!isAdmin && !canUserEditFull && asset) {
           const changes: Partial<Asset> = {};
           (Object.keys(data) as Array<keyof Asset>).forEach(key => {
-            if (JSON.stringify(data[key]) !== JSON.stringify((asset as any)[key])) {
-              (changes as any)[key] = data[key];
+            if (JSON.stringify((data as any)[key]) !== JSON.stringify((asset as any)[key])) {
+              (changes as any)[key] = (data as any)[key];
             }
           });
 
@@ -235,7 +242,7 @@ export default function AssetForm({
                                     <FormControl>
                                       <Input 
                                         {...formField} 
-                                        value={formField.value || ''}
+                                        value={String(formField.value || '')}
                                         readOnly={isFieldDisabled(fieldName)} 
                                         className="h-12 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase shadow-inner" 
                                         placeholder={`Enter ${field.label}...`}

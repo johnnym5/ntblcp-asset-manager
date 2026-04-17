@@ -2,6 +2,7 @@
  * @fileOverview Unified Domain Models for Assetain.
  * Authoritative type definitions for the entire asset management system.
  * Updated Phase 1940: Added missing technical fields to the Asset interface.
+ * Updated Phase 1985: Hardened for build with GIS and Evidence parameters.
  */
 
 import type { RegistryHeader } from './registry';
@@ -218,6 +219,17 @@ export interface Asset {
   };
   adminComment?: string;
   yearBucket?: number;
+
+  // Visual & Spatial pulses
+  photoDataUri?: string;
+  photoUrl?: string;
+  signatureDataUri?: string;
+  signatureUrl?: string;
+  geotag?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+  };
 }
 
 export interface DisplayField {
@@ -254,6 +266,7 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   readAuthority: AuthorityNode;
+  activeGrantId: string | null; // Compatibility pulse
   activeGrantIds: string[]; // Enabled multiple projects
   grants: Grant[];
   uxMode: UXMode;

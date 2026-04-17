@@ -7,6 +7,7 @@
  * Phase 1912: Implementation of Location-Scoped Cloud Pull.
  * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
  * Phase 1960: Overhauled filteredAssets logic to support advanced logic tokens from Dashboard Pulses.
+ * Phase 1995: Fixed Context Provider value to include all missing state properties.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -32,6 +33,8 @@ import type {
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
+
+export type { OptionType };
 
 interface AppStateContextType {
   assets: Asset[];
@@ -180,17 +183,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
       
-      // Hardened fallback for active grants during fresh initialization
       const currentGrantIds = (localSettings?.activeGrantIds && localSettings.activeGrantIds.length > 0)
         ? localSettings.activeGrantIds 
         : (localSettings?.grants.map(g => g.id) || []);
 
       const filtered = (localAssets || []).filter(a => {
-        if (currentGrantIds.length === 0) return true; // Show everything if no grants defined yet
+        if (currentGrantIds.length === 0) return true;
         if (!currentGrantIds.includes(a.grantId)) return false;
         
         const grant = localSettings?.grants.find(g => g.id === a.grantId);
-        // If sheet list is empty, default to true to avoid hiding newly synced data
         if (!grant || grant.enabledSheets.length === 0) return true;
         return grant.enabledSheets.includes(a.category);
       });
@@ -283,7 +284,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return !!val && String(val).trim() !== '' && String(val).trim().toLowerCase() !== 'n/a';
       };
 
-      // ADVANCED LOGIC TOKENS FROM DASHBOARD PULSES
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
@@ -311,7 +311,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       } else if (searchTerm === 'STATUS_UNVERIFIED') {
         results = results.filter(a => a.status === 'UNVERIFIED');
       } else {
-        // STANDARD KEYWORD SEARCH
         const fuzzySearch = getFuzzySignature(searchTerm);
         results = results.filter(a => {
           const hay = `${a.description} ${a.assetIdCode} ${a.serialNumber} ${a.location} ${a.custodian} ${a.category}`;
@@ -408,9 +407,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
   }, [assets]);
 
-  /**
-   * Deep Parity Check Logic.
-   */
   const areAssetsIdentical = useCallback((local: Asset, remote: Asset): boolean => {
     const keysToIgnore = ['syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'updateCount', 'unseenUpdateFields', 'importMetadata'];
     
@@ -425,7 +421,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     return JSON.stringify(localClean) === JSON.stringify(remoteClean);
   }, []);
 
-  // --- DETERMINISTIC TIMESTAMP SYNC PULSE ---
   const manualDownload = useCallback(async (stateScopes?: string[]): Promise<SyncSummary | null> => {
     if (!isOnline) return null;
     setIsSyncing(true);
@@ -449,7 +444,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
       const filteredRemote = allRemoteAssets.filter(a => {
         const grant = appSettings?.grants.find(g => g.id === a.grantId);
-        // Fallback: If onboarding, assume all sheets enabled
         if (!grant || grant.enabledSheets.length === 0) return true;
         return grant.enabledSheets.includes(a.category);
       });
@@ -593,7 +587,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
       activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0) + filters.length,
-      groupsViewMode, setGroupsViewMode
+      groupsViewMode, setGroupsViewMode,
+      selectedLocations, setSelectedLocations,
+      selectedAssignees, setSelectedAssignees,
+      selectedStatuses, setSelectedStatuses,
+      selectedConditions, setSelectedConditions,
+      missingFieldFilter, setMissingFieldFilter
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}

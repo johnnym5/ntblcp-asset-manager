@@ -3,6 +3,7 @@
 /**
  * @fileOverview Visual Evidence Gallery - High-Fidelity Asset Media Workspace.
  * Phase 66: Integrated Forensic Signature Audit Tab.
+ * Phase 1985: Hardened for build with cn import and correct asset properties.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -34,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
+import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 
 export default function GalleryPage() {
@@ -56,9 +58,9 @@ export default function GalleryPage() {
     if (!searchTerm) return list;
     const term = searchTerm.toLowerCase();
     return list.filter(a => 
-      a.description.toLowerCase().includes(term) || 
-      a.location.toLowerCase().includes(term) ||
-      a.assetIdCode?.toLowerCase().includes(term)
+      (a.description || '').toLowerCase().includes(term) || 
+      (a.location || '').toLowerCase().includes(term) ||
+      (a.assetIdCode || '').toLowerCase().includes(term)
     );
   }, [mediaAssets, forensicAssets, searchTerm, activeTab]);
 
