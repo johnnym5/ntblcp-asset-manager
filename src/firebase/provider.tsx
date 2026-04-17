@@ -90,7 +90,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   }, [auth]); // Depends on the auth instance
 
   // Memoize the context value
-  const contextValue = useMemo(function getContextValue(): FirebaseContextState {
+  const contextValue = useMemo(() => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
       areServicesAvailable: servicesAvailable,
