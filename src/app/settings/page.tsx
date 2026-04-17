@@ -1,0 +1,451 @@
+'use client';
+
+/**
+ * @fileOverview SettingsWorkstation - Operational Control Center.
+ * Phase 64: Hardened Emergency Pulse Reset & Local State Reconstruction.
+ */
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import AppLayout from '@/components/app-layout';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from 'next-themes';
+import { 
+  Settings, 
+  FolderKanban, 
+  UserCog, 
+  Palette, 
+  Database, 
+  PlusCircle, 
+  CheckCircle2, 
+  Trash2, 
+  Save, 
+  Loader2, 
+  Sun, 
+  Moon, 
+  Zap,
+  RefreshCw,
+  Smartphone,
+  Info,
+  Download,
+  RotateCcw,
+  ShieldCheck,
+  Lock,
+  Cpu,
+  GraduationCap,
+  Columns,
+  Activity,
+  Bomb,
+  FileUp
+} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { UserManagement } from '@/components/admin/user-management';
+import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { storage } from '@/offline/storage';
+import { ArchiveService } from '@/lib/archive-service';
+import { cn } from '@/lib/utils';
+import type { AppSettings, SheetDefinition, UXMode } from '@/types/domain';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+export default function SettingsPage() {
+  const { appSettings, refreshRegistry, settingsLoaded, isSyncing, isOnline } = useAppState();
+  const { userProfile, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const { setTheme, theme } = useTheme();
+
+  const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  
+  const recoveryInputRef = useRef<HTMLInputElement>(null);
+
+  // Schema Editor State
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (appSettings) {
+      setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+    }
+  }, [appSettings]);
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+  }, [appSettings, draftSettings]);
+
+  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    if (!draftSettings) return;
+    setDraftSettings({ ...draftSettings, [key]: value });
+  };
+
+  const handleCommitChanges = async () => {
+    if (!draftSettings) return;
+    setIsSaving(true);
+    try {
+      await FirestoreService.updateSettings(draftSettings);
+      await storage.saveSettings(draftSettings);
+      await refreshRegistry();
+      toast({ title: "Environment Synchronized", description: "Global configuration pulse broadcasted successfully." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Broadcast Failure", description: "Could not establish cloud parity for settings." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    toast({ title: "Archiving Local State..." });
+    await ArchiveService.generateFullSnapshot();
+    toast({ title: "Device Pulse Exported", description: "Your local database has been archived to JSON." });
+  };
+
+  const handleImportRecovery = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoring(true);
+    try {
+      await ArchiveService.importSnapshot(file);
+      toast({ title: "Recovery Pulse Complete", description: "System state has been reconstructed from the archive." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Recovery Failure", description: "The archive pulse is corrupted or invalid." });
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleSystemReset = async () => {
+    setIsSaving(true);
+    try {
+      await storage.clearAssets();
+      await storage.clearSandbox();
+      localStorage.removeItem('assetain-user-session');
+      toast({ title: "Registry Purged", description: "Local persistence layer has been reset." });
+      window.location.href = '/';
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (authLoading || !settingsLoaded || !draftSettings) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const SectionHeading = ({ title, description, icon: Icon }: { title: string, description: string, icon: any }) => (
+    <div className="flex items-center gap-4 mb-6">
+      <div className="p-3 bg-primary/10 rounded-2xl">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-black uppercase tracking-tight leading-none text-foreground">{title}</h3>
+        <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-1 opacity-60">{description}</p>
+      </div>
+    </div>
+  );
+
+  const SettingRow = ({ label, description, children, icon: Icon, disabled = false }: { label: string, description: string, children: React.ReactNode, icon?: any, disabled?: boolean }) => (
+    <div className={cn(
+      "flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl border-2 border-border/40 bg-card/50 hover:border-primary/20 transition-all gap-4",
+      disabled && "opacity-40 grayscale pointer-events-none"
+    )}>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-3.5 w-3.5 text-primary opacity-60" />}
+          <Label className="text-sm font-black uppercase tracking-tight">{label}</Label>
+        </div>
+        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-sm italic">
+          {description}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <AppLayout>
+      <div className="max-w-6xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
+              <Settings className="text-primary h-8 w-8" /> Control Center
+            </h2>
+            <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
+              Broadband Configuration & Automation Hub
+            </p>
+          </div>
+          <Button 
+            onClick={handleCommitChanges} 
+            disabled={!hasChanges || isSaving}
+            className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Commit Configuration
+          </Button>
+        </div>
+
+        <Tabs defaultValue="environment" className="space-y-8">
+          <TabsList className="bg-muted/30 p-1.5 rounded-[2rem] h-auto flex flex-wrap gap-2 border-2 border-border/40 w-fit">
+            <TabsTrigger value="environment" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <GraduationCap className="h-3.5 w-3.5" /> Environment
+            </TabsTrigger>
+            <TabsTrigger value="registry" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <Columns className="h-3.5 w-3.5" /> Registry
+            </TabsTrigger>
+            <TabsTrigger value="security" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <Lock className="h-3.5 w-3.5" /> Governance
+            </TabsTrigger>
+            <TabsTrigger value="system" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <RefreshCw className="h-3.5 w-3.5" /> System
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="environment" className="space-y-10 outline-none">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Visual Identity" description="Theming & surface language" icon={Palette} />
+                  <div className="space-y-4">
+                    <SettingRow label="System Theme" description="Choose between high-contrast light mode or dark amoled auditor view with gold accents." icon={Sun}>
+                      <div className="flex gap-2 p-1 bg-muted/50 rounded-xl border-2">
+                        <Button 
+                          variant={theme === 'light' ? 'secondary' : 'ghost'} 
+                          size="sm" 
+                          onClick={() => setTheme('light')} 
+                          className="h-8 rounded-lg font-black uppercase text-[9px] tracking-widest gap-2"
+                        >
+                          <Sun className="h-3 w-3" /> Light
+                        </Button>
+                        <Button 
+                          variant={theme === 'dark' ? 'secondary' : 'ghost'} 
+                          size="sm" 
+                          onClick={() => setTheme('dark')} 
+                          className="h-8 rounded-lg font-black uppercase text-[9px] tracking-widest gap-2"
+                        >
+                          <Moon className="h-3 w-3" /> Dark
+                        </Button>
+                      </div>
+                    </SettingRow>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="User Experience" description="Interface logic & accessibility rules" icon={GraduationCap} />
+                  <div className="space-y-4">
+                    <SettingRow label="Operational Mode" description="Switch between beginner-friendly guidance and high-speed expert pulses." icon={Smartphone}>
+                      <Select value={draftSettings.uxMode} onValueChange={(v) => handleSettingChange('uxMode', v as UXMode)}>
+                        <SelectTrigger className="w-36 h-11 rounded-xl font-black uppercase text-[10px] tracking-tighter">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
+                          <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </SettingRow>
+                    
+                    <SettingRow label="Help Tooltips" description="Show descriptive pulses when hovering over buttons." icon={Info}>
+                      <Switch checked={draftSettings.showHelpTooltips} onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)} />
+                    </SettingRow>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="registry" className="space-y-10 outline-none">
+            <div className="px-2">
+              <SectionHeading title="Registry Display" description="Table layout & field visibility setup" icon={Columns} />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-4">
+                  {draftSettings.grants.map((grant) => (
+                    <Card key={grant.id} className={cn(
+                      "border-2 transition-all duration-500 rounded-[2.5rem] overflow-hidden",
+                      draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5 shadow-2xl" : "border-border/40 bg-card/50"
+                    )}>
+                      <CardHeader className="p-8 pb-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("p-2 rounded-xl", draftSettings.activeGrantId === grant.id ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                              <FolderKanban className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <Input 
+                                value={grant.name} 
+                                onChange={(e) => handleSettingChange('grants', draftSettings.grants.map(g => g.id === grant.id ? { ...g, name: e.target.value } : g))}
+                                className="border-none bg-transparent font-black text-xl uppercase tracking-tighter p-0 h-auto focus-visible:ring-0"
+                              />
+                              <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1">ID: {grant.id}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 bg-primary/5 text-primary">
+                            {Object.keys(grant.sheetDefinitions || {}).length} Categories
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-8 pt-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-border/40 group hover:border-primary/20 transition-all">
+                              <span className="text-[10px] font-black uppercase truncate">{sheetName}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                                className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-10 outline-none">
+            <div className="px-2">
+              <SectionHeading title="Identity Governance" description="System auditors & regional scopes" icon={Lock} />
+              <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+                <CardContent className="p-8">
+                  <UserManagement 
+                    users={draftSettings.authorizedUsers}
+                    onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                    adminProfile={userProfile}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="system" className="space-y-10 outline-none">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Infrastructure Health" description="Triple-layer parity monitoring" icon={RefreshCw} />
+                  <div className="space-y-4">
+                    <SettingRow label="Manual Reconciliation" description="Force a full state-refresh." icon={Activity}>
+                      <Button variant="outline" size="sm" onClick={refreshRegistry} disabled={isSyncing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">
+                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                        Sync Now
+                      </Button>
+                    </SettingRow>
+                    
+                    <SettingRow label="Registry Snapshot" description="Export entire register as JSON archive." icon={Download}>
+                      <Button variant="outline" size="sm" onClick={handleExportBackup} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
+                    </SettingRow>
+                  </div>
+                </div>
+
+                <div>
+                  <SectionHeading title="Local Data Recovery" description="Deterministic state restoration" icon={RotateCcw} />
+                  <div className="p-8 rounded-[2.5rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-6">
+                    <div className="flex items-center gap-3">
+                      <Download className="h-5 w-5 text-primary" />
+                      <h4 className="text-sm font-black uppercase tracking-tight text-primary">Import Recovery Pulse</h4>
+                    </div>
+                    <input type="file" ref={recoveryInputRef} onChange={handleImportRecovery} className="hidden" accept=".json" />
+                    <Button 
+                      onClick={() => recoveryInputRef.current?.click()}
+                      disabled={isRestoring}
+                      className="w-full h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20"
+                    >
+                      {isRestoring ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
+                      Load Recovery Pulse
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <SectionHeading title="Danger Zone" description="Immutable state operations" icon={Trash2} />
+                <div className="p-8 rounded-[2.5rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="h-5 w-5 text-orange-600" />
+                    <h4 className="text-sm font-black uppercase tracking-tight text-orange-700">Wipe Registry Cache</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
+                    Purging local encrypted store is irreversible.
+                  </p>
+                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
+                    Reset Local Pulse
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-2xl p-10">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-8 w-8 text-destructive" />
+            </div>
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Pulse?</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
+                This will permanently delete all asset records and cached configuration from this device. Your session will be terminated. Cloud data is not affected.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Reset</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSystemReset} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white m-0">
+              Execute Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={selectedSheetDef.name}
+          onSave={(orig, newDef, all) => {
+            const updatedGrants = draftSettings.grants.map(grant => {
+              if (grant.id === activeGrantForSchema) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }}
+        />
+      )}
+    </AppLayout>
+  );
+}

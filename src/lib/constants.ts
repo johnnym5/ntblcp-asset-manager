@@ -1,5 +1,39 @@
 import type { Asset, SheetDefinition, DisplayField } from "./types";
 
+/**
+ * @fileOverview System Constants & Canonical Sheet Definitions.
+ * Aligned with PRD requirements for dynamic asset register importing.
+ */
+
+export const TARGET_SHEETS = [
+  'NTBLCP-TB-FAR',
+  'MOTORCYCLES',
+  'PDX',
+  'ECG MONITORS',
+  'TB LAMP',
+  'IHVN',
+  'TRUENAT',
+  'VEHICLES',
+  'GENEXPERT',
+  'TBLAMP C19RM',
+];
+
+export const ASSET_CONDITIONS = [
+  "New",
+  "Used- good condition",
+  "Used but in good working condition",
+  "Used but requires occasional repair",
+  "Used but in poor condition",
+  "Bad condition",
+  "F2: Major repairs required-poor condition",
+  "Unsalvageable",
+  "Burnt",
+  "Stolen",
+  "Obsolete",
+  "Insurance settlement",
+  "Writeoff"
+];
+
 export const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
@@ -48,7 +82,6 @@ export const NIGERIAN_STATE_CAPITALS: Record<string, string> = {
   "Zamfara": "Gusau",
 };
 
-
 export const NIGERIAN_ZONES: Record<string, string[]> = {
   "North Central": ["Benue", "FCT - Abuja", "Kogi", "Kwara", "Nasarawa", "Niger", "Plateau"],
   "North East": ["Adamawa", "Bauchi", "Borno", "Gombe", "Taraba", "Yobe"],
@@ -60,65 +93,39 @@ export const NIGERIAN_ZONES: Record<string, string[]> = {
 
 export const ZONAL_STORES = Object.keys(NIGERIAN_ZONES);
 
-export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
-
-export const ASSET_CONDITIONS = [
-    "New",
-    "Used- good condition",
-    "Used but in good working condition",
-    "Used but requires occasional repair",
-    "Used but in poor condition",
-    "Bad condition",
-    "F2: Major repairs required-poor condition",
-    "Unsalvageable",
-    "Burnt",
-    "Stolen",
-    "Obsolete",
-    "Insurance settlement",
-    "Writeoff",
-];
-
 export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
   location: ['LOCATION', 'STATE'],
-  lga: ['LGA'],
-  site: ['SITE'],
-  assignee: ['ASSIGNEE', 'LOCATION/USER'],
+  custodian: ['ASSIGNEE', 'LOCATION/USER', 'CUSTODIAN'],
   assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'TAG NUMBER'],
-  assetClass: ['ASSET CLASS', 'CLASSIFICATION', 'CATEGORY'],
-  manufacturer: ['MANUFACTURER'],
-  modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
+  category: ['ASSET CLASS', 'CLASSIFICATION', 'CATEGORY'],
   serialNumber: ['SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'SERIAL NUMBERS'],
-  supplier: ['SUPPLIER', 'SUPPLIERS'],
-  dateReceived: ['DATE PURCHASED OR RECEIVED', 'DATE PURCHASED OR  RECEIVED', 'YEAR OF PURCHASE'],
-  grnNo: ['CHQ NO / GOODS RECEIVED NOTE NO.'],
-  pvNo: ['PV NO'],
-  costNgn: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)', 'COST(N)'],
-  costUsd: ['PURCHASE PRICE [USD)', 'PURCHASE PRICE (USD)'],
-  funder: ['FUNDER'],
+  purchaseDate: ['DATE PURCHASED OR RECEIVED', 'YEAR OF PURCHASE'],
+  value: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)', 'COST(N)', 'PURCHASE PRICE'],
   condition: ['CONDITION', 'COMMENTS'],
-  remarks: ['REMARKS'],
-  grant: ['GRANT'],
-  usefulLifeYears: ['USEFUL LIFE (YEARS)'],
-  chasisNo: ['CHASIS NO'],
-  engineNo: ['ENGINE NO'],
-  qty: ['QTY'],
-  imei: ['IMEI (TABLETS & MOBILE PHONES)'],
-  verifiedStatus: ['VERIFIED STATUS'],
-  verifiedDate: ['VERIFIED DATE'],
-  lastModifiedBy: ['LAST MODIFIED BY'],
-  lastModified: ['LAST MODIFIED DATE'],
-  customField1: ['Custom 1'],
-  customField2: ['Custom 2'],
-  customField3: ['Custom 3'],
-  customField4: ['Custom 4'],
-  customField5: ['Custom 5'],
 };
 
-export const IHVN_SUB_SHEET_DEFINITIONS: Record<string, string[]> = {
-    'IHVN-General': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "ASSET SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST (NGN)", "GRANT" ],
-    'IHVN-Computers': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ],
-    'IHVN-IT Equipment': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ],
-    'IHVN-Inherited Assets': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST(N)", "GRANT" ],
+// Specialized sub-table signatures for complex sheets (e.g. IHVN)
+export const SUB_TABLE_SIGNATURES: Record<string, string[]> = {
+  'IHVN-General': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS" ],
+  'IHVN-Computers': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "SERIAL NUMBER", "MODEL NUMBER" ],
+  'IHVN-Vehicles': [ "S/N", "DESCRIPTION", "TAG NUMBER", "CHASIS NO", "ENGINE NO" ],
+};
+
+export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
+  'NTBLCP-TB-FAR': { 
+    name: 'NTBLCP-TB-FAR', 
+    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ], 
+    displayFields: []
+  },
+  'MOTORCYCLES': { name: 'MOTORCYCLES', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no' ], displayFields: [] },
+  'PDX': { name: 'PDX', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number' ], displayFields: [] },
+  'ECG MONITORS': { name: 'ECG MONITORS', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class' ], displayFields: [] },
+  'TB LAMP': { name: 'TB LAMP', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class' ], displayFields: [] },
+  'IHVN': { name: 'IHVN', headers: [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'SERIAL NUMBERS' ], displayFields: [] },
+  'TRUENAT': { name: 'TRUENAT', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code' ], displayFields: [] },
+  'VEHICLES': { name: 'VEHICLES', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Chasis no', 'Engine no' ], displayFields: [] },
+  'GENEXPERT': { name: 'GENEXPERT', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code' ], displayFields: [] },
+  'TBLAMP C19RM': { name: 'TBLAMP C19RM', headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code' ], displayFields: [] },
 };
