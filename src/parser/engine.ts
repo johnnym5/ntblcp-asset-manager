@@ -170,6 +170,10 @@ export class ParserEngine {
     const asset: any = {
       id: uuidv4(),
       category: group.groupName,
+      sourceGroup: group.groupName,
+      templateId: group.templateId,
+      headerSource: group.headerSource,
+      headerSetType: group.headerSetType,
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
@@ -189,6 +193,19 @@ export class ParserEngine {
         assetFamily: 'Uncategorized' 
       }
     };
+  /**
+   * Parses a sheet into a GroupImportContainer for compatibility with import pipeline.
+   */
+  public parseWorkbook(sheetName: string, data: any[][]): GroupImportContainer {
+    const groups = this.discoverGroups(sheetName, data);
+    const containers = this.ingestGroups(sheetName, data, groups);
+    // For compatibility, return the first container if present, else a default empty container
+    return containers.length > 0 ? containers[0] : {
+      ...groups[0],
+      assets: [],
+      metrics: { valid: 0, invalid: 0, updates: 0, new: 0 }
+    };
+  }
 
     const exclusions = new Set(group.excludedHeaders || []);
 
