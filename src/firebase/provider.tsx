@@ -101,7 +101,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
-  }, [firebaseApp, firestore, auth, userAuthState]);
+  }, [firebaseApp, firestore, auth, userAuthState.user, userAuthState.isUserLoading, userAuthState.userError]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -159,10 +159,10 @@ type MemoFirebase <T> = T & {__memo?: boolean};
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
   const memoized = useMemo(factory, deps);
   
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
+  if(typeof memoized !== 'object' || memoized === null) return memoized as T;
   (memoized as MemoFirebase<T>).__memo = true;
   
-  return memoized;
+  return memoized as T & MemoFirebase<T>;
 }
 
 /**

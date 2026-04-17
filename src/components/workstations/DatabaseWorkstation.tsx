@@ -2,11 +2,11 @@
 
 /**
  * @fileOverview Database Center - Granular Data Management.
- * Overhauled for simple terminology and high-density explorer UI.
  * Phase 1914: Simplified terminology (Database Center, Records, Clear Data).
+ * Phase 1915: Hardened loadNodes with useCallback for build stability.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Database, 
   RefreshCw, 
@@ -119,11 +119,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
   const [isResetCloudOpen, setIsResetCloudOpen] = useState(false);
   const [isNuclearOpen, setIsNuclearOpen] = useState(false);
 
-  useEffect(() => {
-    loadNodes();
-  }, [activeLayer, activeCollection, assets]);
-
-  const loadNodes = async () => {
+  const loadNodes = useCallback(async () => {
     setLoading(true);
     try {
       const data = await VirtualDBService.getDocuments(activeLayer, activeCollection);
@@ -131,7 +127,11 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeLayer, activeCollection]);
+
+  useEffect(() => {
+    loadNodes();
+  }, [loadNodes, assets]);
 
   const filteredNodes = useMemo(() => {
     if (!searchTerm) return nodes;
@@ -732,7 +732,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-border m-0 hover:bg-muted">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 transition-all">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleCloudReset} 
               disabled={isProcessing}

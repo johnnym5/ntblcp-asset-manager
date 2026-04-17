@@ -3,6 +3,7 @@
 /**
  * @fileOverview SchemaMapper - Interactive Data Engineering Interface.
  * Allows users to manually align Excel headers to Registry fields.
+ * Phase 1002: Fixed unescaped entities for ESLint compliance.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -145,7 +146,7 @@ export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperP
             <div className="space-y-1">
               <h5 className="text-xs font-black uppercase tracking-tight">Engineering Hint</h5>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                All unmapped columns are automatically sequestered into the record's metadata. You will never lose source data during the ingestion traversal.
+                All unmapped columns are automatically sequestered into the record&apos;s metadata. You will never lose source data during the ingestion traversal.
               </p>
             </div>
           </div>

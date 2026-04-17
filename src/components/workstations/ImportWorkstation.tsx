@@ -3,9 +3,10 @@
 /**
  * @fileOverview Import Center - Excel Data Setup.
  * Phase 1916: Expanded group summary to handle unmatched sheets clearly.
+ * Phase 1917: Fixed unescaped entities for ESLint compliance.
  */
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ import { cn, getFuzzySignature } from '@/lib/utils';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { normalizeHeaderName } from '@/lib/registry-utils';
 import type { SheetDefinition } from '@/types/domain';
+import { useToast } from '@/hooks/use-toast';
 
 type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 type MergeStrategy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
@@ -54,6 +56,7 @@ export function ImportWorkstation() {
     isOnline
   } = useAppState();
   const { userProfile } = useAuth();
+  const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -315,7 +318,7 @@ export function ImportWorkstation() {
                   <div className="p-3 bg-orange-500 rounded-xl"><FileWarning className="h-6 w-6 text-black" /></div>
                   <div className="space-y-1">
                     <h4 className="text-base font-black uppercase text-orange-600">{unrecognizedCount} New Folders Detected</h4>
-                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found folders that are not yet defined in your settings. Please use "Define as Template" to map their columns before importing.</p>
+                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found folders that are not yet defined in your settings. Please use &quot;Define as Template&quot; to map their columns before importing.</p>
                   </div>
                 </div>
               )}

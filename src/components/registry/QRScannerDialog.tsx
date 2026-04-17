@@ -3,6 +3,7 @@
 /**
  * @fileOverview QRScannerDialog - Physical Identity Pulse Workstation.
  * Phase 2: Removed redundant manual close button.
+ * Phase 3: Added missing dependencies to useEffect to comply with exhaustive-deps.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -35,10 +36,11 @@ export function QRScannerDialog({ isOpen, onOpenChange, onScanSuccess }: QRScann
       setIsInitializing(true);
       const timer = setTimeout(() => {
         try {
-          scannerRef.current = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-          scannerRef.current.render((decodedText) => {
+          const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+          scannerRef.current = scanner;
+          scanner.render((decodedText) => {
             onScanSuccess(decodedText);
-            scannerRef.current?.clear();
+            scanner.clear();
             onOpenChange(false);
           }, () => {});
           setIsInitializing(false);
@@ -49,10 +51,12 @@ export function QRScannerDialog({ isOpen, onOpenChange, onScanSuccess }: QRScann
       }, 500);
       return () => {
         clearTimeout(timer);
-        if (scannerRef.current) scannerRef.current.clear().catch(() => {});
+        if (scannerRef.current) {
+          scannerRef.current.clear().catch(() => {});
+        }
       };
     }
-  }, [isOpen]);
+  }, [isOpen, onOpenChange, onScanSuccess, toast]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
