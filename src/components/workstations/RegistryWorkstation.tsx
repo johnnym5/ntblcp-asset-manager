@@ -3,12 +3,8 @@
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
  * Optimized for High-Density Grid Pulse & Dual-Mode Setup Interface.
- * Phase 1520: Separated Card Setup Mode from Profile Setup Mode.
- * Phase 1525: Resolved optionsMap ReferenceError by implementing deterministic value discovery.
- * Phase 1530: Implemented unified handleUpdateHeader logic for in-place folder setup.
- * Phase 1805: Integrated UserPermissions for functional lockdown.
- * Phase 1990: Implemented handleSyncFolderPulse and handleSyncAssetPulse for contextual sync.
- * Phase 2000: Added explicit Refresh button to header for manual reconciliation.
+ * Phase 1535: Hardened handleSyncFolderPulse to update local parity and cleanup queue.
+ * Phase 1536: Resolved syntax error in Purge Dialog.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -473,9 +469,32 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsProcessing(true);
     try {
       addNotification({ title: "Syncing Folder...", description: `Uploading ${folderAssets.length} changes from ${cat}.` });
+      
+      // 1. Upload each record to Cloud Authority
       for (const asset of folderAssets) {
         await FirestoreService.saveAsset(asset);
       }
+
+      // 2. Update local storage to reflect parity
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.map(a => {
+        if (a.category === cat && a.syncStatus === 'local') {
+          return { ...a, syncStatus: 'synced' as const };
+        }
+        return a;
+      });
+      await storage.saveAssets(updatedLocal);
+
+      // 3. Clear pending operations for these assets from the queue
+      const queue = await storage.getQueue();
+      const folderAssetIds = new Set(folderAssets.map(a => a.id));
+      for (const entry of queue) {
+        const payloadId = (entry.payload as any).id;
+        if (folderAssetIds.has(payloadId)) {
+          await storage.dequeue(entry.id);
+        }
+      }
+
       await refreshRegistry();
       addNotification({ title: "Folder Sync Complete", variant: "success" });
     } catch (e) {
@@ -498,6 +517,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsProcessing(true);
     try {
       await FirestoreService.saveAsset(asset);
+      
+      // Update local storage status
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.map(a => a.id === id ? { ...a, syncStatus: 'synced' as const } : a);
+      await storage.saveAssets(updatedLocal);
+
+      // Remove from write-ahead queue
+      const queue = await storage.getQueue();
+      for (const entry of queue) {
+        if ((entry.payload as any).id === id) {
+          await storage.dequeue(entry.id);
+        }
+      }
+
       await refreshRegistry();
       addNotification({ title: "Record Synced", variant: "success" });
     } catch (e) {
@@ -537,7 +570,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   return (
     <div className="space-y-4 h-full flex flex-col relative">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-1 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start min-w-0">
             <AnimatePresence mode="wait">
               {showList ? (
