@@ -1,103 +1,124 @@
 'use client';
 
+/**
+ * @fileOverview AssetDataChecklist - Template-Driven Fidelity Pulse.
+ * Automatically tracks completion based on the folder's configured schema.
+ * Phase 1210: Dynamically resolves items from the sheet definition.
+ */
+
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, ShieldQuestion, ListTree, Hash, MapPin, Building, Tag, Settings2 } from 'lucide-react';
-import type { AssetFormValues } from './asset-form';
-import type { DisplayField } from '@/lib/types';
-import { Button } from './ui/button';
-import { ScrollArea } from './ui/scroll-area';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Tag,
+  Car,
+  Laptop,
+  Database
+} from 'lucide-react';
+import type { Asset } from '@/types/domain';
+import { cn, getFuzzySignature } from '@/lib/utils';
+import { useAppState } from '@/contexts/app-state-context';
 
 interface AssetChecklistProps {
-  values: Partial<AssetFormValues>;
-  displayFields?: DisplayField[];
-  isAdmin?: boolean;
-  onEdit?: () => void;
+  values: Partial<Asset>;
 }
 
-const getFieldIcon = (key: string) => {
-    const k = key.toLowerCase();
-    if (k.includes('category') || k.includes('class')) return <ListTree className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('sn') || k.includes('serial') || k.includes('model') || k.includes('engine') || k.includes('chasis')) return <Hash className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('location') || k.includes('state') || k.includes('lga') || k.includes('site')) return <MapPin className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('assignee') || k.includes('user')) return <User className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('condition')) return <ShieldQuestion className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('id') || k.includes('tag')) return <Tag className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('manufacturer') || k.includes('supplier') || k.includes('building')) return <Building className="h-4 w-4 text-muted-foreground" />;
-    return <FileText className="h-4 w-4 text-muted-foreground" />;
-};
-
-const ChecklistItem = ({ label, isCompleted, icon }: { label: string; isCompleted: boolean; icon: React.ReactNode }) => (
-  <div className="flex items-center justify-between text-sm py-1">
-    <div className="flex items-center gap-2 min-w-0">
-      <div className="shrink-0">{icon}</div>
-      <span className="truncate" title={label}>{label}</span>
+const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCompleted: boolean; icon: any }) => (
+  <div className="flex items-center justify-between group transition-all py-1">
+    <div className="flex items-center gap-3">
+      <div className={cn(
+        "p-1.5 rounded-md transition-colors",
+        isCompleted ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+      )}>
+        <Icon className="h-3 w-3" />
+      </div>
+      <span className={cn(
+        "text-[10px] font-black uppercase tracking-tight transition-colors truncate max-w-[180px]",
+        isCompleted ? "text-foreground" : "text-foreground/40"
+      )}>{label}</span>
     </div>
-    <div className="shrink-0 ml-2">
+    <div className="shrink-0">
         {isCompleted ? (
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
         ) : (
-        <XCircle className="h-4 w-4 text-destructive" />
+          <XCircle className="h-4 w-4 text-red-500/40" />
         )}
     </div>
   </div>
 );
 
-export function AssetChecklist({ values, displayFields = [], isAdmin, onEdit }: AssetChecklistProps) {
-  // Use display fields if provided, otherwise fallback to empty list
-  const checklistFields = displayFields.filter(f => f.inChecklist);
-  
-  const requiredItems = checklistFields
-    .filter(f => f.checklistSection === 'required')
-    .map(f => ({ label: f.label, completed: !!values[f.key as keyof AssetFormValues], icon: getFieldIcon(f.key) }));
+export function AssetChecklist({ values }: AssetChecklistProps) {
+  const { appSettings } = useAppState();
 
-  const importantItems = checklistFields
-    .filter(f => f.checklistSection === 'important' || !f.checklistSection)
-    .map(f => ({ label: f.label, completed: !!values[f.key as keyof AssetFormValues], icon: getFieldIcon(f.key) }));
+  // 1. Resolve active template for this asset's category
+  const activeTemplate = React.useMemo(() => {
+    if (!values.category || !appSettings) return null;
+    const grant = appSettings.grants.find(g => 
+      Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(values.category))
+    );
+    if (!grant) return null;
+    const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(values.category));
+    return defKey ? grant.sheetDefinitions[defKey] : null;
+  }, [values.category, appSettings]);
 
-  // Fallback for empty definitions (legacy or brand new sheets)
-  const hasFields = requiredItems.length > 0 || importantItems.length > 0;
+  // 2. Map completion status using template fields
+  const checklistItems = React.useMemo(() => {
+    if (!activeTemplate) return [];
+
+    const isVehicle = (values.category || '').toLowerCase().includes('motor') || (values.category || '').toLowerCase().includes('vehicle');
+
+    return activeTemplate.displayFields
+      .filter(f => f.inChecklist)
+      .map(field => {
+        const fieldName = field.key as keyof Asset;
+        let val: any = undefined;
+
+        // Core prop match
+        if (fieldName in values) {
+          val = (values as any)[fieldName];
+        } else {
+          // Metadata match
+          val = (values.metadata as any)?.[field.label];
+        }
+
+        const isEmpty = !val || String(val).trim() === '' || String(val).trim().toLowerCase() === 'n/a' || String(val).trim().toLowerCase() === '---';
+        
+        // Intelligence Pulse: Vehicles handle Serials differently
+        let isCompleted = !isEmpty;
+        if (isVehicle && field.key === 'serialNumber') {
+          const hasChassis = !!values.chassisNo || !!(values.metadata as any)?.['Chasis no'] || !!(values.metadata as any)?.['Chassis no'];
+          const hasEngine = !!values.engineNo || !!(values.metadata as any)?.['Engine no'];
+          if (hasChassis || hasEngine) isCompleted = true;
+        }
+
+        return {
+          label: field.label,
+          isCompleted,
+          icon: isVehicle ? Car : Laptop,
+          key: field.key
+        };
+      });
+  }, [activeTemplate, values]);
 
   return (
-    <Card className="shadow-none border-none bg-transparent">
-      <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-lg font-bold">Asset Data Checklist</CardTitle>
-        {isAdmin && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onEdit} title="Configure Checklist">
-                <Settings2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
-        )}
-      </CardHeader>
-      <CardContent className="p-0 space-y-6">
-        {!hasFields ? (
-            <div className="p-4 border border-dashed rounded-lg text-center bg-muted/30">
-                <p className="text-xs text-muted-foreground italic">No fields configured for this checklist. {isAdmin ? 'Click the gear icon to manage fields.' : ''}</p>
-            </div>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <div className="space-y-1">
+        <h3 className="text-base font-black uppercase tracking-tight text-foreground leading-none">Record Fidelity</h3>
+        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground opacity-60">FOLDER-SPECIFIC PULSE</p>
+      </div>
+
+      <div className="space-y-3">
+        {checklistItems.length > 0 ? (
+          checklistItems.map((item) => (
+            <ChecklistItem key={item.key} {...item} />
+          ))
         ) : (
-            <>
-                {requiredItems.length > 0 && (
-                    <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Required Fields</h4>
-                        <div className="space-y-1">
-                            {requiredItems.map((item) => (
-                            <ChecklistItem key={item.label} label={item.label} isCompleted={item.completed} icon={item.icon} />
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {importantItems.length > 0 && (
-                    <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Important Fields</h4>
-                        <div className="space-y-1">
-                            {importantItems.map((item) => (
-                            <ChecklistItem key={item.label} label={item.label} isCompleted={item.completed} icon={item.icon} />
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </>
+          <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">
+            <Database className="h-6 w-6 opacity-20" />
+            <p className="text-[8px] font-black uppercase text-muted-foreground opacity-40 italic">Zero checklist markers<br/>configured for this folder</p>
+          </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -1,17 +1,29 @@
 /**
- * @fileOverview Professional Error Monitoring Service
- * 
- * Mimics behavior of tools like Sentry or LogRocket.
- * Captures stack traces, user context, and system metadata.
+ * @fileOverview Advanced Error Monitoring & Resilience Service.
+ * Translates technical failures into user-friendly notifications and logs audits to the cloud.
+ * Phase 1980: Removed FirestoreService dependency to break circular module loop.
+ * Phase 1981: Added log method and fixed logger integration.
  */
 
 'use client';
 
-export interface ErrorContext {
+import { v4 as uuidv4 } from 'uuid';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { sanitizeForFirestore } from '@/lib/utils';
+import { logger } from './logger';
+import type { ErrorLogEntry, ErrorSeverity } from '@/types/domain';
+
+export interface TraceContext {
   component?: string;
+  module?: string;
   action?: string;
   userId?: string;
   userName?: string;
+  userRole?: string;
+  recoveryAttempted?: boolean;
+  recoveryAction?: string;
+  recoveryResult?: string;
   [key: string]: any;
 }
 
@@ -21,61 +33,125 @@ class MonitoringService {
   init() {
     if (typeof window === 'undefined' || this.isInitialized) return;
 
-    // Catch unhandled global errors
     window.addEventListener('error', (event) => {
-      this.trackError(event.error, { context: 'Global Window Error' });
+      this.trackError(event.error, { action: 'GLOBAL_WINDOW_ERROR', module: 'Client Runtime' }, 'CRITICAL');
     });
 
-    // Catch unhandled promise rejections (very common in async Firebase calls)
     window.addEventListener('unhandledrejection', (event) => {
-      this.trackError(event.reason, { context: 'Unhandled Promise Rejection' });
+      this.trackError(event.reason, { action: 'UNHANDLED_PROMISE_REJECTION', module: 'Async Runtime' }, 'CRITICAL');
     });
 
     this.isInitialized = true;
-    console.log("🚀 Monitoring Service Initialized");
+    logger.info("Asset Manager Resilience System Active");
   }
 
   /**
-   * Captures and reports an error with full metadata.
+   * Simple logging pulse for operational status.
    */
-  trackError(error: any, context: ErrorContext = {}) {
+  log(message: string) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[MONITORING] ${message}`);
+    }
+    this.trackEvent('LOG_PULSE', { message });
+  }
+
+  /**
+   * Captures, translates, and logs an error to the administrative audit ledger.
+   * Directly uses Firestore SDK to avoid circular service dependencies.
+   */
+  async trackError(error: any, context: TraceContext = {}, severity: ErrorSeverity = 'WARNING') {
     if (typeof window === 'undefined') return;
 
-    const errorPayload = {
+    const technicalMessage = error?.message || String(error);
+    const laymanExplanation = this.translateToLayman(technicalMessage, error?.code);
+
+    const logEntry: ErrorLogEntry = {
+      id: uuidv4(),
       timestamp: new Date().toISOString(),
-      message: error?.message || String(error),
-      code: error?.code || 'N/A',
-      stack: error?.stack || 'N/A',
+      severity,
+      status: 'PENDING',
+      user: {
+        id: context.userId || 'anonymous',
+        name: context.userName || 'Anonymous User',
+        role: context.userRole || 'VIEWER'
+      },
       context: {
-        ...context,
+        page: window.location.pathname,
+        module: context.module || 'System',
+        action: context.action || 'Data Sync Event',
         browser: navigator.userAgent,
-        language: navigator.language,
-        url: window.location.href,
-        connection: (navigator as any).connection?.effectiveType || 'unknown',
+        isOnline: navigator.onLine
+      },
+      error: {
+        type: error?.name || 'DataAnomaly',
+        message: technicalMessage,
+        technicalMessage,
+        laymanExplanation,
+        stack: error?.stack || null
+      },
+      recovery: {
+        attempted: !!context.recoveryAttempted,
+        action: context.recoveryAction || undefined,
+        result: context.recoveryResult || undefined
       }
     };
 
-    // In a real production app, this would use fetch() to send data to Sentry/Datadog
-    // For now, we log a structured, high-visibility report to the console
-    console.group(`🛑 MONITORING REPORT: ${errorPayload.message}`);
-    console.table({
-      Code: errorPayload.code,
-      Component: context.component || 'Unknown',
-      Action: context.action || 'Unknown',
-      User: context.userName || 'Anonymous',
-    });
-    console.log("Full Payload:", errorPayload);
-    console.groupEnd();
+    // In-memory reporting for dev
+    if (process.env.NODE_ENV !== 'production') {
+      console.group(`🛑 RECOVERY AUDIT: ${logEntry.error.laymanExplanation}`);
+      console.table(logEntry.context);
+      console.groupEnd();
+    }
 
-    // Placeholder for actual SaaS integration:
-    // Sentry.captureException(error, { extra: errorPayload.context });
+    // Direct cloud archival
+    if (db) {
+      try {
+        const logRef = doc(db, 'error_logs', logEntry.id);
+        await setDoc(logRef, sanitizeForFirestore(logEntry));
+      } catch (e) {
+        console.error("Monitoring: Failed to finalize error event to cloud ledger", e);
+      }
+    }
   }
 
+  /**
+   * Records a business-level event for the operational audit trail.
+   */
   trackEvent(name: string, data: any) {
-    // Logic for tracking user behavior/session events
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📊 EVENT: ${name}`, data);
+      logger.info(`SYSTEM STATUS [${name}]:`, data);
     }
+  }
+
+  /**
+   * Translates cryptic technical messages into plain English for auditors and admins.
+   */
+  private translateToLayman(message: string, code?: string): string {
+    const msg = message.toLowerCase();
+
+    if (msg.includes('permission-denied') || msg.includes('insufficient permissions')) {
+      return "Administrative clearance denied for this action.";
+    }
+    if (msg.includes('network-error') || msg.includes('failed to fetch') || msg.includes('timeout')) {
+      return "Cloud heartbeat interrupted. Operation enqueued for background sync.";
+    }
+    if (msg.includes('not-found') || msg.includes('document missing')) {
+      return "Requested record could not be found in the registry.";
+    }
+    if (msg.includes('quota-exceeded')) {
+      return "Cloud storage capacity reached. Contact system administrator.";
+    }
+    if (msg.includes('offline')) {
+      return "Working in offline regional scope. Changes saved locally.";
+    }
+    if (msg.includes('parsing failed') || msg.includes('invalid workbook')) {
+      return "Workbook structure mismatch. Deterministic ingestion failed.";
+    }
+    if (msg.includes('validation')) {
+      return "Data fidelity check failed. Required parameters are missing.";
+    }
+
+    return "An unexpected data anomaly occurred. Recovery protocols active.";
   }
 }
 

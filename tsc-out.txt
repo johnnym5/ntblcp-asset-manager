@@ -1,0 +1,216 @@
+capacitor.config.ts(1,38): error TS2307: Cannot find module '@capacitor/cli' or its corresponding type declarations.
+src/components/asset-checklist.tsx(113,28): error TS2783: 'key' is specified more than once, so this usage will be overwritten.
+src/components/asset-form.tsx(79,5): error TS2322: Type 'Resolver<{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+  Types of parameters 'values' and 'values' are incompatible.
+    Type 'Asset' is not assignable to type '{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }'.
+      Types of property 'sn' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+src/components/asset-form.tsx(223,69): error TS2345: Argument of type 'SubmitHandler<Asset>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Type 'TFieldValues' is not assignable to type 'Asset'.
+    Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-form.tsx(237,33): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
+      Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+        Type 'ResolverResult<Asset, TFieldValues> | Promise<ResolverResult<Asset, TFieldValues>>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
+              Type 'TFieldValues' is not assignable to type 'Asset'.
+                Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-form.tsx(270,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
+      Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+        Type 'ResolverResult<Asset, TFieldValues> | Promise<ResolverResult<Asset, TFieldValues>>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
+              Type 'TFieldValues' is not assignable to type 'Asset'.
+                Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-form.tsx(281,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
+      Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+        Type 'ResolverResult<Asset, TFieldValues> | Promise<ResolverResult<Asset, TFieldValues>>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
+              Type 'TFieldValues' is not assignable to type 'Asset'.
+                Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-form.tsx(294,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
+      Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+        Type 'ResolverResult<Asset, TFieldValues> | Promise<ResolverResult<Asset, TFieldValues>>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<Asset, Asset> | Promise<ResolverResult<Asset, Asset>>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
+              Type 'TFieldValues' is not assignable to type 'Asset'.
+                Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-list.tsx(285,76): error TS2339: Property 'assignee' does not exist on type 'Asset'.
+src/components/asset-list.tsx(285,147): error TS2339: Property 'assignee' does not exist on type 'Asset'.
+src/components/asset-list.tsx(286,73): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(286,123): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(313,28): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+  Types of property 'approvalStatus' are incompatible.
+    Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+      Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(377,124): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset[]' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset[]'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(529,79): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(614,11): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset | undefined' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset | undefined'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(615,11): error TS2322: Type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset) => Promise<void>' is not assignable to type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset) => Promise<void>'.
+  Types of parameters 'assetToSave' and 'assetToSave' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+      Types of property 'approvalStatus' are incompatible.
+        Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+          Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(618,141): error TS2552: Cannot find name 'handleSaveAssetBatch'. Did you mean 'handleSaveAsset'?
+src/components/asset-list.tsx(698,92): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+  Types of property 'approvalStatus' are incompatible.
+    Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+      Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(789,33): error TS2304: Cannot find name 'totalPages'.
+src/components/asset-list.tsx(800,11): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset | undefined' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset | undefined'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(801,11): error TS2322: Type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset) => Promise<void>' is not assignable to type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset) => Promise<void>'.
+  Types of parameters 'assetToSave' and 'assetToSave' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+      Types of property 'approvalStatus' are incompatible.
+        Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+          Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(808,21): error TS2552: Cannot find name 'handleSaveAssetBatch'. Did you mean 'handleSaveAsset'?
+src/components/asset-list.tsx(827,13): error TS2322: Type '(originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => Promise<void>' is not assignable to type '(originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void'.
+  Types of parameters 'newDefinition' and 'newDefinition' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").SheetDefinition' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").SheetDefinition'.
+      Types of property 'displayFields' are incompatible.
+        Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").DisplayField[]' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").DisplayField[]'.
+          Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").DisplayField' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").DisplayField'.
+            Types of property 'key' are incompatible.
+              Type 'keyof import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'keyof import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+                Type '"name"' is not assignable to type 'keyof Asset'.
+src/components/ErrorBoundary.tsx(42,20): error TS2339: Property 'log' does not exist on type 'MonitoringService'.
+src/components/import-preview-dialog.tsx(53,12): error TS2741: Property 'summary' is missing in type '{ assets: Asset[]; }' but required in type 'ReconciliationViewProps'.
+src/components/inbox-sheet.tsx(59,34): error TS2551: Property 'adjudicateAssetPulse' does not exist on type '{ getSettings(): Promise<AppSettings | null>; updateSettings(settings: Partial<AppSettings>): Promise<void>; getProjectAssets(grantId: string, stateScopes?: string[] | undefined): Promise<...>; ... 9 more ...; handlePermissionError(path: string | DocumentReference<...>, operation: string, error: any, data?: any): vo...'. Did you mean 'adjudicateAssetUpdate'?
+src/components/registry/AssetDossier.tsx(191,112): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
+src/components/registry/AssetDossier.tsx(195,11): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+src/components/registry/HeaderManagerDrawer.tsx(141,32): error TS2304: Cannot find name 'setSearchTerm'.
+src/components/registry/RegistryTable.tsx(158,109): error TS2353: Object literal may only specify known properties, and 'disabled' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void; }'.
+src/components/registry/RegistryTable.tsx(162,88): error TS2353: Object literal may only specify known properties, and 'destructive' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void; }'.
+src/components/registry/RegistryTable.tsx(200,120): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
+src/components/settings-sheet.tsx(58,67): error TS2339: Property 'setActiveGrantId' does not exist on type 'AppStateContextType'.
+src/components/settings-sheet.tsx(340,30): error TS2304: Cannot find name 'originalSheetName'.
+src/components/single-sheet-import-dialog.tsx(25,32): error TS2305: Module '"@/parser/types"' has no exported member 'SheetDefinition'.
+src/components/theme-provider.tsx(5,41): error TS2307: Cannot find module 'next-themes/dist/types' or its corresponding type declarations.
+src/components/ui/calendar.tsx(5,27): error TS2307: Cannot find module 'react-day-picker' or its corresponding type declarations.
+src/components/user-profile-setup.tsx(42,3): error TS2353: Object literal may only specify known properties, and 'role' does not exist in type 'AuthorizedUser'.
+src/components/user-profile-setup.tsx(84,14): error TS2339: Property 'isGuest' does not exist on type 'AuthorizedUser | AuthorizedUser'.
+  Property 'isGuest' does not exist on type 'AuthorizedUser'.
+src/components/user-profile-setup.tsx(105,16): error TS2339: Property 'isZonalAdmin' does not exist on type 'AuthorizedUser | AuthorizedUser'.
+  Property 'isZonalAdmin' does not exist on type 'AuthorizedUser'.
+src/components/user-profile-setup.tsx(106,34): error TS2339: Property 'assignedZone' does not exist on type 'AuthorizedUser | AuthorizedUser'.
+  Property 'assignedZone' does not exist on type 'AuthorizedUser'.
+src/components/user-profile-setup.tsx(127,17): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").AuthorizedUser' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").AuthorizedUser'.
+  Property 'role' is missing in type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").AuthorizedUser' but required in type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").AuthorizedUser'.
+src/components/user-profile-setup.tsx(134,39): error TS2339: Property 'isZonalAdmin' does not exist on type 'AuthorizedUser'.
+src/components/workstations/AssetGroupsWorkstation.tsx(232,95): error TS2304: Cannot find name 'p'.
+src/components/workstations/AuditLogWorkstation.tsx(302,44): error TS2322: Type 'Dispatch<SetStateAction<ActivityLogEntry | null>>' is not assignable to type '(open: boolean) => void'.
+  Types of parameters 'value' and 'open' are incompatible.
+    Type 'boolean' is not assignable to type 'SetStateAction<ActivityLogEntry | null>'.
+src/components/workstations/DatabaseWorkstation.tsx(771,42): error TS2322: Type 'Dispatch<SetStateAction<DBNode | null>>' is not assignable to type '(open: boolean) => void'.
+  Types of parameters 'value' and 'open' are incompatible.
+    Type 'boolean' is not assignable to type 'SetStateAction<DBNode | null>'.
+src/components/workstations/DiscrepancyWorkstation.tsx(274,89): error TS2304: Cannot find name 'p'.
+src/components/workstations/RegistryWorkstation.tsx(733,23): error TS2322: Type '{ record: AssetRecord; onEdit: (id: string) => void; onQuickUpdate: (id: string, updates: Partial<Asset>) => Promise<void>; onUpdateHeader: (headerId: string, updates: Partial<...>) => void; onSync: (id: string) => Promise<...>; isHeaderEditingMode: boolean; }' is not assignable to type 'IntrinsicAttributes & { record: AssetRecord; onEdit?: ((id: string) => void) | undefined; onQuickUpdate?: ((id: string, updates: any) => void) | undefined; onUpdateHeader?: ((id: string, updates: Partial<...>) => void) | undefined; className?: string | undefined; isHeaderEditingMode?: boolean | undefined; }'.
+  Property 'onSync' does not exist on type 'IntrinsicAttributes & { record: AssetRecord; onEdit?: ((id: string) => void) | undefined; onQuickUpdate?: ((id: string, updates: any) => void) | undefined; onUpdateHeader?: ((id: string, updates: Partial<...>) => void) | undefined; className?: string | undefined; isHeaderEditingMode?: boolean | undefined; }'.
+src/components/workstations/RegistryWorkstation.tsx(778,28): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'SetStateAction<AppSettings | null>'.
+  Type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to type 'AppSettings'.
+    Types of property 'grants' are incompatible.
+      Type 'Grant[] | undefined' is not assignable to type 'Grant[]'.
+        Type 'undefined' is not assignable to type 'Grant[]'.
+src/components/workstations/RegistryWorkstation.tsx(779,34): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'AppSettings'.
+  Types of property 'grants' are incompatible.
+    Type 'Grant[] | undefined' is not assignable to type 'Grant[]'.
+      Type 'undefined' is not assignable to type 'Grant[]'.
+src/core/auth/__tests__/rbac.test.ts(4,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(35,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(36,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(37,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(40,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(41,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(44,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(45,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(49,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(50,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(51,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(52,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(55,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(56,7): error TS2304: Cannot find name 'expect'.
+src/core/auth/__tests__/rbac.test.ts(59,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(60,7): error TS2304: Cannot find name 'expect'.
+src/core/registry/__tests__/validation.test.ts(3,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(28,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(29,5): error TS2304: Cannot find name 'expect'.
+src/core/registry/__tests__/validation.test.ts(32,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(35,5): error TS2304: Cannot find name 'expect'.
+src/core/registry/__tests__/validation.test.ts(38,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(40,5): error TS2304: Cannot find name 'expect'.
+src/core/registry/__tests__/validation.test.ts(43,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(46,5): error TS2304: Cannot find name 'expect'.
+src/core/registry/__tests__/validation.test.ts(46,22): error TS2551: Property 'purchase_date' does not exist on type '{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }'. Did you mean 'purchaseDate'?
+src/lib/constants.ts(100,3): error TS2353: Object literal may only specify known properties, and 'custodian' does not exist in type '{ id?: string[] | undefined; category?: string[] | undefined; sn?: string[] | undefined; description?: string[] | undefined; serialNumber?: string[] | undefined; assetIdCode?: string[] | undefined; ... 30 more ...; changeSubmittedBy?: string[] | undefined; }'.
+src/lib/database.ts(63,20): error TS2551: Property 'grantId' does not exist on type 'Asset'. Did you mean 'grant'?
+src/lib/idb.ts(139,5): error TS2322: Type 'AppSettings | undefined' is not assignable to type 'AppSettings | null'.
+  Type 'undefined' is not assignable to type 'AppSettings | null'.
+src/lib/location-engine.ts(76,100): error TS2304: Cannot find name 'LocationPulse'.
+src/lib/monitoring.ts(43,5): error TS2304: Cannot find name 'logger'.
+src/lib/monitoring.ts(82,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/lib/monitoring.ts(83,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/lib/monitoring.ts(110,7): error TS2304: Cannot find name 'logger'.
+src/lib/offline-queue.ts(5,10): error TS2305: Module '"./idb"' has no exported member 'getQueuedOps'.
+src/lib/offline-queue.ts(5,24): error TS2305: Module '"./idb"' has no exported member 'saveQueuedOp'.
+src/lib/offline-queue.ts(5,38): error TS2305: Module '"./idb"' has no exported member 'deleteQueuedOp'.
+src/lib/offline-queue.ts(5,59): error TS2305: Module '"./idb"' has no exported member 'OfflineOp'.
+src/lib/offline-queue.ts(29,10): error TS2339: Property 'log' does not exist on type '{ info: (message: string, context?: any) => void; warn: (message: string, context?: any) => void; error: (message: string, error?: any, context?: any) => void; }'.
+src/lib/offline-queue.ts(43,13): error TS7006: Parameter 'op' implicitly has an 'any' type.
+src/lib/offline-queue.ts(44,12): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/lib/offline-queue.ts(44,15): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/lib/offline-queue.ts(48,10): error TS2339: Property 'log' does not exist on type '{ info: (message: string, context?: any) => void; warn: (message: string, context?: any) => void; error: (message: string, error?: any, context?: any) => void; }'.
+src/lib/utils.ts(2,25): error TS7016: Could not find a declaration file for module 'tailwind-merge'. 'C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/node_modules/tailwind-merge/dist/bundle-mjs.mjs' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/tailwind-merge` if it exists or add a new declaration (.d.ts) file containing `declare module 'tailwind-merge';`
+src/modules/registry/components/RegistryTable.tsx(31,15): error TS2614: Module '"@/app/assets/page"' has no exported member 'SortConfig'. Did you mean to use 'import SortConfig from "@/app/assets/page"' instead?
+src/offline/__tests__/queue.test.ts(4,1): error TS2304: Cannot find name 'jest'.
+src/offline/__tests__/queue.test.ts(6,14): error TS2304: Cannot find name 'jest'.
+src/offline/__tests__/queue.test.ts(7,15): error TS2304: Cannot find name 'jest'.
+src/offline/__tests__/queue.test.ts(11,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/offline/__tests__/queue.test.ts(12,3): error TS2304: Cannot find name 'beforeEach'.
+src/offline/__tests__/queue.test.ts(13,5): error TS2304: Cannot find name 'jest'.
+src/offline/__tests__/queue.test.ts(16,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/offline/__tests__/queue.test.ts(20,5): error TS2304: Cannot find name 'expect'.
+src/offline/__tests__/queue.test.ts(21,5): error TS2304: Cannot find name 'expect'.
+src/offline/__tests__/queue.test.ts(21,50): error TS2304: Cannot find name 'expect'.
+src/offline/__tests__/queue.test.ts(30,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/offline/__tests__/queue.test.ts(34,42): error TS2503: Cannot find namespace 'jest'.
+src/offline/__tests__/queue.test.ts(35,5): error TS2304: Cannot find name 'expect'.
+src/offline/storage.ts(104,17): error TS2322: Type 'AppSettings | undefined' is not assignable to type 'AppSettings | null'.
+  Type 'undefined' is not assignable to type 'AppSettings | null'.
+src/offline/sync.ts(52,52): error TS2339: Property 'deleteAsset' does not exist on type '{ getSettings(): Promise<AppSettings | null>; updateSettings(settings: Partial<AppSettings>): Promise<void>; getProjectAssets(grantId: string, stateScopes?: string[] | undefined): Promise<...>; ... 9 more ...; handlePermissionError(path: string | DocumentReference<...>, operation: string, error: any, data?: any): vo...'.
+src/parser/__tests__/classifyRow.test.ts(3,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(5,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(8,5): error TS2304: Cannot find name 'expect'.
+src/parser/__tests__/classifyRow.test.ts(11,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(14,5): error TS2304: Cannot find name 'expect'.
+src/parser/__tests__/classifyRow.test.ts(17,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(20,5): error TS2304: Cannot find name 'expect'.
+src/parser/__tests__/classifyRow.test.ts(23,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(26,5): error TS2304: Cannot find name 'expect'.
+src/parser/__tests__/classifyRow.test.ts(29,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(32,5): error TS2304: Cannot find name 'expect'.
+src/parser/__tests__/classifyRow.test.ts(35,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(38,5): error TS2304: Cannot find name 'expect'.
+src/services/firebase/firestore.ts(172,29): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+  Types of property 'approvalStatus' are incompatible.
+    Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+      Type '"PENDING"' is not assignable to type '"pending"'.
+src/types/virtual-db.ts(14,11): error TS2304: Cannot find name 'StorageLayer'.

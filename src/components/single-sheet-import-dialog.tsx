@@ -1,38 +1,37 @@
-
 "use client";
 
+/**
+ * @fileOverview Import Orchestrator - Two-Stage Ingestion Pulse.
+ * Phase 186: Added targetFolderName enforcement for Single-Sheet imports.
+ * Phase 187: Fixed activeGrantIds reference and ParserEngine initialization.
+ */
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { addNotification } from '@/hooks/use-notifications';
-import { Loader2, FileUp, FileCheck2, AlertTriangle, ScanSearch, ChevronsUpDown } from 'lucide-react';
-import { scanExcelFile, parseExcelFile, type ScannedSheetInfo } from '@/lib/excel-parser';
-import { getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
+import { Loader2, DatabaseZap, Check, FileSpreadsheet, ScanSearch, Layers, FolderOpen } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { ParserEngine } from '@/parser/engine';
+import { storage } from '@/offline/storage';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { Checkbox } from './ui/checkbox';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Separator } from './ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { cn, getFuzzySignature } from '@/lib/utils';
+import { Checkbox } from './ui/checkbox';
+import type { DiscoveredGroup, SheetDefinition } from '@/parser/types';
 
 interface ImportScannerDialogProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+  targetFolderName?: string | null;
 }
 
-export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialogProps) {
-  const { appSettings, setOfflineAssets, setDataSource, activeGrantId } = useAppState();
+export function ImportScannerDialog({ isOpen, onOpenChange, targetFolderName }: ImportScannerDialogProps) {
+  const { appSettings, activeGrantIds, setDataSource, refreshRegistry, assets } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -40,267 +39,225 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   const [fileName, setFileName] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [scanResults, setScanResults] = useState<ScannedSheetInfo[]>([]);
-  const [scanErrors, setScanErrors] = useState<string[]>([]);
-  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+  const [scanResults, setScanResults] = useState<DiscoveredGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]} | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const engineRef = useRef<ParserEngine | null>(null);
 
-  const activeGrant = useMemo(() => {
-    return appSettings?.grants?.find(g => g.id === activeGrantId);
-  }, [appSettings, activeGrantId]);
+  const mergedSheetDefinitions = useMemo(() => {
+    const defs: Record<string, SheetDefinition> = {};
+    if (!appSettings) return defs;
+    appSettings.grants.forEach(g => {
+      Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
+        defs[name] = def as any;
+      });
+    });
+    return defs;
+  }, [appSettings]);
 
   useEffect(() => {
-    if (file && activeGrant) {
+    if (file) {
       const performScan = async () => {
         setIsScanning(true);
         setScanResults([]);
-        setScanErrors([]);
-        setSelectedSheets([]);
-        
-        const { scannedSheets, errors } = await scanExcelFile(file, activeGrant.sheetDefinitions);
-        
-        if (errors.length > 0) {
-          setScanErrors(errors);
+        setSelectedGroupIds([]);
+        try {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
+          
+          engineRef.current = new ParserEngine(file.name, assets, mergedSheetDefinitions as any);
+          const groups = engineRef.current.discoverGroups(sheetName, data);
+          
+          setActiveSheetData({ name: sheetName, data });
+          setScanResults(groups);
+          
+          // Auto-select groups that match existing folders, or everything if it's a specific target import
+          const autoSelect = targetFolderName 
+            ? groups.map(g => g.id) 
+            : groups.filter(g => g.isTemplateMatched).map(g => g.id);
+          
+          setSelectedGroupIds(autoSelect);
+        } catch (e) {
+          toast({ variant: "destructive", title: "Scan Failed" });
+        } finally {
+          setIsScanning(false);
         }
-        if (scannedSheets.length > 0) {
-          setScanResults(scannedSheets);
-          // Auto-select all found sheets by default
-          setSelectedSheets(scannedSheets.map(s => s.sheetName));
-        }
-        setIsScanning(false);
       };
       performScan();
     }
-  }, [file, activeGrant]);
+  }, [file, assets, mergedSheetDefinitions, targetFolderName, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const selectedFile = event.target.files[0];
-      setFile(selectedFile);
-      setFileName(selectedFile.name);
+    if (event.target.files?.[0]) {
+      setFile(event.target.files[0]);
+      setFileName(event.target.files[0].name);
     }
   };
 
   const handleImport = async () => {
-    if (!file || selectedSheets.length === 0 || !appSettings || !activeGrant) {
-      toast({ title: 'Nothing to Import', description: 'Please select a file and at least one sheet to import.', variant: 'destructive' });
+    if (!file || selectedGroupIds.length === 0 || !engineRef.current || !activeSheetData || !appSettings) return;
+    
+    // Resolve target grant ID (Project)
+    let targetGrantId = activeGrantIds[0];
+    if (targetFolderName) {
+      const parentGrant = appSettings.grants.find(g => 
+        Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(targetFolderName))
+      );
+      if (parentGrant) targetGrantId = parentGrant.id;
+    }
+
+    if (!targetGrantId) {
+      toast({ variant: "destructive", title: "Project Mismatch", description: "Could not identify target project scope." });
       return;
     }
 
     setIsImporting(true);
-    addNotification({ title: 'Importing Selected Sheets...', description: `Processing ${selectedSheets.length} sheet(s).` });
-
-    const baseAssets = await getLockedOfflineAssets();
-    const sheetsToImport = scanResults.filter(r => selectedSheets.includes(r.sheetName));
-
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, activeGrant.sheetDefinitions, appSettings.lockAssetList, baseAssets, sheetsToImport);
-
-    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
-    if (skipped > 0) {
-      addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
-    }
-
-    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
-      ...asset,
-      grantId: activeGrantId,
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
-      syncStatus: undefined
-    }));
-
-    if (allChanges.length > 0) {
-      const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-      allChanges.forEach(a => assetMap.set(a.id, a));
-      const combinedAssets = Array.from(assetMap.values());
+    try {
+      const selectedGroups = scanResults.filter(g => selectedGroupIds.includes(g.id));
+      const results = engineRef.current.ingestGroups(activeSheetData.name, activeSheetData.data, selectedGroups);
       
-      await saveLockedOfflineAssets(combinedAssets);
-      setOfflineAssets(combinedAssets);
-      addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved for review.` });
-      setDataSource('local_locked');
-      
-    } else if (errors.length === 0) {
-      addNotification({ title: "No New Data Imported", description: "No new or updated assets were found in the selected sheets." });
-    }
+      const taggedAssets = results.flatMap(c => c.assets).map(a => ({
+        ...a,
+        category: targetFolderName || a.category,
+        grantId: targetGrantId,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'System Import',
+      }));
 
-    setIsImporting(false);
-    onOpenChange(false);
+      if (taggedAssets.length > 0) {
+        await storage.saveToSandbox(taggedAssets as any[]);
+        addNotification({ 
+          title: 'Sandbox Ready', 
+          description: `Staged ${taggedAssets.length} assets for review.` 
+        });
+        setDataSource('SANDBOX');
+        await refreshRegistry();
+        onOpenChange(false);
+      } else {
+        toast({ title: "No Data Extracted", description: "Ensure the workbook contains valid data rows." });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Ingestion Failed" });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const resetState = () => {
     setFile(null);
     setFileName('');
-    setIsScanning(false);
-    setIsImporting(false);
     setScanResults([]);
-    setScanErrors([]);
-    setSelectedSheets([]);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
+    setSelectedGroupIds([]);
+    setActiveSheetData(null);
+    engineRef.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
-  
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      resetState();
-    }
-    onOpenChange(open);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedSheets(scanResults.map(s => s.sheetName));
-    } else {
-      setSelectedSheets([]);
-    }
-  };
-
-  const handleSelectSheet = (sheetName: string, checked: boolean) => {
-    setSelectedSheets(prev => checked ? [...prev, sheetName] : prev.filter(s => s !== sheetName));
-  };
-  
-  const allSelected = scanResults.length > 0 && selectedSheets.length === scanResults.length;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Scan and Import Workbook</DialogTitle>
-          <DialogDescription>
-            Select an Excel file to scan. The system will automatically match sheets to your templates, which you can then review and change before importing.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="file-upload">Excel File</Label>
-            <Button
-              variant="outline"
-              className="w-full justify-start text-left font-normal"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isScanning || isImporting}
-            >
-              <FileUp className="mr-2 h-4 w-4" />
-              {fileName || "Select a file..."}
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".xlsx, .xls"
-              className="hidden"
-            />
-          </div>
-          
-          {(isScanning || scanResults.length > 0 || scanErrors.length > 0) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Scan Results</CardTitle>
-                <CardDescription>
-                  {isScanning 
-                    ? "Scanning your workbook for asset data..." 
-                    : "Review the automatic matches for the sheets found in your workbook."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isScanning && <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}
-                
-                {scanErrors.length > 0 && !isScanning && (
-                   <div className="text-destructive bg-destructive/10 p-3 rounded-md text-sm flex items-center gap-2">
-                     <AlertTriangle className="h-5 w-5" />
-                     <div>{scanErrors.map((e, i) => <p key={i}>{e}</p>)}</div>
-                   </div>
-                )}
-                
-                {scanResults.length > 0 && !isScanning && activeGrant && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2">
-                       <Label className="font-semibold">Found {scanResults.length} compatible sheets</Label>
-                       <div className="flex items-center gap-2">
-                           <Label htmlFor="select-all" className="text-sm">Select All</Label>
-                           <Checkbox id="select-all" checked={allSelected} onCheckedChange={(checked) => handleSelectAll(checked as boolean)} />
-                       </div>
-                    </div>
-                    <Separator />
-                    <ScrollArea className="h-[250px] pr-3">
-                      <div className="space-y-2 p-1">
-                        {scanResults.map(result => (
-                          <Collapsible key={result.sheetName} asChild>
-                            <div className="p-3 rounded-md border bg-muted/50">
-                                <div className="flex items-center">
-                                    <Checkbox
-                                        id={`sheet-${result.sheetName}`}
-                                        className="mr-3 mt-1 self-start"
-                                        checked={selectedSheets.includes(result.sheetName)}
-                                        onCheckedChange={(checked) => handleSelectSheet(result.sheetName, checked as boolean)}
-                                    />
-                                    <Label htmlFor={`sheet-${result.sheetName}`} className="flex-1 cursor-pointer">
-                                        <p className="font-medium">{result.sheetName}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Found {result.rowCount} potential asset rows.
-                                        </p>
-                                    </Label>
-                                    <CollapsibleTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <ChevronsUpDown className="h-4 w-4" />
-                                            <span className="sr-only">View headers</span>
-                                        </Button>
-                                    </CollapsibleTrigger>
-                                </div>
-                                <div className="pl-7 pt-3 space-y-1">
-                                    <Label className="text-xs font-semibold">Matched Template</Label>
-                                    <Select
-                                        value={result.definitionName}
-                                        onValueChange={(newDefName) => {
-                                            const newScanResults = scanResults.map(r => 
-                                                r.sheetName === result.sheetName 
-                                                    ? { ...r, definitionName: newDefName } 
-                                                    : r
-                                            );
-                                            setScanResults(newScanResults);
-                                        }}
-                                    >
-                                        <SelectTrigger className="h-9 text-sm">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.keys(activeGrant.sheetDefinitions).map(defName => (
-                                                <SelectItem key={defName} value={defName} className="text-sm">{defName}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <CollapsibleContent className="pt-3 mt-3 border-t">
-                                    <div className="pl-7">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Headers Found in File:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {result.headers.map((header, i) => (
-                                                <Badge key={i} variant="secondary" className="font-normal">{header}</Badge>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </CollapsibleContent>
-                            </div>
-                          </Collapsible>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
+    <Dialog open={isOpen} onOpenChange={(o) => { if (!o) resetState(); onOpenChange(o); }}>
+      <DialogContent className="max-w-3xl bg-black border-white/10 p-0 overflow-hidden rounded-[2.5rem] text-white shadow-3xl">
+        <div className="p-8 pb-6 border-b border-white/5 bg-white/[0.02]">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <DialogTitle className="text-2xl font-black uppercase text-white tracking-tight">
+                  {targetFolderName ? 'Targeted Ingestion' : 'Registry Scanner'}
+                </DialogTitle>
+                <DialogDescription className="text-[11px] text-white/40 uppercase tracking-widest font-bold">
+                  {targetFolderName ? `Mapping to: ${targetFolderName}` : 'Identifying structural blocks'}
+                </DialogDescription>
+              </div>
+              {targetFolderName && (
+                <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-xl shadow-lg">
+                  <FolderOpen className="h-3.5 w-3.5 mr-2" /> {targetFolderName}
+                </Badge>
+              )}
+            </div>
+          </DialogHeader>
         </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleImport} disabled={isImporting || isScanning || selectedSheets.length === 0}>
-            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck2 className="mr-2 h-4 w-4" />}
-            Import {selectedSheets.length > 0 ? selectedSheets.length : ''} Sheet(s)
+
+        <ScrollArea className="max-h-[70vh] bg-black">
+          <div className="p-8 pt-6 space-y-10">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 pl-1">Target Workbook</Label>
+              <div onClick={() => fileInputRef.current?.click()} className={cn("h-16 rounded-2xl bg-[#0A0A0A] border-2 border-white/5 flex items-center px-6 gap-4 cursor-pointer hover:border-primary/40 transition-all", file && "border-primary/20 shadow-xl shadow-primary/5")}>
+                <div className={cn("p-2 rounded-lg bg-white/5", file && "bg-primary/10")}>
+                  <FileSpreadsheet className={cn("h-5 w-5 text-white/20", file && "text-primary")} />
+                </div>
+                <span className={cn("text-sm font-black uppercase tracking-tight truncate", file ? "text-white" : "text-white/20")}>{fileName || "Select pulse file..."}</span>
+              </div>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls" className="hidden" />
+            </div>
+
+            {(isScanning || scanResults.length > 0) && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
+                    <ScanSearch className="h-4 w-4" /> Discovered Groups
+                  </h4>
+                  <Badge variant="outline" className="h-6 px-3 border-white/10 text-white/40 font-mono text-[9px]">
+                    {scanResults.length} NODES IDENTIFIED
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {isScanning ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-20">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Traversing Workbook Pulse...</span>
+                    </div>
+                  ) : scanResults.map(result => {
+                    const isSelected = selectedGroupIds.includes(result.id);
+                    const isMatched = result.isTemplateMatched || !!targetFolderName;
+                    return (
+                      <div key={result.id} className={cn("p-6 rounded-[2rem] bg-[#0A0A0A] border-2 transition-all group", isSelected ? "border-primary/20 shadow-lg" : "border-white/5 opacity-60")}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-5">
+                            <button 
+                              onClick={() => setSelectedGroupIds(prev => isSelected ? prev.filter(id => id !== result.id) : [...prev, result.id])} 
+                              disabled={!isMatched}
+                              className={cn(
+                                "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all", 
+                                isSelected ? "bg-primary border-primary" : "border-white/10",
+                                !isMatched && "opacity-20 cursor-not-allowed"
+                              )}
+                            >
+                              {isSelected && <Check className="h-4 w-4 text-black font-black" />}
+                            </button>
+                            <div className="space-y-1">
+                              <h5 className="text-sm font-black uppercase text-white tracking-tight leading-none">{result.groupName}</h5>
+                              <div className="flex items-center gap-3">
+                                <p className="text-[10px] font-bold text-white/20 uppercase">Rows: {result.rowCount}</p>
+                                {!isMatched && <Badge variant="outline" className="text-[7px] font-black border-orange-500/20 text-orange-500">DEFINITION REQUIRED</Badge>}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[8px] font-mono border-white/10 text-white/40">{result.headerSetType}</Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="p-8 bg-[#050505] border-t border-white/5 flex items-center justify-between">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-14 px-10 rounded-2xl text-white/40 font-black uppercase text-[10px] tracking-widest hover:text-white hover:bg-white/5 transition-all">Cancel</Button>
+          <Button 
+            onClick={handleImport} 
+            disabled={isImporting || isScanning || selectedGroupIds.length === 0} 
+            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3 transition-transform hover:scale-105 active:scale-95"
+          >
+            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <DatabaseZap className="h-4 w-4" />}
+            Stage {selectedGroupIds.length} Groups
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

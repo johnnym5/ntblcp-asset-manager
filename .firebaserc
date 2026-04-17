@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "ntblcp-asset-manager"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

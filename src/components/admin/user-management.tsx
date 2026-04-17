@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
+/**
+ * @fileOverview User Management Directory.
+ * Phase 1600: Zonal Admin scoping. Filters users by zonal states.
+ * Phase 1610: Integrated Tactile Menu for User Rows.
+ * Phase 1620: Simplified Role Labels (Admin, Zonal Admin, User, Super Admin).
+ * Phase 1630: Zonal badge display for Regional Scope column.
+ */
+
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -10,9 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, KeyRound, UserPlus, Edit, Trash2, MapPin } from 'lucide-react';
+import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon, KeyRound, Mail, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AuthorizedUser } from '@/lib/types';
+import type { AuthorizedUser } from '@/types/domain';
 import { UserEditForm } from './user-edit-form';
 import {
   AlertDialog,
@@ -24,20 +32,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { cn, getFuzzySignature } from '@/lib/utils';
+import { NIGERIAN_ZONES } from '@/lib/constants';
+import { TactileMenu } from '@/components/TactileMenu';
 
 interface UserManagementProps {
   users: AuthorizedUser[];
-  onUsersChange: (users: AuthorizedUser[]) => Promise<void>;
-  adminProfile: { loginName: string } | null;
+  onUsersChange: (users: AuthorizedUser[]) => void;
+  adminProfile: any;
 }
 
 export function UserManagement({ users, onUsersChange, adminProfile }: UserManagementProps) {
   const { toast } = useToast();
-  
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AuthorizedUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AuthorizedUser | null>(null);
+
+  const isSuperAdmin = adminProfile?.role === 'SUPERADMIN';
+  const isZonalAdmin = !!adminProfile?.isZonalAdmin;
+  const assignedZone = adminProfile?.assignedZone;
+
+  const filteredUsers = useMemo(() => {
+    if (isSuperAdmin) return users;
+    
+    if (isZonalAdmin && assignedZone) {
+      const zonalStates = NIGERIAN_ZONES[assignedZone as keyof typeof NIGERIAN_ZONES] || [];
+      const zonalStatesFuzzy = zonalStates.map(s => getFuzzySignature(s));
+      
+      return users.filter(u => {
+        if (u.loginName === adminProfile.loginName) return true;
+        return u.states.some(s => zonalStatesFuzzy.includes(getFuzzySignature(s)));
+      });
+    }
+
+    return users;
+  }, [users, isSuperAdmin, isZonalAdmin, assignedZone, adminProfile]);
 
   const handleAddNewUser = () => {
     setUserToEdit(null);
@@ -51,95 +81,124 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
 
   const handleSaveUser = async (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => {
     let newUsers = [...(users || [])];
-    
-    const findIndex = originalLoginName 
-      ? newUsers.findIndex(u => u.loginName === originalLoginName)
-      : -1;
+    const findIndex = originalLoginName ? newUsers.findIndex(u => u.loginName === originalLoginName) : -1;
 
     if (newUsers.some(u => u.loginName === userToSave.loginName && u.loginName !== originalLoginName)) {
-      toast({ title: "Save Failed", description: `The login name "${userToSave.loginName}" is already in use.`, variant: "destructive" });
+      toast({ variant: "destructive", title: "Identity Conflict", description: `Login ID "${userToSave.loginName}" is taken.` });
       return;
     }
     
-    if (findIndex > -1) {
-      const existingUser = newUsers[findIndex];
-      newUsers[findIndex] = {
-        ...existingUser,
-        ...userToSave,
-        password: userToSave.password || existingUser.password
-      };
-    } else {
-      newUsers.push(userToSave as AuthorizedUser);
-    }
+    if (findIndex > -1) newUsers[findIndex] = { ...newUsers[findIndex], ...userToSave };
+    else newUsers.push(userToSave as AuthorizedUser);
     
-    await onUsersChange(newUsers);
+    onUsersChange(newUsers);
     setIsEditFormOpen(false);
+    toast({ title: "User Protocol Synchronized" });
   };
 
-  const handleDeleteUser = async () => {
+  const handleDeleteUser = () => {
     if (!userToDelete) return;
-
-    const newUsers = (users || []).filter(u => u.loginName !== userToDelete.loginName);
-    await onUsersChange(newUsers);
-    
+    onUsersChange(users.filter(u => u.loginName !== userToDelete.loginName));
     setUserToDelete(null);
+    toast({ title: "Identity Purged" });
+  };
+
+  const getRoleLabel = (user: AuthorizedUser) => {
+    if (user.role === 'SUPERADMIN') return 'Super Admin';
+    if (user.role === 'ADMIN') return 'Admin';
+    if (user.isZonalAdmin) return 'Zonal Admin';
+    return 'User';
   };
   
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Manage user accounts and state assignments</h3>
-        <Button onClick={handleAddNewUser} size="sm">
-          <UserPlus className="mr-2 h-4 w-4" /> Add User
+    <div className="space-y-6">
+      <div className="flex justify-between items-center px-1">
+        <div className="space-y-1">
+          <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+            <UserIcon className="h-4 w-4" /> Personnel Directory
+          </h3>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">
+            {isZonalAdmin ? `Managing Zone: ${assignedZone}` : 'Authorized system auditors & admins.'}
+          </p>
+        </div>
+        <Button onClick={handleAddNewUser} className="h-10 px-6 rounded-xl font-black uppercase text-[10px] shadow-lg">
+          <UserPlus className="h-3.5 w-3.5 mr-2" /> Add Personnel
         </Button>
       </div>
-      <div className="rounded-lg border bg-background">
+
+      <div className="rounded-2xl border-2 border-border/40 overflow-hidden bg-background">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Display Name</TableHead>
-              <TableHead>Login Name</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>States</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+          <TableHeader className="bg-muted/30">
+            <TableRow className="hover:bg-transparent border-b-2">
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4 pl-6">Personnel</TableHead>
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4">Security Tier</TableHead>
+              <TableHead className="font-black uppercase text-[9px] tracking-widest py-4">Authorized Scope</TableHead>
+              <TableHead className="text-right pr-6 text-[9px] font-black uppercase tracking-widest py-4">Pulse</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users && users.map(user => (
-              <TableRow key={user.loginName} className="group">
-                <TableCell className="font-medium">{user.displayName}</TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">{user.loginName}</TableCell>
-                <TableCell>
-                  {user.isAdmin ? (
-                    <Badge variant="default" className="font-normal">Admin</Badge>
-                  ) : user.isGuest ? (
-                    <Badge variant="outline" className="font-normal text-blue-500 border-blue-200">Guest</Badge>
+            {filteredUsers.map(user => (
+              <TableRow key={user.loginName} className="group hover:bg-primary/[0.02] border-b last:border-0 transition-colors">
+                <TableCell className="py-4 pl-6 p-0">
+                  <TactileMenu
+                    title="User Shortcuts"
+                    className="w-full h-full py-4 pl-6"
+                    options={[
+                      { label: 'Edit Profile', icon: Edit, onClick: () => handleEditUser(user) },
+                      { label: 'Copy Email', icon: Mail, onClick: () => navigator.clipboard.writeText(user.email) },
+                      { label: 'Purge Identity', icon: Trash2, onClick: () => setUserToDelete(user), destructive: true, disabled: adminProfile?.loginName === user.loginName }
+                    ]}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-black text-xs uppercase text-foreground">{user.displayName}</span>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-40">ID: {user.loginName}</span>
+                    </div>
+                  </TactileMenu>
+                </TableCell>
+                <TableCell className="py-4">
+                  <Badge variant="outline" className={cn(
+                    "text-[8px] font-black uppercase h-6 px-3 rounded-lg border-2",
+                    user.role === 'SUPERADMIN' ? "border-primary/40 bg-primary/10 text-primary" :
+                    user.role === 'ADMIN' ? "border-primary/20 bg-primary/5 text-primary" : 
+                    user.isZonalAdmin ? "border-teal-500/20 bg-teal-500/5 text-teal-600" :
+                    "border-muted-foreground/20"
+                  )}>
+                    {user.role === 'SUPERADMIN' ? <ShieldAlert className="mr-1.5 h-2.5 w-2.5" /> :
+                     user.isAdmin && <ShieldCheck className="mr-1.5 h-2.5 w-2.5" />}
+                    {getRoleLabel(user)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="py-4">
+                  {user.isZonalAdmin && user.assignedZone ? (
+                    <Badge className="bg-teal-500/10 text-teal-600 border-teal-500/20 text-[8px] font-black uppercase h-6 px-3">
+                      {user.assignedZone} Zone
+                    </Badge>
                   ) : (
-                    <Badge variant="secondary" className="font-normal">User</Badge>
+                    <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                      {user.states?.slice(0, 2).map(s => (
+                        <Badge key={s} variant="secondary" className="text-[7px] font-black uppercase px-2 h-5 bg-muted/50 border border-border/40">
+                          {s}
+                        </Badge>
+                      ))}
+                      {user.states?.length > 2 && <span className="text-[8px] font-bold text-muted-foreground">+{user.states.length - 2}</span>}
+                    </div>
                   )}
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1 max-w-[200px]">
-                    {user.states?.map(s => (
-                      <Badge key={s} variant="outline" className="text-[10px] h-5 py-0 px-1.5 flex items-center gap-1">
-                        <MapPin className="h-2 w-2" /> {s}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right space-x-1">
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditUser(user)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
-                    onClick={() => setUserToDelete(user)} 
-                    disabled={adminProfile?.loginName === user.loginName}
-                  >
-                      <Trash2 className="h-4 w-4" />
-                  </Button>
+                <TableCell className="py-4 text-right pr-6">
+                   <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary" onClick={() => handleEditUser(user)}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg text-destructive/40 hover:text-destructive hover:bg-destructive/10" 
+                      onClick={() => setUserToDelete(user)} 
+                      disabled={adminProfile?.loginName === user.loginName}
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                   </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -147,25 +206,20 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
         </Table>
       </div>
       
-      <UserEditForm 
-        isOpen={isEditFormOpen} 
-        onOpenChange={setIsEditFormOpen} 
-        user={userToEdit}
-        onSave={handleSaveUser}
-      />
+      <UserEditForm isOpen={isEditFormOpen} onOpenChange={setIsEditFormOpen} user={userToEdit} onSave={handleSaveUser} />
       
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-3xl bg-black text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove <strong>{userToDelete?.displayName}</strong> from the system. This action cannot be undone.
+            <AlertDialogTitle className="text-xl font-black uppercase">Purge Identity?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
+              This will permanently revoke system access for <strong>{userToDelete?.displayName}</strong>. All staged regional scope locks for this user will be destroyed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">
-              Yes, remove user
+          <AlertDialogFooter className="mt-6 gap-3">
+            <AlertDialogCancel className="font-bold rounded-xl border-2 border-white/10 m-0">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-white font-black uppercase text-[10px] tracking-widest h-12 px-8 rounded-xl m-0 shadow-2xl shadow-destructive/20">
+              Execute Purge
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,0 +1,30 @@
+{
+  "asset_categories": {
+    "vehicles": {
+      "url": "https://picsum.photos/seed/truck/600/400",
+      "hint": "vehicle truck"
+    },
+    "it_equipment": {
+      "url": "https://picsum.photos/seed/laptop/600/400",
+      "hint": "laptop computer"
+    },
+    "medical_devices": {
+      "url": "https://picsum.photos/seed/medical/600/400",
+      "hint": "medical laboratory"
+    },
+    "furniture": {
+      "url": "https://picsum.photos/seed/office/600/400",
+      "hint": "office furniture"
+    },
+    "infrastructure": {
+      "url": "https://picsum.photos/seed/power/600/400",
+      "hint": "generator infrastructure"
+    }
+  },
+  "placeholders": {
+    "default": {
+      "url": "https://picsum.photos/seed/assetain/600/400",
+      "hint": "warehouse industrial"
+    }
+  }
+}
