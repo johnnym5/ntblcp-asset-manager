@@ -25,6 +25,7 @@ export type ValidationGroup = 'electronics' | 'vehicles' | 'furniture' | 'medica
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
+  | 'VERIFY'
   | 'GROUPS'
   | 'IMPORT' 
   | 'REPORTS' 

@@ -56,6 +56,7 @@ import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorksta
 import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
 import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
+import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsCenter';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -122,6 +123,7 @@ export default function HomeHub() {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
       case 'REGISTRY': return <RegistryWorkstation />;
+      case 'VERIFY': return <VerifyWorkstation />;
       case 'GROUPS': return <AssetGroupsWorkstation isEmbedded={false} />;
       case 'ANOMALIES': return <DiscrepancyWorkstation isEmbedded={false} />;
       case 'SETTINGS': return <SettingsWorkstation />;
@@ -147,6 +149,7 @@ export default function HomeHub() {
     // Page access logic
     if (perms?.page_dashboard) base.push({ label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') });
     if (perms?.page_registry) base.push({ label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') });
+    if (perms?.page_registry) base.push({ label: 'Verification Queue', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') });
     if (perms?.page_groups) base.push({ label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') });
     if (perms?.page_reports) base.push({ label: 'Report Center', icon: FileText, onClick: () => setActiveView('REPORTS') });
     if (perms?.page_alerts) base.push({ label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') });

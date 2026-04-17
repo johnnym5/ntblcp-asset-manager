@@ -167,7 +167,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
   const activeGrantIds = useMemo(() => appSettings?.activeGrantIds || [], [appSettings]);
-  const activeGrantId = useMemo(() => appSettings?.activeGrantId || activeGrantIds[0] || null, [appSettings, activeGrantIds]);
+  const activeGrantId = useMemo(() => appSettings?.activeGrantId || (activeGrantIds.length > 0 ? activeGrantIds[0] : null), [appSettings, activeGrantIds]);
 
   const refreshRegistry = useCallback(async () => {
     try {
