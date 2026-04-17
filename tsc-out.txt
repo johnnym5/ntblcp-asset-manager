@@ -1,42 +1,15 @@
 capacitor.config.ts(1,38): error TS2307: Cannot find module '@capacitor/cli' or its corresponding type declarations.
-src/app/gallery/page.tsx(47,35): error TS2339: Property 'photoDataUri' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(47,55): error TS2339: Property 'photoUrl' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(51,35): error TS2339: Property 'signatureDataUri' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(51,59): error TS2339: Property 'signatureUrl' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(150,62): error TS2339: Property 'photoUrl' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(150,80): error TS2339: Property 'photoDataUri' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(150,109): error TS2339: Property 'signatureUrl' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(150,131): error TS2339: Property 'signatureDataUri' does not exist on type 'Asset'.
-src/app/gallery/page.tsx(153,36): error TS2304: Cannot find name 'cn'.
-src/app/gis/page.tsx(49,35): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/gis/page.tsx(66,62): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/gis/page.tsx(169,42): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/gis/page.tsx(170,41): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/gis/page.tsx(242,62): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/gis/page.tsx(242,94): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/app/settings/page.tsx(283,37): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
-src/app/settings/page.tsx(288,80): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
-src/app/verify/page.tsx(36,52): error TS2339: Property 'activeGrantId' does not exist on type 'AppStateContextType'.
-src/app/verify/page.tsx(226,9): error TS2322: Type '{ isOpen: boolean; onOpenChange: Dispatch<SetStateAction<boolean>>; asset: Asset | undefined; onSave: (a: Asset) => Promise<void>; onQuickSave: () => Promise<...>; isReadOnly: false; }' is not assignable to type 'IntrinsicAttributes & AssetFormProps'.
-  Property 'onQuickSave' does not exist on type 'IntrinsicAttributes & AssetFormProps'.
-src/components/admin/database-admin-dialog.tsx(51,76): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
-src/components/admin/database-admin-dialog.tsx(166,91): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
-src/components/asset-checklist.tsx(112,14): error TS2741: Property 'isCompleted' is missing in type '{ label: string; completed: boolean; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; key: string; }' but required in type '{ label: string; isCompleted: boolean; icon: any; }'.
-src/components/asset-filter-sheet.tsx(21,15): error TS2459: Module '"@/contexts/app-state-context"' declares 'OptionType' locally, but it is not exported.
-src/components/asset-form.tsx(75,11): error TS2339: Property 'activeGrantId' does not exist on type 'AppStateContextType'.
-src/components/asset-form.tsx(78,5): error TS2322: Type 'Resolver<{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }>' is not assignable to type 'Resolver<Asset, any, Asset>'.
+src/components/asset-checklist.tsx(113,28): error TS2783: 'key' is specified more than once, so this usage will be overwritten.
+src/components/asset-form.tsx(79,5): error TS2322: Type 'Resolver<{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }>' is not assignable to type 'Resolver<Asset, any, Asset>'.
   Types of parameters 'values' and 'values' are incompatible.
     Type 'Asset' is not assignable to type '{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }'.
       Types of property 'sn' are incompatible.
         Type 'string | undefined' is not assignable to type 'string'.
           Type 'undefined' is not assignable to type 'string'.
-src/components/asset-form.tsx(102,20): error TS2352: Conversion of type '{ id: string; grantId: any; status: "UNVERIFIED"; condition: string; conditionGroup: "Good"; location: string; description: string; category: string; custodian: string; serialNumber: string; lastModified: string; ... 6 more ...; updateCount: number; }' to type 'Asset' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
-  Type '{ id: string; grantId: any; status: "UNVERIFIED"; condition: string; conditionGroup: "Good"; location: string; description: string; category: string; custodian: string; serialNumber: string; lastModified: string; ... 6 more ...; updateCount: number; }' is missing the following properties from type 'Asset': section, subsection, assetFamily, overallFidelityScore, and 2 more.
-src/components/asset-form.tsx(216,69): error TS2345: Argument of type '(data: Asset) => Promise<void>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
-  Types of parameters 'data' and 'data' are incompatible.
-    Type 'TFieldValues' is not assignable to type 'Asset'.
-      Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
-src/components/asset-form.tsx(230,33): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+src/components/asset-form.tsx(223,69): error TS2345: Argument of type 'SubmitHandler<Asset>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Type 'TFieldValues' is not assignable to type 'Asset'.
+    Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
+src/components/asset-form.tsx(237,33): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
   The types of '_options.resolver' are incompatible between these types.
     Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
       Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
@@ -45,7 +18,7 @@ src/components/asset-form.tsx(230,33): error TS2322: Type 'Control<Asset, any, T
             Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
               Type 'TFieldValues' is not assignable to type 'Asset'.
                 Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
-src/components/asset-form.tsx(263,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+src/components/asset-form.tsx(270,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
   The types of '_options.resolver' are incompatible between these types.
     Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
       Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
@@ -54,7 +27,7 @@ src/components/asset-form.tsx(263,36): error TS2322: Type 'Control<Asset, any, T
             Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
               Type 'TFieldValues' is not assignable to type 'Asset'.
                 Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
-src/components/asset-form.tsx(274,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+src/components/asset-form.tsx(281,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
   The types of '_options.resolver' are incompatible between these types.
     Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
       Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
@@ -63,7 +36,7 @@ src/components/asset-form.tsx(274,36): error TS2322: Type 'Control<Asset, any, T
             Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
               Type 'TFieldValues' is not assignable to type 'Asset'.
                 Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
-src/components/asset-form.tsx(287,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
+src/components/asset-form.tsx(294,36): error TS2322: Type 'Control<Asset, any, TFieldValues>' is not assignable to type 'Control<Asset, any, Asset>'.
   The types of '_options.resolver' are incompatible between these types.
     Type 'Resolver<Asset, any, TFieldValues> | undefined' is not assignable to type 'Resolver<Asset, any, Asset> | undefined'.
       Type 'Resolver<Asset, any, TFieldValues>' is not assignable to type 'Resolver<Asset, any, Asset>'.
@@ -72,161 +45,62 @@ src/components/asset-form.tsx(287,36): error TS2322: Type 'Control<Asset, any, T
             Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<Asset>'.
               Type 'TFieldValues' is not assignable to type 'Asset'.
                 Type 'FieldValues' is missing the following properties from type 'Asset': id, description, category, grantId, and 19 more.
-src/components/asset-list.tsx(69,10): error TS2614: Module '"./asset-form"' has no exported member 'AssetForm'. Did you mean to use 'import AssetForm from "./asset-form"' instead?
-src/components/asset-list.tsx(72,26): error TS2305: Module '"@/lib/excel-parser"' has no exported member 'exportToExcel'.
-src/components/asset-list.tsx(73,57): error TS2305: Module '"@/lib/constants"' has no exported member 'SPECIAL_LOCATIONS'.
-src/components/asset-list.tsx(74,28): error TS2305: Module '"@/contexts/app-state-context"' has no exported member 'SortConfig'.
-src/components/asset-list.tsx(88,39): error TS2459: Module '"./sync-confirmation-dialog"' declares 'SyncSummary' locally, but it is not exported.
-src/components/asset-list.tsx(129,35): error TS7006: Parameter 'l' implicitly has an 'any' type.
-src/components/asset-list.tsx(203,13): error TS2339: Property 'setAssets' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(204,5): error TS2339: Property 'offlineAssets' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(204,20): error TS2339: Property 'setOfflineAssets' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(205,5): error TS2339: Property 'globalStateFilter' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(205,24): error TS2339: Property 'setGlobalStateFilter' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(208,5): error TS2339: Property 'setLocationOptions' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(208,25): error TS2339: Property 'setAssigneeOptions' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(208,60): error TS2339: Property 'setStatusOptions' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(209,5): error TS2339: Property 'sortConfig' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(209,17): error TS2339: Property 'setSortConfig' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(211,5): error TS2339: Property 'manualDownloadTrigger' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(212,5): error TS2339: Property 'manualUploadTrigger' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(213,16): error TS2339: Property 'setIsSyncing' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(215,5): error TS2339: Property 'assetToView' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(215,18): error TS2339: Property 'setAssetToView' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(216,5): error TS2339: Property 'setDataActions' does not exist on type 'AppStateContextType'.
-src/components/asset-list.tsx(219,11): error TS2339: Property 'enabledSheets' does not exist on type 'AppSettings | null'.
-src/components/asset-list.tsx(219,26): error TS2339: Property 'lockAssetList' does not exist on type 'AppSettings | null'.
-src/components/asset-list.tsx(219,41): error TS2339: Property 'sheetDefinitions' does not exist on type 'AppSettings | null'.
-src/components/asset-list.tsx(222,32): error TS2339: Property 'isGuest' does not exist on type 'LocalUserProfile'.
-src/components/asset-list.tsx(224,38): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(291,36): error TS7006: Parameter 'pushedAsset' implicitly has an 'any' type.
-src/components/asset-list.tsx(434,9): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(442,7): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(445,28): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(453,41): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(461,41): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(466,37): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(476,37): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(488,35): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(497,35): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(520,22): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Asset'.
-src/components/asset-list.tsx(521,22): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Asset'.
-src/components/asset-list.tsx(529,56): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(533,34): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(545,38): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(579,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(599,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(618,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(651,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(659,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(693,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(701,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(708,27): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(709,48): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(711,46): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(718,25): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(720,13): error TS2367: This comparison appears to be unintentional because the types '"VERIFIED" | "UNVERIFIED" | "DISCREPANCY" | undefined' and '"Verified"' have no overlap.
-src/components/asset-list.tsx(722,43): error TS2367: This comparison appears to be unintentional because the types '"VERIFIED" | "UNVERIFIED" | "DISCREPANCY"' and '"Verified"' have no overlap.
-src/components/asset-list.tsx(728,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(730,57): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(731,7): error TS2322: Type '{}[]' is not assignable to type 'Asset[]'.
-  Type '{}' is missing the following properties from type 'Asset': id, category
-src/components/asset-list.tsx(737,57): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(738,7): error TS2322: Type '{}[]' is not assignable to type 'Asset[]'.
-  Type '{}' is missing the following properties from type 'Asset': id, category
-src/components/asset-list.tsx(750,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(759,27): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(760,45): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(780,29): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(804,11): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(838,27): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(839,37): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(842,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(857,21): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(860,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(890,94): error TS2345: Argument of type 'AppSettings | null' is not assignable to parameter of type 'Record<string, SheetDefinition>'.
-  Type 'null' is not assignable to type 'Record<string, SheetDefinition>'.
-src/components/asset-list.tsx(907,52): error TS2345: Argument of type '{ lastModified: string; lastModifiedBy: string | undefined; lastModifiedByState: string | undefined; syncStatus: undefined; id: string; sn?: string; name?: string; description: string; ... 54 more ...; yearBucket?: number; }' is not assignable to parameter of type 'Asset'.
+src/components/asset-list.tsx(285,76): error TS2339: Property 'assignee' does not exist on type 'Asset'.
+src/components/asset-list.tsx(285,147): error TS2339: Property 'assignee' does not exist on type 'Asset'.
+src/components/asset-list.tsx(286,73): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(286,123): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(313,28): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
   Types of property 'approvalStatus' are incompatible.
     Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
       Type '"PENDING"' is not assignable to type '"pending"'.
-src/components/asset-list.tsx(913,23): error TS2345: Argument of type '"local_locked"' is not assignable to parameter of type 'DataSource'.
-src/components/asset-list.tsx(952,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1042,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1098,59): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(1099,61): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(1104,38): error TS7006: Parameter 'asset' implicitly has an 'any' type.
-src/components/asset-list.tsx(1131,14): error TS2339: Property 'hide' does not exist on type 'CategoryBatchUpdateData'.
-src/components/asset-list.tsx(1134,26): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1134,38): error TS2339: Property 'enabledSheets' does not exist on type 'AppSettings'.
-src/components/asset-list.tsx(1134,59): error TS7006: Parameter 'sheet' implicitly has an 'any' type.
-src/components/asset-list.tsx(1152,29): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1162,13): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1191,37): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1198,9): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1230,12): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1230,24): error TS2339: Property 'sheetDefinitions' does not exist on type 'AppSettings'.
-src/components/asset-list.tsx(1234,20): error TS2345: Argument of type '{ sheetDefinitions: any; version?: number | undefined; authorizedUsers?: AuthorizedUser[] | undefined; lockAssetList?: boolean | undefined; appMode?: "management" | "verification" | undefined; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'SetStateAction<AppSettings | null>'.
-  Type '{ sheetDefinitions: any; version?: number | undefined; authorizedUsers?: AuthorizedUser[] | undefined; lockAssetList?: boolean | undefined; appMode?: "management" | "verification" | undefined; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to type 'AppSettings'.
-    Types of property 'version' are incompatible.
-      Type 'number | undefined' is not assignable to type 'number'.
-        Type 'undefined' is not assignable to type 'number'.
-src/components/asset-list.tsx(1240,78): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1241,32): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1295,20): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1316,101): error TS2339: Property 'size' does not exist on type 'string[]'.
-src/components/asset-list.tsx(1318,34): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1319,34): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1330,31): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1334,115): error TS7006: Parameter 'prev' implicitly has an 'any' type.
-src/components/asset-list.tsx(1334,115): error TS2345: Argument of type '(prev: any) => "cloud" | "local_locked"' is not assignable to parameter of type 'DataSource'.
-src/components/asset-list.tsx(1335,34): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1339,46): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1364,108): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1369,61): error TS7006: Parameter 'loc' implicitly has an 'any' type.
-src/components/asset-list.tsx(1371,116): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1380,117): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1389,118): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1412,20): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1431,124): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1520,25): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-src/components/asset-list.tsx(1521,19): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-src/components/asset-list.tsx(1525,32): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1526,32): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1530,82): error TS7006: Parameter 'f' implicitly has an 'any' type.
-src/components/asset-list.tsx(1531,86): error TS7006: Parameter 'f' implicitly has an 'any' type.
-src/components/asset-list.tsx(1533,7): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1571,127): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"local_locked"' have no overlap.
-src/components/asset-list.tsx(1576,110): error TS7006: Parameter 'a' implicitly has an 'any' type.
-src/components/asset-list.tsx(1633,72): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1637,75): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1762,28): error TS18047: 'appSettings' is possibly 'null'.
-src/components/asset-list.tsx(1768,71): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1798,75): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-src/components/asset-list.tsx(1826,36): error TS2367: This comparison appears to be unintentional because the types 'DataSource' and '"cloud"' have no overlap.
-src/components/asset-list.tsx(1840,13): error TS2322: Type '(newDefinition: SheetDefinition) => Promise<void>' is not assignable to type '(originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void'.
-  Types of parameters 'newDefinition' and 'originalName' are incompatible.
-    Type 'string | null' is not assignable to type 'SheetDefinition'.
-      Type 'null' is not assignable to type 'SheetDefinition'.
-src/components/CommandPalette.tsx(93,71): error TS2345: Argument of type '"VERIFY"' is not assignable to parameter of type 'WorkstationView'.
+src/components/asset-list.tsx(377,124): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset[]' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset[]'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(529,79): error TS2339: Property 'verifiedStatus' does not exist on type 'Asset'.
+src/components/asset-list.tsx(614,11): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset | undefined' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset | undefined'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(615,11): error TS2322: Type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset) => Promise<void>' is not assignable to type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset) => Promise<void>'.
+  Types of parameters 'assetToSave' and 'assetToSave' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+      Types of property 'approvalStatus' are incompatible.
+        Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+          Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(618,141): error TS2552: Cannot find name 'handleSaveAssetBatch'. Did you mean 'handleSaveAsset'?
+src/components/asset-list.tsx(698,92): error TS2345: Argument of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to parameter of type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+  Types of property 'approvalStatus' are incompatible.
+    Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+      Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(789,33): error TS2304: Cannot find name 'totalPages'.
+src/components/asset-list.tsx(800,11): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset | undefined' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset | undefined'.
+  Type 'Asset' is missing the following properties from type 'Asset': grantId, section, subsection, assetFamily, and 11 more.
+src/components/asset-list.tsx(801,11): error TS2322: Type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset) => Promise<void>' is not assignable to type '(assetToSave: import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset) => Promise<void>'.
+  Types of parameters 'assetToSave' and 'assetToSave' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+      Types of property 'approvalStatus' are incompatible.
+        Type '"PENDING" | "APPROVED" | "REJECTED" | undefined' is not assignable to type '"pending" | undefined'.
+          Type '"PENDING"' is not assignable to type '"pending"'.
+src/components/asset-list.tsx(808,21): error TS2552: Cannot find name 'handleSaveAssetBatch'. Did you mean 'handleSaveAsset'?
+src/components/asset-list.tsx(827,13): error TS2322: Type '(originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => Promise<void>' is not assignable to type '(originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void'.
+  Types of parameters 'newDefinition' and 'newDefinition' are incompatible.
+    Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").SheetDefinition' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").SheetDefinition'.
+      Types of property 'displayFields' are incompatible.
+        Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").DisplayField[]' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").DisplayField[]'.
+          Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").DisplayField' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").DisplayField'.
+            Types of property 'key' are incompatible.
+              Type 'keyof import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'keyof import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
+                Type '"name"' is not assignable to type 'keyof Asset'.
 src/components/ErrorBoundary.tsx(42,20): error TS2339: Property 'log' does not exist on type 'MonitoringService'.
 src/components/import-preview-dialog.tsx(53,12): error TS2741: Property 'summary' is missing in type '{ assets: Asset[]; }' but required in type 'ReconciliationViewProps'.
 src/components/inbox-sheet.tsx(59,34): error TS2551: Property 'adjudicateAssetPulse' does not exist on type '{ getSettings(): Promise<AppSettings | null>; updateSettings(settings: Partial<AppSettings>): Promise<void>; getProjectAssets(grantId: string, stateScopes?: string[] | undefined): Promise<...>; ... 9 more ...; handlePermissionError(path: string | DocumentReference<...>, operation: string, error: any, data?: any): vo...'. Did you mean 'adjudicateAssetUpdate'?
 src/components/registry/AssetDossier.tsx(191,112): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
 src/components/registry/AssetDossier.tsx(195,11): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
 src/components/registry/HeaderManagerDrawer.tsx(141,32): error TS2304: Cannot find name 'setSearchTerm'.
-src/components/registry/RegistryCard.tsx(217,101): error TS2353: Object literal may only specify known properties, and 'disabled' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void | undefined; }'.
-src/components/registry/RegistryCard.tsx(224,80): error TS2353: Object literal may only specify known properties, and 'destructive' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void | undefined; }'.
 src/components/registry/RegistryTable.tsx(158,109): error TS2353: Object literal may only specify known properties, and 'disabled' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void; }'.
 src/components/registry/RegistryTable.tsx(162,88): error TS2353: Object literal may only specify known properties, and 'destructive' does not exist in type '{ label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; onClick: () => void; }'.
 src/components/registry/RegistryTable.tsx(200,120): error TS2322: Type '{}' is not assignable to type 'ReactNode'.
 src/components/settings-sheet.tsx(58,67): error TS2339: Property 'setActiveGrantId' does not exist on type 'AppStateContextType'.
-src/components/settings-sheet.tsx(58,85): error TS2339: Property 'activeGrantId' does not exist on type 'AppStateContextType'.
-src/components/settings-sheet.tsx(211,48): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
 src/components/settings-sheet.tsx(340,30): error TS2304: Cannot find name 'originalSheetName'.
 src/components/single-sheet-import-dialog.tsx(25,32): error TS2305: Module '"@/parser/types"' has no exported member 'SheetDefinition'.
 src/components/theme-provider.tsx(5,41): error TS2307: Cannot find module 'next-themes/dist/types' or its corresponding type declarations.
-src/components/travel-report-dialog.tsx(71,63): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
 src/components/ui/calendar.tsx(5,27): error TS2307: Cannot find module 'react-day-picker' or its corresponding type declarations.
 src/components/user-profile-setup.tsx(42,3): error TS2353: Object literal may only specify known properties, and 'role' does not exist in type 'AuthorizedUser'.
 src/components/user-profile-setup.tsx(84,14): error TS2339: Property 'isGuest' does not exist on type 'AuthorizedUser | AuthorizedUser'.
@@ -246,52 +120,43 @@ src/components/workstations/DatabaseWorkstation.tsx(771,42): error TS2322: Type 
   Types of parameters 'value' and 'open' are incompatible.
     Type 'boolean' is not assignable to type 'SetStateAction<DBNode | null>'.
 src/components/workstations/DiscrepancyWorkstation.tsx(274,89): error TS2304: Cannot find name 'p'.
-src/components/workstations/GISWorkstation.tsx(42,35): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/GISWorkstation.tsx(59,62): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/GISWorkstation.tsx(143,40): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/GISWorkstation.tsx(144,39): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/GISWorkstation.tsx(222,71): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/GISWorkstation.tsx(222,103): error TS2339: Property 'geotag' does not exist on type 'Asset'.
-src/components/workstations/ImportWorkstation.tsx(335,21): error TS2304: Cannot find name 'toast'.
-src/components/workstations/RegistryWorkstation.tsx(705,23): error TS2322: Type '{ record: AssetRecord; onEdit: (id: string) => void; onQuickUpdate: (id: string, updates: Partial<Asset>) => Promise<void>; onUpdateHeader: (headerId: string, updates: Partial<...>) => void; onSync: (id: string) => Promise<...>; isHeaderEditingMode: boolean; }' is not assignable to type 'IntrinsicAttributes & { record: AssetRecord; onEdit?: ((id: string) => void) | undefined; onQuickUpdate?: ((id: string, updates: any) => void) | undefined; onUpdateHeader?: ((id: string, updates: Partial<...>) => void) | undefined; className?: string | undefined; isHeaderEditingMode?: boolean | undefined; }'.
+src/components/workstations/RegistryWorkstation.tsx(733,23): error TS2322: Type '{ record: AssetRecord; onEdit: (id: string) => void; onQuickUpdate: (id: string, updates: Partial<Asset>) => Promise<void>; onUpdateHeader: (headerId: string, updates: Partial<...>) => void; onSync: (id: string) => Promise<...>; isHeaderEditingMode: boolean; }' is not assignable to type 'IntrinsicAttributes & { record: AssetRecord; onEdit?: ((id: string) => void) | undefined; onQuickUpdate?: ((id: string, updates: any) => void) | undefined; onUpdateHeader?: ((id: string, updates: Partial<...>) => void) | undefined; className?: string | undefined; isHeaderEditingMode?: boolean | undefined; }'.
   Property 'onSync' does not exist on type 'IntrinsicAttributes & { record: AssetRecord; onEdit?: ((id: string) => void) | undefined; onQuickUpdate?: ((id: string, updates: any) => void) | undefined; onUpdateHeader?: ((id: string, updates: Partial<...>) => void) | undefined; className?: string | undefined; isHeaderEditingMode?: boolean | undefined; }'.
-src/components/workstations/RegistryWorkstation.tsx(750,28): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 6 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'SetStateAction<AppSettings | null>'.
-  Type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 6 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to type 'AppSettings'.
+src/components/workstations/RegistryWorkstation.tsx(778,28): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'SetStateAction<AppSettings | null>'.
+  Type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to type 'AppSettings'.
     Types of property 'grants' are incompatible.
       Type 'Grant[] | undefined' is not assignable to type 'Grant[]'.
         Type 'undefined' is not assignable to type 'Grant[]'.
-src/components/workstations/RegistryWorkstation.tsx(751,34): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 6 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'AppSettings'.
+src/components/workstations/RegistryWorkstation.tsx(779,34): error TS2345: Argument of type '{ grants: Grant[] | undefined; version: number; authorizedUsers: AuthorizedUser[]; lockAssetList: boolean; appMode: "management" | "verification"; ... 7 more ...; globalHeaders?: RegistryHeader[]; }' is not assignable to parameter of type 'AppSettings'.
   Types of property 'grants' are incompatible.
     Type 'Grant[] | undefined' is not assignable to type 'Grant[]'.
       Type 'undefined' is not assignable to type 'Grant[]'.
-src/contexts/app-state-context.tsx(580,31): error TS2740: Type '{ assets: Asset[]; filteredAssets: Asset[]; sandboxAssets: Asset[]; dataSource: DataSource; setDataSource: Dispatch<SetStateAction<DataSource>>; ... 50 more ...; setGroupsViewMode: Dispatch<...>; }' is missing the following properties from type 'AppStateContextType': selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees, and 6 more.
-src/core/auth/__tests__/rbac.test.ts(4,1): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
-src/core/auth/__tests__/rbac.test.ts(35,3): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
-src/core/auth/__tests__/rbac.test.ts(36,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(4,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(35,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(36,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(37,7): error TS2304: Cannot find name 'expect'.
-src/core/auth/__tests__/rbac.test.ts(40,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(40,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(41,7): error TS2304: Cannot find name 'expect'.
-src/core/auth/__tests__/rbac.test.ts(44,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(44,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(45,7): error TS2304: Cannot find name 'expect'.
-src/core/auth/__tests__/rbac.test.ts(49,3): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
-src/core/auth/__tests__/rbac.test.ts(50,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(49,3): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/auth/__tests__/rbac.test.ts(50,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(51,7): error TS2304: Cannot find name 'expect'.
 src/core/auth/__tests__/rbac.test.ts(52,7): error TS2304: Cannot find name 'expect'.
-src/core/auth/__tests__/rbac.test.ts(55,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(55,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(56,7): error TS2304: Cannot find name 'expect'.
-src/core/auth/__tests__/rbac.test.ts(59,5): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/auth/__tests__/rbac.test.ts(59,5): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/auth/__tests__/rbac.test.ts(60,7): error TS2304: Cannot find name 'expect'.
-src/core/registry/__tests__/validation.test.ts(3,1): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
-src/core/registry/__tests__/validation.test.ts(28,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/registry/__tests__/validation.test.ts(3,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/core/registry/__tests__/validation.test.ts(28,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/registry/__tests__/validation.test.ts(29,5): error TS2304: Cannot find name 'expect'.
-src/core/registry/__tests__/validation.test.ts(32,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/registry/__tests__/validation.test.ts(32,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/registry/__tests__/validation.test.ts(35,5): error TS2304: Cannot find name 'expect'.
-src/core/registry/__tests__/validation.test.ts(38,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/registry/__tests__/validation.test.ts(38,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/registry/__tests__/validation.test.ts(40,5): error TS2304: Cannot find name 'expect'.
-src/core/registry/__tests__/validation.test.ts(43,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/core/registry/__tests__/validation.test.ts(43,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/core/registry/__tests__/validation.test.ts(46,5): error TS2304: Cannot find name 'expect'.
 src/core/registry/__tests__/validation.test.ts(46,22): error TS2551: Property 'purchase_date' does not exist on type '{ id: string; sn: string; description: string; category: string; grantId: string; section: string; subsection: string; assetFamily: string; location: string; custodian: string; lga: string; site: string; ... 36 more ...; signatureUrl?: string | undefined; }'. Did you mean 'purchaseDate'?
-src/lib/archive-service.ts(26,34): error TS2551: Property 'activeGrantId' does not exist on type 'AppSettings'. Did you mean 'activeGrantIds'?
 src/lib/constants.ts(100,3): error TS2353: Object literal may only specify known properties, and 'custodian' does not exist in type '{ id?: string[] | undefined; category?: string[] | undefined; sn?: string[] | undefined; description?: string[] | undefined; serialNumber?: string[] | undefined; assetIdCode?: string[] | undefined; ... 30 more ...; changeSubmittedBy?: string[] | undefined; }'.
 src/lib/database.ts(63,20): error TS2551: Property 'grantId' does not exist on type 'Asset'. Did you mean 'grant'?
 src/lib/idb.ts(139,5): error TS2322: Type 'AppSettings | undefined' is not assignable to type 'AppSettings | null'.
@@ -315,35 +180,34 @@ src/lib/offline-queue.ts(48,10): error TS2339: Property 'log' does not exist on 
 src/lib/utils.ts(2,25): error TS7016: Could not find a declaration file for module 'tailwind-merge'. 'C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/node_modules/tailwind-merge/dist/bundle-mjs.mjs' implicitly has an 'any' type.
   Try `npm i --save-dev @types/tailwind-merge` if it exists or add a new declaration (.d.ts) file containing `declare module 'tailwind-merge';`
 src/modules/registry/components/RegistryTable.tsx(31,15): error TS2614: Module '"@/app/assets/page"' has no exported member 'SortConfig'. Did you mean to use 'import SortConfig from "@/app/assets/page"' instead?
-src/modules/registry/components/RegistryTable.tsx(129,28): error TS2339: Property 'photoDataUri' does not exist on type 'Asset'.
 src/offline/__tests__/queue.test.ts(4,1): error TS2304: Cannot find name 'jest'.
 src/offline/__tests__/queue.test.ts(6,14): error TS2304: Cannot find name 'jest'.
 src/offline/__tests__/queue.test.ts(7,15): error TS2304: Cannot find name 'jest'.
-src/offline/__tests__/queue.test.ts(11,1): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/offline/__tests__/queue.test.ts(11,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/offline/__tests__/queue.test.ts(12,3): error TS2304: Cannot find name 'beforeEach'.
 src/offline/__tests__/queue.test.ts(13,5): error TS2304: Cannot find name 'jest'.
-src/offline/__tests__/queue.test.ts(16,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/offline/__tests__/queue.test.ts(16,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/offline/__tests__/queue.test.ts(20,5): error TS2304: Cannot find name 'expect'.
 src/offline/__tests__/queue.test.ts(21,5): error TS2304: Cannot find name 'expect'.
 src/offline/__tests__/queue.test.ts(21,50): error TS2304: Cannot find name 'expect'.
-src/offline/__tests__/queue.test.ts(30,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/offline/__tests__/queue.test.ts(30,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/offline/__tests__/queue.test.ts(34,42): error TS2503: Cannot find namespace 'jest'.
 src/offline/__tests__/queue.test.ts(35,5): error TS2304: Cannot find name 'expect'.
 src/offline/storage.ts(104,17): error TS2322: Type 'AppSettings | undefined' is not assignable to type 'AppSettings | null'.
   Type 'undefined' is not assignable to type 'AppSettings | null'.
 src/offline/sync.ts(52,52): error TS2339: Property 'deleteAsset' does not exist on type '{ getSettings(): Promise<AppSettings | null>; updateSettings(settings: Partial<AppSettings>): Promise<void>; getProjectAssets(grantId: string, stateScopes?: string[] | undefined): Promise<...>; ... 9 more ...; handlePermissionError(path: string | DocumentReference<...>, operation: string, error: any, data?: any): vo...'.
-src/parser/__tests__/classifyRow.test.ts(3,1): error TS2582: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
-src/parser/__tests__/classifyRow.test.ts(5,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(3,1): error TS2593: Cannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+src/parser/__tests__/classifyRow.test.ts(5,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(8,5): error TS2304: Cannot find name 'expect'.
-src/parser/__tests__/classifyRow.test.ts(11,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(11,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(14,5): error TS2304: Cannot find name 'expect'.
-src/parser/__tests__/classifyRow.test.ts(17,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(17,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(20,5): error TS2304: Cannot find name 'expect'.
-src/parser/__tests__/classifyRow.test.ts(23,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(23,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(26,5): error TS2304: Cannot find name 'expect'.
-src/parser/__tests__/classifyRow.test.ts(29,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(29,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(32,5): error TS2304: Cannot find name 'expect'.
-src/parser/__tests__/classifyRow.test.ts(35,3): error TS2582: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha`.
+src/parser/__tests__/classifyRow.test.ts(35,3): error TS2593: Cannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
 src/parser/__tests__/classifyRow.test.ts(38,5): error TS2304: Cannot find name 'expect'.
 src/services/firebase/firestore.ts(172,29): error TS2322: Type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/types/domain").Asset' is not assignable to type 'import("C:/Users/Johnmary/Documents/VS CODE/ntblcp-asset-manager/src/lib/types").Asset'.
   Types of property 'approvalStatus' are incompatible.
