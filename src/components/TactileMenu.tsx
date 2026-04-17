@@ -3,6 +3,7 @@
 /**
  * @fileOverview TactileMenu - Universal Interaction Wrapper.
  * Provides a context menu triggered by right-click OR long-press.
+ * Updated Phase 1535: Migrated from onClick to onSelect for better Radix reliability.
  */
 
 import React from 'react';
@@ -20,7 +21,8 @@ import { cn } from "@/lib/utils";
 interface TactileOption {
   label: string;
   icon?: any;
-  onClick: () => void;
+  onSelect?: () => void; // Support for native Radix onSelect
+  onClick?: () => void; // Legacy support
   destructive?: boolean;
   disabled?: boolean;
 }
@@ -66,7 +68,11 @@ export function TactileMenu({ children, title, options, className }: TactileMenu
           {options.map((opt, i) => (
             <ContextMenuItem 
               key={`${opt.label}-${i}`} 
-              onClick={(e) => { e.stopPropagation(); opt.onClick(); }}
+              onSelect={(e) => { 
+                e.stopPropagation(); 
+                if (opt.onSelect) opt.onSelect();
+                else if (opt.onClick) opt.onClick();
+              }}
               disabled={opt.disabled}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest cursor-pointer transition-colors",
