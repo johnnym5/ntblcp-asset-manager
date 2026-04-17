@@ -1,8 +1,7 @@
 /**
  * @fileOverview Registry Validation Rules.
  * Strict deterministic Zod schemas for system data.
- * Updated Phase 1940: Expanded schema to prevent data stripping during cloud sync.
- * Updated Phase 1997: Added discrepancies, overallFidelityScore, and unseenUpdateFields for type parity.
+ * Updated Phase 1998: Synchronized all fields to resolve strict property mismatches in the Asset Form.
  */
 
 import { z } from 'zod';
@@ -15,6 +14,9 @@ export const AssetSchema = z.object({
   category: z.string().min(1, "Category is required"),
   grantId: z.string().min(1, "Grant ID is required"),
   
+  // Data Synchronization Status
+  syncStatus: z.enum(['synced', 'local']).optional(),
+
   // Hierarchical Context
   section: z.string().default("General"),
   subsection: z.string().default("Base Register"),
@@ -22,6 +24,13 @@ export const AssetSchema = z.object({
   
   // Location & Assignment
   location: z.string().min(1, "Location is required"),
+  normalizedLocation: z.string().optional(),
+  normalizedState: z.string().optional(),
+  normalizedZone: z.string().optional(),
+  normalizedLga: z.string().optional(),
+  locationConfidence: z.enum(['HIGH', 'MEDIUM', 'LOW', 'NONE']).optional(),
+  locationStatus: z.enum(['MATCHED', 'PARTIAL', 'UNASSIGNED', 'NEEDS_REVIEW', 'INVALID']).optional(),
+  
   lga: z.string().default(""),
   custodian: z.string().default("Unassigned"),
   site: z.string().default(""),
@@ -29,8 +38,12 @@ export const AssetSchema = z.object({
   // State & Assessment
   status: z.enum(["VERIFIED", "UNVERIFIED", "DISCREPANCY"]).default("UNVERIFIED"),
   condition: z.string().default("Unassessed"),
-  conditionGroup: z.string().default("Good"),
+  conditionGroup: z.enum(["Good", "Bad", "Stolen", "Obsolete", "Unsalvageable", "Discrepancy"]).default("Good"),
   remarks: z.string().default(""),
+  conditionNotes: z.string().optional(),
+  conditionHistory: z.array(z.any()).optional(),
+  discrepancyFlag: z.boolean().optional(),
+  reviewStatus: z.enum(['PENDING', 'RESOLVED', 'FLAGGED']).optional(),
   
   // Fidelity Pulse
   discrepancies: z.array(z.any()).default([]),
@@ -54,12 +67,21 @@ export const AssetSchema = z.object({
   usefulLifeYears: z.string().default(""),
   funder: z.string().default(""),
   
+  classification: z.any().optional(),
+
   photoDataUri: z.string().optional(),
   photoUrl: z.string().optional(),
   
   // Forensic Fields
   signatureDataUri: z.string().optional(),
   signatureUrl: z.string().optional(),
+
+  // Spatial
+  geotag: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    accuracy: z.number().optional()
+  }).optional(),
   
   // Nested Structured Data
   hierarchy: z.object({
@@ -86,6 +108,11 @@ export const AssetSchema = z.object({
   // Restoration Buffer
   previousState: z.record(z.unknown()).nullable().optional(),
   
+  // Traceability
+  sourceGroup: z.string().optional(),
+  sourceColumnAGroup: z.string().optional(),
+  templateId: z.string().optional(),
+
   // Governance
   approvalStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
   pendingChanges: z.record(z.unknown()).optional(),
