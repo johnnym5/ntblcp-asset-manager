@@ -8,7 +8,7 @@ import { NIGERIAN_GEO_DATA, type StateInfo } from '@/lib/nigeria-geo';
 import { getFuzzySignature } from '@/lib/utils';
 import type { MatchConfidence, LocationMatchStatus } from '@/types/domain';
 
-export interface LocationPulse {
+export interface LocationData {
   raw: string;
   normalized: string;
   state: string;
@@ -19,9 +19,9 @@ export interface LocationPulse {
 
 export const LocationEngine = {
   /**
-   * Normalizes a raw string to a canonical Nigerian state pulse.
+   * Normalizes a raw string to a canonical Nigerian location mapping.
    */
-  normalize(input: string | null | undefined): LocationPulse {
+  normalize(input: string | null | undefined): LocationData {
     const raw = (input || '').trim();
     if (!raw) {
       return { 

@@ -30,7 +30,7 @@ export interface RegistryHeader {
   group?: "Identity" | "Location" | "Classification" | "Procurement" | "Condition" | "Metadata" | "Hierarchy";
   schemaName?: string;        // schema variant this belongs to
   guidance?: string;          // Explain what this field is for
-  example?: string;           // Provide a sample pulse value
+  example?: string;           // Provide a sample data value
 }
 
 export interface RegistryFieldValue {

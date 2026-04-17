@@ -20,7 +20,7 @@ import { getFuzzySignature } from "./utils";
 export function normalizeHeaderName(name: string): string {
   let n = name.toLowerCase().trim();
   
-  // High-Fidelity Mapping Pulse
+  // High-Fidelity Asset Mapping
   if (n.includes("purchase price") && (n.includes("naira") || n.includes("(n)") || n.includes("ngn"))) return "value";
   if (n.includes("purchase price") && (n.includes("usd") || n.includes("[usd]"))) return "purchasePriceUsd";
   if (n.includes("chq no") || n.includes("goods received note") || n.includes("grn no") || n.includes("grn")) return "grnNo";
@@ -176,7 +176,7 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "site": rawValue = asset.site; break;
     }
 
-    // 2. Fuzzy Discovery Pulse: If core prop is empty, hunt in metadata
+    // 2. Fuzzy Data Discovery: If core prop is empty, hunt in metadata
     const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a" || String(rawValue).trim() === "---";
     
     if (isEmpty) {

@@ -235,8 +235,8 @@ export class ParserEngine {
     });
 
     if (asset.location) {
-      const pulse = LocationEngine.normalize(asset.location);
-      asset.location = pulse.normalized;
+      const normalized = LocationEngine.normalize(asset.location);
+      asset.location = normalized.normalized;
     }
 
     const existing = this.findExistingAsset(asset);

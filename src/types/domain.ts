@@ -1,6 +1,6 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
- * Authoritative type definitions for the entire application pulse.
+ * Authoritative type definitions for the entire asset management system.
  * Updated Phase 1940: Added missing technical fields to the Asset interface.
  */
 
@@ -141,7 +141,7 @@ export interface Asset {
   category: string;
   grantId: string; 
   
-  // Sync Pulse
+  // Data Synchronization Status
   syncStatus?: SyncStatus;
 
   // Hierarchical Context

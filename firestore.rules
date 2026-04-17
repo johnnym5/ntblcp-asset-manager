@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     /**
-     * ASSETAIN GLOBAL ACCESS PULSE
+     * ASSET MANAGER GLOBAL DATA ACCESS
      * 
      * Operational Philosophy:
      * Logic-based security and Role-Based Access Control (RBAC) are enforced

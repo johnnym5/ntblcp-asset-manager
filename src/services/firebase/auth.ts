@@ -15,7 +15,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
-// singleton promise to handle concurrent ensureSession pulses
+// singleton promise to handle concurrent session initialization
 let signInPromise: Promise<User | null> | null = null;
 
 export const FirebaseAuthService = {

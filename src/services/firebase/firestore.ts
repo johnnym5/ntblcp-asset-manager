@@ -1,7 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
  * Forensic update: Captures diffs and previous state automatically for the audit trail.
- * Optimization Pulse: Implemented partial updates to send only modified fields.
+ * Optimization Cycle: Implemented partial updates to send only modified fields.
  */
 
 import { 
@@ -134,7 +134,7 @@ export const FirestoreService = {
       }
     } catch (e) {}
 
-    // Parity Check: If nothing functionally changed and it's an update, skip the cloud pulse
+    // Parity Check: If nothing functionally changed and it's an update, skip the cloud sync
     if (operation === 'UPDATE' && !hasFunctionalChanges && oldData) {
       return;
     }
@@ -144,7 +144,7 @@ export const FirestoreService = {
 
     try {
       if (operation === 'UPDATE' && oldData) {
-        // Differential Update Pulse
+        // Differential Update Event
         const updatePayload = {
           ...partialUpdate,
           previousState: oldData, // Store previous version for undo capability
@@ -153,7 +153,7 @@ export const FirestoreService = {
         };
         await updateDoc(assetRef, sanitizeForFirestore(updatePayload));
       } else {
-        // Full Object Pulse (CREATE or RESTORE)
+        // Full Object Save (CREATE or RESTORE)
         const fullPayload = {
           ...validation.data,
           previousState: oldData || null,
@@ -208,7 +208,7 @@ export const FirestoreService = {
     });
   },
 
-  async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT'): Promise<void> {
+  async adjudicateAssetUpdate(assetId: string, action: 'APPROVE' | 'REJECT'): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     const snap = await getDoc(assetRef);

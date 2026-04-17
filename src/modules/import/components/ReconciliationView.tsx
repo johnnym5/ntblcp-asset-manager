@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview ReconciliationView - The Discovery Pulse visualization.
+ * @fileOverview ReconciliationView - The Data Discovery visualization.
  * Phase 1008: Integrated Duplicate/Update metrics into the summary dashboard.
  */
 
@@ -45,7 +45,7 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
-      {/* 1. Global Metrics Pulse */}
+      {/* 1. Global Metrics View */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-1">
         <Card className="bg-primary/5 border-primary/10 shadow-xl rounded-3xl group transition-all">
           <CardHeader className="pb-2">
@@ -55,7 +55,7 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black tracking-tighter text-white">{stats.total}</div>
-            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Incoming Pulses</p>
+            <p className="text-[8px] font-bold text-white/40 uppercase mt-1 opacity-60">Data Updates</p>
           </CardContent>
         </Card>
 

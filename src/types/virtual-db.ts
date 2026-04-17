@@ -25,7 +25,7 @@ export interface DatabaseStats {
   recordCount: number;
   pendingChanges: number;
   conflictCount: number;
-  lastPulse: string;
+  lastSyncTime: string;
   status: 'ONLINE' | 'OFFLINE' | 'SYNCING';
 }
 
