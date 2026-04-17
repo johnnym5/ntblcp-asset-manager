@@ -4,7 +4,6 @@
  * Updated Phase 1940: Added missing technical fields to the Asset interface.
  */
 
-import { type Dispatch, type SetStateAction } from 'react';
 import type { RegistryHeader } from './registry';
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';

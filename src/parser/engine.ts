@@ -166,14 +166,37 @@ export class ParserEngine {
     });
   }
 
+  public parseWorkbook(sheetName: string, data: any[][]): GroupImportContainer[] {
+    const groups = this.discoverGroups(sheetName, data);
+    return this.ingestGroups(sheetName, data, groups);
+  }
+
   private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset {
     const asset: any = {
       id: uuidv4(),
+      description: '',
       category: group.groupName,
+      grantId: '',
+      section: group.groupName,
+      subsection: 'Base Register',
+      assetFamily: 'Uncategorized',
       status: 'UNVERIFIED',
       condition: 'New',
+      conditionGroup: 'Good',
+      location: '',
+      serialNumber: '',
+      value: 0,
+      discrepancies: [],
+      overallFidelityScore: 0,
+      updateCount: 0,
+      unseenUpdateFields: [],
+      sourceGroup: group.groupName,
+      templateId: group.templateId,
+      headerSource: group.headerSource,
+      headerSetType: group.headerSetType,
       lastModified: new Date().toISOString(),
       lastModifiedBy: 'System Ingestion',
+      lastModifiedByState: 'System',
       importMetadata: { 
         sourceFile: this.workbookName, 
         sheetName: group.sheetName, 
@@ -194,13 +217,10 @@ export class ParserEngine {
 
     tpl.normalizedHeaders.forEach((key, idx) => {
       const rawHeader = tpl.rawHeaders[idx];
-      
-      // SKIP INGESTION FOR EXCLUDED COLUMNS
       if (exclusions.has(rawHeader)) return;
 
       const val = row[idx];
       if (val === undefined || val === null) return;
-      
       const strVal = String(val).trim();
       if (strVal === '') return;
 
@@ -223,14 +243,17 @@ export class ParserEngine {
         case 'usefulLifeYears': asset.usefulLifeYears = strVal; break;
         case 'funder': asset.funder = strVal; break;
         case 'site': asset.site = strVal; break;
-        case 'value': 
+        case 'value': {
           const numericVal = parseFloat(strVal.replace(/[^0-9.]/g, ''));
-          asset.value = isNaN(numericVal) ? 0 : numericVal; 
+          asset.value = isNaN(numericVal) ? 0 : numericVal;
           break;
+        }
         case 'purchaseDate': asset.purchaseDate = strVal; break;
-        default: 
-          const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$/[\]\n\r]/g, '_').trim();
+        default: {
+          const safeKey = (tpl.rawHeaders[idx] || `Column ${idx + 1}`).replace(/[.#$\/\[\]\n\r]/g, '_').trim();
           asset.metadata[safeKey] = val;
+          break;
+        }
       }
     });
 

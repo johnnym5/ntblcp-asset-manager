@@ -95,9 +95,9 @@ export async function parseExcelFile(
           if (!sheet) continue;
 
           const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-          const groupContainer = engine.parseWorkbook(sheetName, data);
+          const groupContainers = engine.parseWorkbook(sheetName, data);
           
-          groupContainer.assets.forEach(asset => {
+          groupContainers.flatMap(c => c.assets).forEach(asset => {
             if (asset.validation.isUpdate) {
               result.updatedAssets.push(asset as any);
             } else {

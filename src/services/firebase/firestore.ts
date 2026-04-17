@@ -26,7 +26,11 @@ import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
 import { batchSetAssets as mirrorToRtdb, clearAssets as clearRtdb } from '@/lib/database';
+
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
+
+const auditValue = (value: unknown) => value === undefined ? 'EMPTY' : value;
+const valuesDiffer = (left: unknown, right: unknown) => JSON.stringify(left) !== JSON.stringify(right);
 
 export const FirestoreService = {
   async getSettings(): Promise<AppSettings | null> {
@@ -45,10 +49,12 @@ export const FirestoreService = {
     if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
     const sanitized = sanitizeForFirestore(settings);
-    
-    setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
+    try {
+      await setDoc(settingsRef, sanitized, { merge: true });
+    } catch (err: any) {
       this.handlePermissionError(settingsRef, 'update', err, sanitized);
-    });
+      throw err;
+    }
   },
 
   async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
@@ -64,7 +70,7 @@ export const FirestoreService = {
 
     try {
       if (hasStates) {
-        const CHUNK_SIZE = 30;
+        const CHUNK_SIZE = 10;
         const stateChunks = [];
         for (let i = 0; i < stateScopes!.length; i += CHUNK_SIZE) {
           stateChunks.push(stateScopes!.slice(i, i + CHUNK_SIZE));
@@ -124,9 +130,8 @@ export const FirestoreService = {
         keys.forEach(k => {
           const oldVal = (oldData as any)[k];
           const newVal = (asset as any)[k];
-          
-          if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-            changes[k] = { old: oldVal || 'EMPTY', new: newVal || 'EMPTY' };
+          if (valuesDiffer(oldVal, newVal)) {
+            changes[k] = { old: auditValue(oldVal), new: auditValue(newVal) };
             partialUpdate[k] = newVal;
             hasFunctionalChanges = true;
           }
@@ -163,7 +168,11 @@ export const FirestoreService = {
       }
 
       // Always mirror full object to RTDB for failover consistency
-      mirrorToRtdb([sanitizeForFirestore(asset) as Asset]).catch(() => {});
+      try {
+        await mirrorToRtdb([sanitizeForFirestore(asset) as Asset]);
+      } catch (mirrorError) {
+        console.error('RTDB mirror failed for asset', asset.id, mirrorError);
+      }
       
       await this.logActivity({
         assetId: asset.id,
@@ -252,7 +261,12 @@ export const FirestoreService = {
     if (!db) return;
     const logRef = collection(db, 'audit_logs');
     const data = { ...entry, id: crypto.randomUUID(), timestamp: new Date().toISOString() };
-    addDoc(logRef, sanitizeForFirestore(data)).catch(() => {});
+    try {
+      await addDoc(logRef, sanitizeForFirestore(data));
+    } catch (err: any) {
+      console.error('Audit log write failed', err);
+      monitoring.trackError(err, { module: 'Firestore', action: 'logActivity' }, 'WARNING');
+    }
   },
 
   async getGlobalActivity(limitCount: number = 100): Promise<ActivityLogEntry[]> {
