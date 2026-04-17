@@ -50,7 +50,7 @@ export const PdfService = {
     // 3. Technical Grid
     autoTable(doc, {
       startY: 75,
-      head: [['TECHNICAL PARAMETER', 'FIELD PULSE VALUE']],
+      head: [['TECHNICAL PARAMETER', 'FIELD DATA VALUE']],
       body: [
         ['Tag ID Code', asset.assetIdCode || 'UNTAGGED'],
         ['Manufacturer Serial', asset.serialNumber || 'N/A'],
@@ -68,7 +68,7 @@ export const PdfService = {
 
     const finalY = (doc as any).lastAutoTable.finalY || 150;
 
-    // 4. Evidence Pulse: Visual & Forensic
+    // 4. Evidence Documentation: Visual & Forensic
     let evidenceY = finalY + 15;
 
     // A. Asset Photo
@@ -101,7 +101,7 @@ export const PdfService = {
           doc.text('Digital Signature Anchor', sigX, evidenceY + 35);
         }
       } catch (e) {
-        doc.text('[Signature pulse missing]', sigX, evidenceY + 10);
+        doc.text('[Signature documentation missing]', sigX, evidenceY + 10);
       }
     }
 

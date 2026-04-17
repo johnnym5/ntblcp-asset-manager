@@ -5,6 +5,6 @@
  */
 
 import { LocationEngine as CoreEngine } from '@/lib/location-engine';
-export type { LocationPulse } from '@/lib/location-engine';
+export type { LocationData } from '@/lib/location-engine';
 
 export const LocationEngine = CoreEngine;

@@ -21,8 +21,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#000000',
 };
@@ -42,7 +40,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-sans select-none overflow-hidden overscroll-none" suppressHydrationWarning>
+      <body className="font-sans select-none" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

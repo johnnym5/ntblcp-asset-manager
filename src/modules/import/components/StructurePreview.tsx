@@ -69,7 +69,7 @@ export function StructurePreview({
             Registry Skeleton
           </h4>
           <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
-            Column A discovery pulse: identifying structural register blocks.
+            Column A discovery phase: identifying structural register blocks.
           </p>
         </div>
 

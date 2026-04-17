@@ -1,6 +1,6 @@
 /**
  * @fileOverview Advanced Error Monitoring & Resilience Service.
- * Translates technical failures into layman-friendly pulses and logs audits to the cloud.
+ * Translates technical failures into user-friendly notifications and logs audits to the cloud.
  * Phase 1980: Removed FirestoreService dependency to break circular module loop.
  */
 
@@ -40,7 +40,7 @@ class MonitoringService {
     });
 
     this.isInitialized = true;
-    console.log("🚀 Assetain Resilience Pulse Active");
+    logger.info("Asset Manager Resilience System Active");
   }
 
   /**
@@ -66,12 +66,12 @@ class MonitoringService {
       context: {
         page: window.location.pathname,
         module: context.module || 'System',
-        action: context.action || 'Operational Pulse',
+        action: context.action || 'Data Sync Event',
         browser: navigator.userAgent,
         isOnline: navigator.onLine
       },
       error: {
-        type: error?.name || 'PulseAnomaly',
+        type: error?.name || 'DataAnomaly',
         message: technicalMessage,
         technicalMessage,
         laymanExplanation,
@@ -97,7 +97,7 @@ class MonitoringService {
         const logRef = doc(db, 'error_logs', logEntry.id);
         await setDoc(logRef, sanitizeForFirestore(logEntry));
       } catch (e) {
-        console.error("Monitoring: Failed to commit error pulse to cloud ledger", e);
+        console.error("Monitoring: Failed to finalize error event to cloud ledger", e);
       }
     }
   }
@@ -107,7 +107,7 @@ class MonitoringService {
    */
   trackEvent(name: string, data: any) {
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📊 OPERATIONAL PULSE [${name}]:`, data);
+      logger.debug(`SYSTEM STATUS [${name}]:`, data);
     }
   }
 
@@ -139,7 +139,7 @@ class MonitoringService {
       return "Data fidelity check failed. Required parameters are missing.";
     }
 
-    return "An unexpected operational pulse anomaly occurred. Resilience protocols active.";
+    return "An unexpected data anomaly occurred. Recovery protocols active.";
   }
 }
 

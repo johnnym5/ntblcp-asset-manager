@@ -38,8 +38,8 @@ export function ErrorBoundary({ children, module = 'Application Shell', isGlobal
         />
       )}
       onReset={() => {
-        // Safe module re-initialization pulse
-        console.log(`♻️ Resetting ${module} pulse...`);
+        // Safe module re-initialization
+        monitoring.log(`Module ${module} recovering from error state`);
       }}
       onError={handleError}
     >

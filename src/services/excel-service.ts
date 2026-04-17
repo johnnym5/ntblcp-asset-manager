@@ -71,7 +71,7 @@ export const ExcelService = {
     fileName: string = `Registry-Export-${new Date().toISOString().split('T')[0]}.xlsx`
   ) {
     if (!assets || assets.length === 0) {
-      throw new Error("Registry is empty. No data pulses available for export.");
+      throw new Error("Registry is empty. No data available for export.");
     }
 
     const workbook = XLSX.utils.book_new();
@@ -133,7 +133,7 @@ export const ExcelService = {
             case 'subsection_name': row[label] = asset.subsection || ''; break;
             case 'status': row[label] = asset.status || ''; break;
             default:
-              // Robust fallback for metadata pulse
+              // Robust fallback for metadata fields
               row[label] = (asset.metadata as any)?.[label] || (asset.metadata as any)?.[key] || '';
           }
         });

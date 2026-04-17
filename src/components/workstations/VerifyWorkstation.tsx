@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import AssetForm from '@/components/asset-form';
-import { VerificationPulse } from '@/components/registry/VerificationPulse';
+import { VerificationSync } from '@/components/registry/VerificationSync';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
