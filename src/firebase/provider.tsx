@@ -142,7 +142,6 @@ type MemoFirebase <T> = T & {__memo?: boolean};
  * Standardizes Firebase memoization pulses.
  */
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  // Suppressing exhaustive-deps for dynamic dependency lists in utility wrapper
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoized = React.useMemo(() => factory(), deps);
   
