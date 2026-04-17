@@ -43,7 +43,6 @@ const TARGET_FIELDS = [
 export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperProps) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
 
-  // Auto-suggest mapping logic
   useEffect(() => {
     const initialMap: Record<string, string> = {};
     headers.forEach(header => {

@@ -115,7 +115,6 @@ export function ImportWorkstation() {
       setWorkbookData(wbData);
       setDiscoveredGroups(allGroups);
       
-      // Auto-select ONLY matched groups to encourage setup of others
       setSelectedIds(new Set(allGroups.filter(g => g.isTemplateMatched).map(g => g.id)));
 
       setTimeout(() => {
@@ -294,7 +293,7 @@ export function ImportWorkstation() {
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
                 <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Start New Import</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">Select an Excel file to scan for asset folders and records.</p>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">&quot;Select an Excel file to scan for asset folders and records.&quot;</p>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Excel File</Button>
               </Card>
             </motion.div>

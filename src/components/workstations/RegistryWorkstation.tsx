@@ -470,12 +470,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     try {
       addNotification({ title: "Syncing Folder...", description: `Uploading ${folderAssets.length} changes from ${cat}.` });
       
-      // 1. Upload each record to Cloud Authority
       for (const asset of folderAssets) {
         await FirestoreService.saveAsset(asset);
       }
 
-      // 2. Update local storage to reflect parity
       const currentLocal = await storage.getAssets();
       const updatedLocal = currentLocal.map(a => {
         if (a.category === cat && a.syncStatus === 'local') {
@@ -485,7 +483,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
       await storage.saveAssets(updatedLocal);
 
-      // 3. Clear pending operations for these assets from the queue
       const queue = await storage.getQueue();
       const folderAssetIds = new Set(folderAssets.map(a => a.id));
       for (const entry of queue) {
@@ -518,12 +515,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     try {
       await FirestoreService.saveAsset(asset);
       
-      // Update local storage status
       const currentLocal = await storage.getAssets();
       const updatedLocal = currentLocal.map(a => a.id === id ? { ...a, syncStatus: 'synced' as const } : a);
       await storage.saveAssets(updatedLocal);
 
-      // Remove from write-ahead queue
       const queue = await storage.getQueue();
       for (const entry of queue) {
         if ((entry.payload as any).id === id) {
