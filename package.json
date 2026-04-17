@@ -41,8 +41,8 @@
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "docx": "^8.5.0",
-    "firebase": "^11.9.1",
     "file-saver": "^2.0.5",
+    "firebase": "^11.9.1",
     "framer-motion": "^11.2.10",
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.0",
@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
-    "@types/node": "^20",
+    "@types/node": "^20.14.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^9.0.8",
