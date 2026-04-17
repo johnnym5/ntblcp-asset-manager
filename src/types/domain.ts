@@ -1,6 +1,7 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Authoritative type definitions for the entire application pulse.
+ * Updated Phase 1940: Added missing technical fields to the Asset interface.
  */
 
 import { type Dispatch, type SetStateAction } from 'react';
@@ -176,6 +177,7 @@ export interface Asset {
   // Financial & Technical
   purchaseDate?: string;
   value: number;
+  purchasePriceUsd?: number;
   serialNumber: string;
   assetIdCode?: string;
   manufacturer?: string;
@@ -184,6 +186,11 @@ export interface Asset {
   engineNo?: string;
   supplier?: string;
   remarks?: string;
+  grnNo?: string;
+  pvNo?: string;
+  pvJvNo?: string;
+  usefulLifeYears?: string;
+  funder?: string;
   
   classification?: AssetClassification;
 

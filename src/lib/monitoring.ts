@@ -1,12 +1,15 @@
 /**
  * @fileOverview Advanced Error Monitoring & Resilience Service.
  * Translates technical failures into layman-friendly pulses and logs audits to the cloud.
+ * Phase 1980: Removed FirestoreService dependency to break circular module loop.
  */
 
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { FirestoreService } from '@/services/firebase/firestore';
+import { doc, setDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { sanitizeForFirestore } from '@/lib/utils';
 import type { ErrorLogEntry, ErrorSeverity } from '@/types/domain';
 
 export interface TraceContext {
@@ -42,6 +45,7 @@ class MonitoringService {
 
   /**
    * Captures, translates, and logs an error to the administrative audit ledger.
+   * Directly uses Firestore SDK to avoid circular service dependencies.
    */
   async trackError(error: any, context: TraceContext = {}, severity: ErrorSeverity = 'WARNING') {
     if (typeof window === 'undefined') return;
@@ -87,11 +91,14 @@ class MonitoringService {
       console.groupEnd();
     }
 
-    // Direct cloud archival using the dedicated firestore service
-    try {
-      await FirestoreService.logErrorAudit(logEntry);
-    } catch (e) {
-      console.error("Monitoring: Failed to commit error pulse to cloud ledger", e);
+    // Direct cloud archival
+    if (db) {
+      try {
+        const logRef = doc(db, 'error_logs', logEntry.id);
+        await setDoc(logRef, sanitizeForFirestore(logEntry));
+      } catch (e) {
+        console.error("Monitoring: Failed to commit error pulse to cloud ledger", e);
+      }
     }
   }
 

@@ -4,6 +4,7 @@
  * @fileOverview Inventory Pulse - High-Fidelity Sliding Cascade.
  * Phase 1600: Integrated navigation controls & Swipe actions.
  * Phase 1601: Implemented unlimited loop logic.
+ * Phase 1602: Added setIsExplored to direct navigation pulse.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -50,7 +51,8 @@ export function AssetSummaryDashboard() {
         filteredAssets,
         setActiveView,
         appSettings,
-        setSearchTerm
+        setSearchTerm,
+        setIsExplored
     } = useAppState();
 
     const [scrollIndex, setScrollIndex] = useState(0);
@@ -98,7 +100,11 @@ export function AssetSummaryDashboard() {
                 id: 'missing-model',
                 label: 'Model No Gaps',
                 description: 'Equipment items missing specific model identification.',
-                count: assets.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A')).length,
+                count: assets.filter(a => {
+                  const hasModel = !!a.modelNumber && a.modelNumber !== 'N/A';
+                  const hasMetaModel = !!(a.metadata as any)?.['Model Number'] || !!(a.metadata as any)?.['Model No'];
+                  return !isVehicle(a) && !hasModel && !hasMetaModel;
+                }).length,
                 icon: Info,
                 color: 'bg-amber-500',
                 token: 'MISSING_MODEL',
@@ -202,6 +208,7 @@ export function AssetSummaryDashboard() {
 
     const navigateTo = (token: string) => {
         setSearchTerm(token);
+        setIsExplored(true); // Jump straight to asset list, skip folder browse
         setActiveView('REGISTRY');
     };
 

@@ -7,6 +7,8 @@
  * Phase 1525: Resolved optionsMap ReferenceError by implementing deterministic value discovery.
  * Phase 1530: Implemented unified handleUpdateHeader logic for in-place folder setup.
  * Phase 1805: Integrated UserPermissions for functional lockdown.
+ * Phase 1990: Implemented handleSyncFolderPulse and handleSyncAssetPulse for contextual sync.
+ * Phase 2000: Added explicit Refresh button to header for manual reconciliation.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -38,7 +40,9 @@ import {
   FileDown,
   ArrowRight,
   FileUp,
-  PlusCircle
+  PlusCircle,
+  CloudUpload,
+  RefreshCw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +58,7 @@ import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord, normalizeHeaderName } from '@/lib/registry-utils';
 import { cn, sanitizeSearch, getFuzzySignature } from '@/lib/utils';
 import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
 import { Input } from '@/components/ui/input';
 import { addNotification } from '@/hooks/use-notifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -82,11 +87,11 @@ import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-bat
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import { FirestoreService } from '@/services/firebase/firestore';
-import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
 import type { Asset, SheetDefinition, DisplayField } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -123,8 +128,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   } = useAppState();
   
   const { userProfile } = useAuth();
+  const { toast } = useToast();
   const isMobile = useIsMobile();
   
+  // UI State
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -149,6 +156,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const perms = userProfile?.permissions;
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -451,6 +460,53 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleSyncFolderPulse = async (cat: string) => {
+    if (!isOnline) {
+      addNotification({ title: "Offline", description: "Internet required to sync folder.", variant: "destructive" });
+      return;
+    }
+    const folderAssets = assets.filter(a => a.category === cat && a.syncStatus === 'local');
+    if (folderAssets.length === 0) {
+      addNotification({ title: "Folder Synced", description: `"${cat}" is already in parity with the cloud.` });
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      addNotification({ title: "Syncing Folder...", description: `Uploading ${folderAssets.length} changes from ${cat}.` });
+      for (const asset of folderAssets) {
+        await FirestoreService.saveAsset(asset);
+      }
+      await refreshRegistry();
+      addNotification({ title: "Folder Sync Complete", variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Sync Failure", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSyncAssetPulse = async (id: string) => {
+    if (!isOnline) {
+      addNotification({ title: "Offline", description: "Internet required to sync record.", variant: "destructive" });
+      return;
+    }
+    const asset = assets.find(a => a.id === id);
+    if (!asset || asset.syncStatus === 'synced') {
+        if (asset?.syncStatus === 'synced') addNotification({ title: "Asset Synced", description: "Record already in parity." });
+        return;
+    }
+    setIsProcessing(true);
+    try {
+      await FirestoreService.saveAsset(asset);
+      await refreshRegistry();
+      addNotification({ title: "Record Synced", variant: "success" });
+    } catch (e) {
+      addNotification({ title: "Sync Failure", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleExploreFolder = (cat: string) => {
     setSelectedCategories([cat]);
     setIsExplored(true);
@@ -464,6 +520,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await ExcelService.exportRegistry(selectedAssets, activeFolderHeaders);
       addNotification({ title: "Report Ready", variant: "success" });
     } catch (e) { addNotification({ title: "Export Failed", variant: "destructive" }); }
+  };
+
+  const handleManualRefreshPulse = async () => {
+    setIsProcessing(true);
+    try {
+      await refreshRegistry();
+      addNotification({ title: "Registry Reconciled", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const isSelectionBarVisible = (showList && selectedAssetIds.size > 0) || (!showList && selectedCategories.length > 0);
@@ -496,6 +562,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={handleManualRefreshPulse} 
+                      disabled={isProcessing}
+                      className="h-10 w-10 rounded-xl border-2 hover:bg-primary/10 text-primary transition-all shadow-sm shrink-0"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-[8px] font-black uppercase">Refresh Register</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {isQuickViewSetupActive && perms?.func_edit_headers && (
                 <Button onClick={handleSaveGlobalHeaders} disabled={isProcessing} className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl animate-in fade-in zoom-in-95">
                   {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Commit Arrangement
@@ -549,7 +632,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           {!showList ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
               {categories.map(cat => (
-                <TactileMenu key={cat} title="Folder Actions" options={[{ label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) }, { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); }, disabled: !perms?.func_import }, { label: 'Folder Setup', icon: Wrench, onClick: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } }, disabled: !perms?.func_edit_headers }, { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true, disabled: !perms?.func_delete_asset }] : [])]}>
+                <TactileMenu key={cat} title="Folder Actions" options={[
+                  { label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) }, 
+                  { label: 'Sync Folder', icon: CloudUpload, onClick: () => handleSyncFolderPulse(cat), disabled: !isOnline },
+                  { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, 
+                  ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); }, disabled: !perms?.func_import }, { label: 'Folder Setup', icon: Wrench, onClick: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } }, disabled: !perms?.func_edit_headers }, { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true, disabled: !perms?.func_delete_asset }] : [])
+                ]}>
                   <Card onClick={() => handleExploreFolder(cat)} className={cn("bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer min-h-[220px] flex flex-col justify-between", selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border")}>
                     <div>
                       <div className="flex justify-between items-start mb-6">
@@ -577,10 +665,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <AnimatePresence mode="popLayout">
                   {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <RegistryCard record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} onInspect={handleEditAsset} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} onToggleExpand={() => handleToggleExpand(asset.id)} onManageLabels={handleManageLabels} onQuickUpdate={handleQuickUpdate} onUpdateHeader={handleUpdateHeader} isSetupMode={isQuickViewSetupActive} />
+                      <RegistryCard record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} onInspect={handleEditAsset} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} onToggleExpand={() => handleToggleExpand(asset.id)} onManageLabels={handleManageLabels} onQuickUpdate={handleQuickUpdate} onUpdateHeader={handleUpdateHeader} onSync={handleSyncAssetPulse} isSetupMode={isQuickViewSetupActive} />
                     </motion.div>
                   )) : (
-                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} />
+                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} onSync={handleSyncAssetPulse} />
                   )}
                 </AnimatePresence>
               </div>
@@ -614,6 +702,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       onEdit={handleEditAsset} 
                       onQuickUpdate={handleQuickUpdate} 
                       onUpdateHeader={handleUpdateHeader} 
+                      onSync={handleSyncAssetPulse}
                       isHeaderEditingMode={isHeaderEditingMode} 
                     />
                   )}

@@ -6,6 +6,7 @@
  * Phase 812: Added Guidance Dictionary for field explanations.
  * Phase 813: Added LGA to default headers and ensured core property resolution.
  * Phase 814: Implemented resilient property resolver for snake_case/camelCase parity.
+ * Phase 815: Enhanced header normalization to handle typos (e.g. Asignee) and plurals.
  */
 
 import type { Asset } from "@/types/domain";
@@ -14,25 +15,33 @@ import { getFuzzySignature } from "./utils";
 
 /**
  * Normalizes source headers to canonical camelCase keys matching the Asset schema.
+ * Uses aggressive fuzzy detection to handle typos and pluralization.
  */
 export function normalizeHeaderName(name: string): string {
   let n = name.toLowerCase().trim();
   
+  // High-Fidelity Mapping Pulse
   if (n.includes("purchase price") && (n.includes("naira") || n.includes("(n)") || n.includes("ngn"))) return "value";
   if (n.includes("purchase price") && (n.includes("usd") || n.includes("[usd]"))) return "purchasePriceUsd";
-  if (n.includes("chq no") || n.includes("goods received note")) return "grnNo";
-  if (n.includes("assignee")) return "custodian";
-  if (n.includes("asset description")) return "description";
-  if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers") || n.includes("tag no")) return "assetIdCode";
-  if (n.includes("asset class") || n.includes("classification") || n === "category") return "category";
+  if (n.includes("chq no") || n.includes("goods received note") || n.includes("grn no") || n.includes("grn")) return "grnNo";
+  if (n.includes("assign") || n.includes("asign") || n.includes("auditor")) return "custodian";
+  if (n.includes("description")) return "description";
+  if (n.includes("tag") || n.includes("id code") || n.includes("id_code")) return "assetIdCode";
+  if (n.includes("class") || n.includes("categor") || n.includes("type")) return "category";
   if (n === "s/n" || n === "sn") return "sn";
-  if (n === "serial number" || n === "serial numbers") return "serialNumber";
-  if (n === "model number" || n === "model numbers" || n === "model no") return "modelNumber";
-  if (n.includes("chasis no") || n.includes("chassis no")) return "chassisNo";
-  if (n.includes("engine no")) return "engineNo";
+  if (n.includes("serial")) return "serialNumber";
+  if (n.includes("model")) return "modelNumber";
+  if (n.includes("chasis") || n.includes("chassis")) return "chassisNo";
+  if (n.includes("engine")) return "engineNo";
   if (n.includes("lga")) return "lga";
-  if (n.includes("date purchased") || n.includes("year of purchase") || n.includes("date received")) return "purchaseDate";
-  if (n.includes("useful life")) return "usefulLifeYears";
+  if (n.includes("supplier")) return "supplier";
+  if (n.includes("remark") || n.includes("comment")) return "remarks";
+  if (n.includes("pv no") || n.includes("pv/jv") || n.includes("voucher")) return "pvNo";
+  if (n.includes("date") || n.includes("year")) return "purchaseDate";
+  if (n.includes("life")) return "usefulLifeYears";
+  if (n.includes("funder") || n.includes("donor")) return "funder";
+  if (n.includes("site") || n.includes("facility")) return "site";
+  if (n.includes("manufacturer")) return "manufacturer";
 
   return n
     .replace(/[^a-z0-9]/g, "_")
@@ -57,7 +66,6 @@ export function getColorForSource(source: string, branding?: Record<string, stri
 
 /**
  * Baseline Generic Headers. 
- * Note: These are used as fallbacks only. Folder-specific templates override these.
  */
 export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">[] = [
   { 
@@ -101,6 +109,14 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
     example: "Ikeja, Alimosho, etc."
   },
   { 
+    rawName: "Assignee", 
+    displayName: "Assignee", 
+    normalizedName: "custodian", 
+    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Location",
+    guidance: "The officer or facility staff member responsible for the asset.",
+    example: "Dr. Ibrahim or Lab Unit"
+  },
+  { 
     rawName: "Condition", 
     displayName: "Condition", 
     normalizedName: "condition", 
@@ -115,29 +131,13 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
     visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
     guidance: "The unique manufacturer's code. For vehicles, use Chassis/Engine instead.",
     example: "ABC123456789"
-  },
-  { 
-    rawName: "Chassis No", 
-    displayName: "Chassis No", 
-    normalizedName: "chassisNo", 
-    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
-    guidance: "The unique Vehicle Identification Number (VIN) stamped on the frame. Primary ID for vehicles.",
-    example: "VIN-XXXX-XXXX"
-  },
-  { 
-    rawName: "Engine No", 
-    displayName: "Engine No", 
-    normalizedName: "engineNo", 
-    visible: true, table: true, quickView: true, inChecklist: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Identity",
-    guidance: "The unique ID of the vehicle's physical motor block.",
-    example: "E-12345-6789"
   }
 ];
 
 /**
  * Transforms a Domain Asset to an AssetRecord for the high-density grid.
  * Dynamically resolves values based on the PROVIDED headers (the folder's template).
- * Uses a resilient key resolver to handle snake_case and camelCase variants.
+ * Uses a resilient key resolver to handle root properties AND metadata fallbacks.
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
@@ -168,19 +168,24 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "remarks": rawValue = asset.remarks; break;
       case "value": rawValue = asset.value; break;
       case "purchasedate": rawValue = asset.purchaseDate; break;
-      case "source_sheet": rawValue = asset.importMetadata?.sheetName; break;
-      case "row_number": rawValue = asset.importMetadata?.rowNumber; break;
+      case "supplier": rawValue = asset.supplier; break;
+      case "grnno": rawValue = asset.grnNo; break;
+      case "pvno": rawValue = asset.pvNo; break;
+      case "usefullifeyears": rawValue = asset.usefulLifeYears; break;
+      case "funder": rawValue = asset.funder; break;
+      case "site": rawValue = asset.site; break;
     }
 
     // 2. Fuzzy Discovery Pulse: If core prop is empty, hunt in metadata
-    const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a";
+    const isEmpty = rawValue === undefined || rawValue === null || String(rawValue).trim() === "" || String(rawValue).trim().toLowerCase() === "n/a" || String(rawValue).trim() === "---";
     
     if (isEmpty) {
       const meta = asset.metadata || {};
-      // Exact Match
+      
+      // Try exact matches on raw metadata keys
       rawValue = meta[header.rawName] || meta[header.displayName] || meta[header.normalizedName];
       
-      // Fuzzy Fingerprint Match
+      // Try fuzzy signature match
       if (rawValue === undefined || rawValue === null) {
         const fuzzyHeader = getFuzzySignature(header.displayName);
         const matchedKey = Object.keys(meta).find(k => getFuzzySignature(k) === fuzzyHeader);

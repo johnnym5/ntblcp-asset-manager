@@ -6,6 +6,7 @@
  * Phase 1501: Integrated inline high-speed verification controls with color-coding.
  * Phase 1502: Added Folder column for combined project views.
  * Phase 1503: Implemented Explicit Save button for Remarks input.
+ * Phase 1990: Added TactileMenu integration for single-asset sync pulse.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -22,7 +23,9 @@ import {
   XCircle,
   Clock,
   FolderOpen,
-  Save
+  Save,
+  CloudUpload,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -34,9 +37,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TactileMenu } from '@/components/TactileMenu';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -46,6 +51,7 @@ interface RegistryTableProps {
   onSelectAll: (checked: boolean) => void;
   onToggleExpand: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
+  onSync?: (id: string) => void;
 }
 
 const TableRemarkInput = ({ record, onUpdate }: { record: AssetRecord, onUpdate: (id: string, updates: any) => void }) => {
@@ -89,12 +95,16 @@ export function RegistryTable({
   onToggleSelect, 
   onSelectAll,
   onToggleExpand,
-  onQuickUpdate
+  onQuickUpdate,
+  onSync,
+  onInspect
 }: RegistryTableProps) {
-  const { appSettings } = useAppState();
+  const { appSettings, isOnline } = useAppState();
+  const { userProfile } = useAuth();
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isVerificationMode = appSettings?.appMode === 'verification';
+  const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   // Determine if we should show the category column (if multiple categories exist in the view)
   const uniqueCategories = Array.from(new Set(records.map(r => r.sourceSheet)));
@@ -139,110 +149,124 @@ export function RegistryTable({
           const grantId = (record.rawRow as any).grantId;
           const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
+          const menuOptions = [
+            { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand(record.id) },
+            { label: 'Edit Record', icon: Edit3, onClick: () => onInspect?.(record.id) }
+          ];
+
+          if (syncStatus === 'local') {
+            menuOptions.push({ label: 'Sync Record', icon: CloudUpload, onClick: () => onSync?.(record.id), disabled: !isOnline });
+          }
+
+          if (isAdmin) {
+            menuOptions.push({ label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true });
+          }
+
           return (
-            <div 
-              key={record.id} 
-              className={cn(
-                "h-16 flex items-center px-6 rounded-2xl border-2 transition-all duration-300 group cursor-pointer",
-                isSelected ? "border-primary/40 bg-primary/[0.03] shadow-lg" : "border-border/40 bg-card hover:border-primary/20",
-                isVerificationMode && isVerified && !isSelected && "bg-green-500/[0.02] border-green-500/10",
-                isVerificationMode && !isVerified && !isSelected && "bg-red-500/[0.02] border-red-500/10"
-              )}
-              onClick={() => onToggleExpand(record.id)}
-            >
-              <div className="w-10 shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                <Checkbox 
-                  checked={isSelected} 
-                  onCheckedChange={() => onToggleSelect(record.id)}
-                  className="h-5 w-5 rounded-full border-2 border-border data-[state=checked]:bg-primary"
-                />
-              </div>
-
-              <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
-                {/* Col 1: S/N */}
-                <div className="col-span-1">
-                  <span className="text-[10px] font-mono font-black text-muted-foreground/40">{record.sn || '---'}</span>
-                </div>
-
-                {/* Col 2: Identification */}
-                <div className={showCategoryCol ? "col-span-3 flex items-center gap-3 min-w-0" : "col-span-4 flex items-center gap-3 min-w-0"}>
-                  <div className={cn(
-                    "p-1.5 rounded-lg border shrink-0",
-                    syncStatus === 'synced' ? "bg-green-500/5 border-green-500/20 text-green-600" : "bg-blue-500/5 border-blue-500/20 text-blue-600"
-                  )}>
-                    {syncStatus === 'synced' ? <Globe className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-black uppercase text-foreground leading-none truncate">{String(record.rawRow.description || 'Untitled Asset')}</span>
-                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {record.rawRow.assetIdCode || 'UNSET'}</span>
-                  </div>
-                </div>
-
-                {/* Optional Folder Column */}
-                {showCategoryCol && (
-                  <div className="col-span-2 min-w-0 flex flex-col gap-1">
-                    <span className="text-[7px] font-black uppercase text-primary tracking-tighter truncate opacity-60">
-                      {grantName}
-                    </span>
-                    <Badge variant="outline" className="border-border/60 text-[8px] font-black uppercase tracking-tighter truncate max-w-full">
-                      <FolderOpen className="h-2.5 w-2.5 mr-1 text-primary opacity-60" />
-                      {record.sourceSheet}
-                    </Badge>
-                  </div>
+            <TactileMenu key={record.id} title="Asset Options" options={menuOptions}>
+              <div 
+                className={cn(
+                  "h-16 flex items-center px-6 rounded-2xl border-2 transition-all duration-300 group cursor-pointer",
+                  isSelected ? "border-primary/40 bg-primary/[0.03] shadow-lg" : "border-border/40 bg-card hover:border-primary/20",
+                  isVerificationMode && isVerified && !isSelected && "bg-green-500/[0.02] border-green-500/10",
+                  isVerificationMode && !isVerified && !isSelected && "bg-red-500/[0.02] border-red-500/10"
                 )}
-
-                {/* Col 3: Scope */}
-                <div className="col-span-2 min-w-0">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-black uppercase text-foreground/80 truncate leading-none">{String(record.rawRow.location || 'Global')}</span>
-                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter mt-1 truncate">{String(record.rawRow.custodian || 'Unassigned')}</span>
-                  </div>
+                onClick={() => onToggleExpand(record.id)}
+              >
+                <div className="w-10 shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox 
+                    checked={isSelected} 
+                    onCheckedChange={() => onToggleSelect(record.id)}
+                    className="h-5 w-5 rounded-full border-2 border-border data-[state=checked]:bg-primary"
+                  />
                 </div>
 
-                {/* Col 4: Assessment / Actions */}
-                <div className="col-span-4" onClick={e => e.stopPropagation()}>
-                  {isVerificationMode ? (
-                    <div className="flex items-center gap-3">
-                      <Button 
-                        size="sm" 
-                        onClick={() => onQuickUpdate?.(record.id, { status: isVerified ? 'UNVERIFIED' : 'VERIFIED' })}
-                        className={cn(
-                          "h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md",
-                          isVerified ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
-                        )}
-                      >
-                        {isVerified ? <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> : <XCircle className="h-3.5 w-3.5 mr-1.5" />}
-                        {isVerified ? 'Verified' : 'Confirm'}
-                      </Button>
+                <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
+                  {/* Col 1: S/N */}
+                  <div className="col-span-1">
+                    <span className="text-[10px] font-mono font-black text-muted-foreground/40">{record.sn || '---'}</span>
+                  </div>
 
-                      <Select 
-                        value={String(record.rawRow.condition || '')} 
-                        onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
-                      >
-                        <SelectTrigger className="h-9 w-28 bg-muted/20 border-border/40 text-[9px] font-black uppercase rounded-xl">
-                          <SelectValue placeholder="Condition" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border-border">
-                          {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      {onQuickUpdate && <TableRemarkInput record={record} onUpdate={onQuickUpdate} />}
+                  {/* Col 2: Identification */}
+                  <div className={showCategoryCol ? "col-span-3 flex items-center gap-3 min-w-0" : "col-span-4 flex items-center gap-3 min-w-0"}>
+                    <div className={cn(
+                      "p-1.5 rounded-lg border shrink-0",
+                      syncStatus === 'synced' ? "bg-green-500/5 border-green-500/20 text-green-600" : "bg-blue-500/5 border-blue-500/20 text-blue-600"
+                    )}>
+                      {syncStatus === 'synced' ? <Globe className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
                     </div>
-                  ) : (
-                    <div className="flex justify-end pr-4">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-10 w-10 rounded-xl bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-40 group-hover/item:opacity-100"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[13px] font-black uppercase text-foreground leading-none truncate">{String(record.rawRow.description || 'Untitled Asset')}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {record.rawRow.assetIdCode || 'UNSET'}</span>
+                    </div>
+                  </div>
+
+                  {/* Optional Folder Column */}
+                  {showCategoryCol && (
+                    <div className="col-span-2 min-w-0 flex flex-col gap-1">
+                      <span className="text-[7px] font-black uppercase text-primary tracking-tighter truncate opacity-60">
+                        {grantName}
+                      </span>
+                      <Badge variant="outline" className="border-border/60 text-[8px] font-black uppercase tracking-tighter truncate max-w-full">
+                        <FolderOpen className="h-2.5 w-2.5 mr-1 text-primary opacity-60" />
+                        {record.sourceSheet}
+                      </Badge>
                     </div>
                   )}
+
+                  {/* Col 3: Scope */}
+                  <div className="col-span-2 min-w-0">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-black uppercase text-foreground/80 truncate leading-none">{String(record.rawRow.location || 'Global')}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-tighter mt-1 truncate">{String(record.rawRow.custodian || 'Unassigned')}</span>
+                    </div>
+                  </div>
+
+                  {/* Col 4: Assessment / Actions */}
+                  <div className="col-span-4" onClick={e => e.stopPropagation()}>
+                    {isVerificationMode ? (
+                      <div className="flex items-center gap-3">
+                        <Button 
+                          size="sm" 
+                          onClick={() => onQuickUpdate?.(record.id, { status: isVerified ? 'UNVERIFIED' : 'VERIFIED' })}
+                          className={cn(
+                            "h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md",
+                            isVerified ? "bg-green-600 hover:bg-green-500 text-white" : "bg-red-600 hover:bg-red-500 text-white"
+                          )}
+                        >
+                          {isVerified ? <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> : <XCircle className="h-3.5 w-3.5 mr-1.5" />}
+                          {isVerified ? 'Verified' : 'Confirm'}
+                        </Button>
+
+                        <Select 
+                          value={String(record.rawRow.condition || '')} 
+                          onValueChange={(v) => onQuickUpdate?.(record.id, { condition: v })}
+                        >
+                          <SelectTrigger className="h-9 w-28 bg-muted/20 border-border/40 text-[9px] font-black uppercase rounded-xl">
+                            <SelectValue placeholder="Condition" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border-border">
+                            {ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-[9px] font-bold uppercase">{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+
+                        {onQuickUpdate && <TableRemarkInput record={record} onUpdate={onQuickUpdate} />}
+                      </div>
+                    ) : (
+                      <div className="flex justify-end pr-4">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-10 w-10 rounded-xl bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-40 group-hover/item:opacity-100"
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </TactileMenu>
           );
         })}
       </div>
