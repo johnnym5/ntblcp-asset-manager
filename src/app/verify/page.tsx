@@ -33,7 +33,7 @@ import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 
 export default function VerificationQueuePage() {
-  const { assets, refreshRegistry, settingsLoaded, activeGrantId } = useAppState();
+  const { assets, refreshRegistry, settingsLoaded } = useAppState();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -223,7 +223,6 @@ export default function VerificationQueuePage() {
           toast({ title: "Assessment Committed" });
           setIsFormOpen(false);
         }}
-        onQuickSave={async () => {}}
         isReadOnly={false}
       />
     </AppLayout>

@@ -93,7 +93,7 @@ export default function AssetForm({
     if (!grant) return null;
     const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(category));
     return defKey ? grant.sheetDefinitions[defKey] : null;
-  }, [asset?.category, form.watch('category'), appSettings]);
+  }, [asset?.category, form, appSettings]);
 
   useEffect(() => {
     if (isOpen) {

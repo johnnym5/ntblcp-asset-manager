@@ -7,7 +7,7 @@
  * Phase 1912: Implementation of Location-Scoped Cloud Pull.
  * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
  * Phase 1960: Overhauled filteredAssets logic to support advanced logic tokens from Dashboard Pulses.
- * Phase 1995: Fixed Context Provider value to include all missing state properties.
+ * Phase 1995: Fixed Context Provider value to include all missing state properties and activeGrantId.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -52,6 +52,7 @@ interface AppStateContextType {
   settingsLoaded: boolean;
   isHydrated: boolean;
   activeGrantIds: string[];
+  activeGrantId: string | null;
   activeView: WorkstationView;
   setActiveView: (view: WorkstationView) => void;
   refreshRegistry: () => Promise<void>;
@@ -166,6 +167,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
   const activeGrantIds = useMemo(() => appSettings?.activeGrantIds || [], [appSettings]);
+  const activeGrantId = useMemo(() => appSettings?.activeGrantId || activeGrantIds[0] || null, [appSettings, activeGrantIds]);
 
   const refreshRegistry = useCallback(async () => {
     try {
@@ -574,7 +576,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantIds, activeView, setActiveView: setActiveViewStatus,
+      activeGrantIds, activeGrantId, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload, executeSync, syncSummary, isSyncConfirmOpen, setIsSyncConfirmOpen,
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,

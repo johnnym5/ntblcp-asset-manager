@@ -1,12 +1,12 @@
-
 'use client';
 
 /**
  * @fileOverview Reporting Workstation & Data Quality Suite.
  * Phase 56: Integrated Exception PDF Pulse for Management.
+ * Phase 1926: Hardened runAuditPulse with useCallback for build stability.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,13 +58,7 @@ export default function ReportsPage() {
   const [isFixing, setIsFixing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    if (activeTab === 'quality') {
-      runAuditPulse();
-    }
-  }, [activeTab, assets]);
-
-  const runAuditPulse = async () => {
+  const runAuditPulse = useCallback(async () => {
     setIsScanning(true);
     try {
       const auditIssues = await IntegrityEngine.runFullAudit(assets);
@@ -72,7 +66,13 @@ export default function ReportsPage() {
     } finally {
       setIsScanning(false);
     }
-  };
+  }, [assets]);
+
+  useEffect(() => {
+    if (activeTab === 'quality') {
+      runAuditPulse();
+    }
+  }, [activeTab, runAuditPulse]);
 
   const handleFixCasing = async (issue: IntegrityIssue) => {
     setIsFixing(true);
