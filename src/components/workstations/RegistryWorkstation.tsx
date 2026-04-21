@@ -2,7 +2,7 @@
 
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
- * Phase 2015: Synchronized sync logic and fixed syntax errors in maintenance dialogs.
+ * Phase 2018: Synchronized sync logic and fixed syntax errors in maintenance dialogs.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -82,7 +82,7 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { TactileMenu } from '@/components/TactileMenu';
-import type { Asset, SheetDefinition, DisplayField } from '@/types/domain';
+import type { Asset, SheetDefinition, DisplayField, Grant, AppSettings } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -772,23 +772,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={selectedSheetDef} originalSheetName={originalSheetName} onSave={(orig, newDef, all) => {
-          const grant = appSettings?.grants.find(g => g.sheetDefinitions[originalSheetName || ''] || g.sheetDefinitions[newDef.name]);
-          if (!grant) return;
-          const updatedGrants = appSettings?.grants.map(g => {
-            if (g.id === grant.id) {
-              const newSheetDefs = { ...g.sheetDefinitions, [newDef.name]: newDef };
+          if (!appSettings) return;
+          const updatedGrants = appSettings.grants.map(grant => {
+            if (activeGrantIdForSchema === grant.id) {
+              const newSheetDefs = { ...grant.sheetDefinitions, [newDef.name]: newDef };
               if (originalSheetName && originalSheetName !== newDef.name) delete newSheetDefs[originalSheetName];
               return { ...grant, sheetDefinitions: newSheetDefs };
             }
-            return g;
+            return grant;
           });
-          if (appSettings) {
-            const nextSettings = { ...appSettings, grants: updatedGrants };
-            setAppSettings(nextSettings);
-            storage.saveSettings(nextSettings);
-            if (isOnline) FirestoreService.updateSettings(nextSettings);
-            addNotification({ title: "Setup Updated", variant: "success" });
-          }
+          const nextSettings = { ...appSettings, grants: updatedGrants };
+          setAppSettings(nextSettings);
+          storage.saveSettings(nextSettings);
+          if (isOnline) FirestoreService.updateSettings(nextSettings);
+          addNotification({ title: "Setup Updated", variant: "success" });
         }} />
       )}
     </div>

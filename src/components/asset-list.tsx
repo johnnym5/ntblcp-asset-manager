@@ -3,8 +3,7 @@
 /**
  * @fileOverview Legacy Asset List Component.
  * Fixed for production build: synchronized property accessors with domain Asset interface.
- * Phase 2015: assignee -> custodian, verifiedStatus -> status.
- * Phase 2016: Escaped reserved characters for ESLint compliance.
+ * Phase 2018: Resolved 'assignee' and 'verifiedStatus' type errors.
  */
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -365,10 +364,6 @@ export default function AssetList() {
 
   const handleSaveColumnSettings = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
     addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
-  };
-
-  const handleSyncConfirm = () => {
-    // sync confirm pulse
   };
 
   const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {

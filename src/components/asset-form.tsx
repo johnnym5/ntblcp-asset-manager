@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Phase 2015: Synchronized with domain.ts and implemented strict administrative governance.
+ * Phase 2018: Strict administrative governance. Non-admin updates are sequestered for review.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -52,7 +52,7 @@ import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
 import { getCanonicalGroup } from "@/lib/condition-logic";
 import type { Asset } from "@/types/domain";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { addNotification } from "@/hooks/use-notifications";
 
 interface AssetFormProps {
@@ -196,15 +196,17 @@ export default function AssetForm({
       <div className="flex items-center gap-2 mb-1.5">
         <FormLabel className="text-[9px] font-black uppercase text-white/40 mb-0">{label}</FormLabel>
         {header?.guidance && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40" /></div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
-              <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
-              <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40" /></div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
+                <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
+                <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     );

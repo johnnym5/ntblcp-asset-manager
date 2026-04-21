@@ -1,7 +1,7 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Authoritative type definitions for the entire asset management system.
- * Updated Phase 2015: Synchronized for strict type parity in AssetForm and legacy lists.
+ * Updated Phase 2018: Synchronized for strict type parity and build stability.
  */
 
 import type { RegistryHeader, HeaderFilter } from './registry';
@@ -191,9 +191,6 @@ export interface Asset {
     lng: number;
     accuracy?: number;
   };
-  // Legacy aliases for build compatibility
-  assignee?: string;
-  verifiedStatus?: VerificationStatus;
 }
 
 export interface DisplayField {

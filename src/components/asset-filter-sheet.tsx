@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Filter Engine.
- * Phase 2015: Synchronized OptionType import with central domain models.
+ * Phase 2018: Fixed OptionType import path for build stability.
  */
 
 import React from 'react';
