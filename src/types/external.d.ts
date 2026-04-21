@@ -1,0 +1,9 @@
+declare module 'html5-qrcode';
+declare module 'recharts';
+declare module 'react-error-boundary';
+declare module 'jspdf';
+declare module 'jspdf-autotable';
+declare module 'xlsx';
+declare module 'file-saver';
+declare module 'uuid';
+declare module '@radix-ui/react-context-menu';

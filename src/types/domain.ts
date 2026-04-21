@@ -232,6 +232,17 @@ export interface Asset {
   };
   adminComment?: string;
   yearBucket?: number;
+
+  // Custom fields from models.ts
+  customField1?: string;
+  customField2?: string;
+  customField3?: string;
+  customField4?: string;
+  customField5?: string;
+
+  // Compatibility fields
+  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
+  verifiedDate?: string;
 }
 
 export interface DisplayField {
@@ -267,24 +278,37 @@ export interface AppSettings {
   authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
-  readAuthority: AuthorityNode;
-  activeGrantId?: string;
+  readAuthority?: AuthorityNode; // Optional to support legacy
+  activeGrantId: string | null;
   activeGrantIds: string[]; // Enabled multiple projects
   grants: Grant[];
-  uxMode: UXMode;
-  onboardingComplete: boolean;
-  showHelpTooltips: boolean;
-  sourceBranding: Record<string, string>;
+  uxMode?: UXMode;
+  onboardingComplete?: boolean;
+  showHelpTooltips?: boolean;
+  sourceBranding?: Record<string, string>;
   globalHeaders?: RegistryHeader[];
+  locations?: string[];
+  defaultDataSource?: 'cloud' | 'local_locked';
+  activeDatabase?: 'firestore' | 'rtdb';
+  lastModified?: string;
+  lastModifiedBy?: {
+    displayName: string;
+    loginName: string;
+  };
+  settingsHistory?: HistoricalAppSettings[];
+}
+
+export interface HistoricalAppSettings extends Omit<AppSettings, 'settingsHistory' | 'grants'> {
+    grants: Omit<Grant, 'sheetDefinitions'>[];
 }
 
 export interface AuthorizedUser {
   loginName: string;
   displayName: string;
-  email: string;
+  email?: string;
   password?: string;
   states: string[];
-  role: UserRole;
+  role?: UserRole;
   isAdmin: boolean;
   isGuest?: boolean;
   isSuperAdmin?: boolean; 
@@ -292,6 +316,7 @@ export interface AuthorizedUser {
   assignedZone?: string;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
   permissions?: UserPermissions;
 }
 
