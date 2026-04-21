@@ -27,14 +27,7 @@ interface TactileOption {
   disabled?: boolean;
 }
 
-interface TactileMenuProps {
-  children: React.ReactNode;
-  title?: string;
-  options: TactileOption[];
-  className?: string;
-}
-
-export function TactileMenu({ children, title, options, className }: TactileMenuProps) {
+export function TactileMenu({ children, title, options, className }: { children: React.ReactNode; title?: string; options: TactileOption[]; className?: string }) {
   const triggerRef = React.useRef<HTMLDivElement>(null);
 
   const lp = useLongPress(() => {
@@ -68,8 +61,7 @@ export function TactileMenu({ children, title, options, className }: TactileMenu
           {options.map((opt, i) => (
             <ContextMenuItem 
               key={`${opt.label}-${i}`} 
-              onSelect={(e) => { 
-                e.stopPropagation(); 
+              onSelect={() => { 
                 if (opt.onSelect) opt.onSelect();
                 else if (opt.onClick) opt.onClick();
               }}

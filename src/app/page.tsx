@@ -39,7 +39,8 @@ import {
   LayoutGrid,
   X,
   Terminal,
-  Filter
+  Filter,
+  CloudUpload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -147,24 +148,24 @@ export default function HomeHub() {
     const base = [];
     
     // Page access logic
-    if (perms?.page_dashboard) base.push({ label: 'Home Hub', icon: LayoutDashboard, onClick: () => setActiveView('DASHBOARD') });
-    if (perms?.page_registry) base.push({ label: 'Asset List', icon: FolderOpen, onClick: () => setActiveView('REGISTRY') });
-    if (perms?.page_registry) base.push({ label: 'Verification Queue', icon: ClipboardCheck, onClick: () => setActiveView('VERIFY') });
-    if (perms?.page_groups) base.push({ label: 'Folder Browse', icon: LayoutGrid, onClick: () => setActiveView('GROUPS') });
-    if (perms?.page_reports) base.push({ label: 'Report Center', icon: FileText, onClick: () => setActiveView('REPORTS') });
-    if (perms?.page_alerts) base.push({ label: 'Issue Alerts', icon: ShieldAlert, onClick: () => setActiveView('ALERTS') });
-    if (perms?.page_audit_log) base.push({ label: 'Activity History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') });
-    if (perms?.page_sync_queue) base.push({ label: 'Sync Queue', icon: Activity, onClick: () => setActiveView('SYNC_QUEUE') });
+    if (perms?.page_dashboard) base.push({ label: 'Home Hub', icon: LayoutDashboard, onSelect: () => setActiveView('DASHBOARD') });
+    if (perms?.page_registry) base.push({ label: 'Asset List', icon: FolderOpen, onSelect: () => setActiveView('REGISTRY') });
+    if (perms?.page_registry) base.push({ label: 'Verification Queue', icon: ClipboardCheck, onSelect: () => setActiveView('VERIFY') });
+    if (perms?.page_groups) base.push({ label: 'Folder Browse', icon: LayoutGrid, onSelect: () => setActiveView('GROUPS') });
+    if (perms?.page_reports) base.push({ label: 'Report Center', icon: FileText, onSelect: () => setActiveView('REPORTS') });
+    if (perms?.page_alerts) base.push({ label: 'Issue Alerts', icon: ShieldAlert, onSelect: () => setActiveView('ALERTS') });
+    if (perms?.page_audit_log) base.push({ label: 'Activity History', icon: HistoryIcon, onSelect: () => setActiveView('AUDIT_LOG') });
+    if (perms?.page_sync_queue) base.push({ label: 'Sync Queue', icon: Activity, onSelect: () => setActiveView('SYNC_QUEUE') });
 
     if (isAdmin) {
-      if (perms?.func_import) base.push({ label: 'Import Data', icon: FileUp, onClick: () => setActiveView('IMPORT') });
-      if (perms?.page_users) base.push({ label: 'Personnel List', icon: UserIcon, onClick: () => setActiveView('USERS') });
-      if (perms?.page_settings) base.push({ label: 'System Settings', icon: SettingsIcon, onClick: () => setActiveView('SETTINGS') });
+      if (perms?.func_import) base.push({ label: 'Import Data', icon: FileUp, onSelect: () => setActiveView('IMPORT') });
+      if (perms?.page_users) base.push({ label: 'Personnel List', icon: UserIcon, onSelect: () => setActiveView('USERS') });
+      if (perms?.page_settings) base.push({ label: 'System Settings', icon: SettingsIcon, onSelect: () => setActiveView('SETTINGS') });
     }
 
     if (userProfile?.role === 'SUPERADMIN') {
-      if (perms?.page_infrastructure) base.push({ label: 'System Infrastructure', icon: Monitor, onClick: () => setActiveView('INFRASTRUCTURE') });
-      if (perms?.page_database) base.push({ label: 'Database Center', icon: Terminal, onClick: () => setActiveView('DATABASE') });
+      if (perms?.page_infrastructure) base.push({ label: 'System Infrastructure', icon: Monitor, onSelect: () => setActiveView('INFRASTRUCTURE') });
+      if (perms?.page_database) base.push({ label: 'Database Center', icon: Terminal, onSelect: () => setActiveView('DATABASE') });
     }
 
     return base;
@@ -256,8 +257,8 @@ export default function HomeHub() {
               <TactileMenu
                 title="Search Hub"
                 options={[
-                  { label: 'Open Search', icon: Search, onClick: () => setIsCommandPaletteOpen(true) },
-                  { label: 'Quick Filters', icon: Filter, onClick: () => setActiveView('REGISTRY') }
+                  { label: 'Open Search', icon: Search, onSelect: () => setIsCommandPaletteOpen(true) },
+                  { label: 'Quick Filters', icon: Filter, onSelect: () => setActiveView('REGISTRY') }
                 ]}
               >
                 <button onClick={() => setIsCommandPaletteOpen(true)} className="flex items-center gap-4 px-5 py-2 bg-muted/30 border border-border rounded-xl text-foreground/40 hover:text-primary transition-all h-10 max-w-[400px] w-full group">
@@ -295,10 +296,10 @@ export default function HomeHub() {
           <TactileMenu
             title="Sync Control"
             options={[
-              { label: 'Sync Hub', icon: Activity, onClick: () => setIsSyncStatusOpen(true) },
-              { label: 'Fetch Data', icon: Download, onClick: handleDownloadPulse, disabled: !isOnline },
-              { label: 'Save Changes', icon: Upload, onClick: manualUpload, disabled: !isOnline },
-              ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onClick: refreshRegistry }] : [])
+              { label: 'Sync Hub', icon: Activity, onSelect: () => setIsSyncStatusOpen(true) },
+              { label: 'Fetch Data', icon: Download, onSelect: handleDownloadPulse, disabled: !isOnline },
+              { label: 'Save Changes', icon: Upload, onSelect: manualUpload, disabled: !isOnline },
+              ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onSelect: refreshRegistry }] : [])
             ]}
           >
             <div 
@@ -324,9 +325,9 @@ export default function HomeHub() {
           <TactileMenu
             title="Update History"
             options={[
-              { label: 'All Alerts', icon: Bell, onClick: () => setIsNotificationsOpen(true) },
-              { label: 'Full History', icon: HistoryIcon, onClick: () => setActiveView('AUDIT_LOG') },
-              { label: 'Clear Alerts', icon: Trash2, onClick: clearAll, destructive: true }
+              { label: 'All Alerts', icon: Bell, onSelect: () => setIsNotificationsOpen(true) },
+              { label: 'Full History', icon: HistoryIcon, onSelect: () => setActiveView('AUDIT_LOG') },
+              { label: 'Clear Alerts', icon: Trash2, onSelect: clearAll, destructive: true }
             ]}
           >
             <button 
