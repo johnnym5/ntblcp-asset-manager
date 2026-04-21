@@ -170,7 +170,7 @@ export default function AssetList() {
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
-  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isAssetBatchEditOpen, setIsAssetBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [isClearCategoryDialogOpen, setIsClearCategoryDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -296,7 +296,7 @@ export default function AssetList() {
   };
 
   const handleBatchEdit = () => {
-    setIsBatchEditOpen(true);
+    setIsAssetBatchEditOpen(true);
   }
   
   const handleSaveAssetBatch = async (data: BatchUpdateData) => {
@@ -508,7 +508,7 @@ export default function AssetList() {
           onSave={handleSaveAsset}
           isReadOnly={isFormReadOnly} 
         />
-        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
+        <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
          <SyncConfirmationDialog
           isOpen={isSyncConfirmOpen}
@@ -691,8 +691,8 @@ export default function AssetList() {
           isReadOnly={isFormReadOnly}
         />
         <AssetBatchEditForm 
-            isOpen={isBatchEditOpen} 
-            onOpenChange={setIsBatchEditOpen}
+            isOpen={isAssetBatchEditOpen} 
+            onOpenChange={setIsAssetBatchEditOpen}
             selectedAssetCount={selectedAssetIds.length}
             onSave={handleSaveAssetBatch}
         />
