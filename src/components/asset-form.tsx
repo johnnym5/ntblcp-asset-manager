@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Phase 2010: Synchronized validation resolver with Asset domain interface.
+ * Phase 2011: Implemented strict Governance Pulse. User updates are enqueued for approval.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -79,7 +79,7 @@ export default function AssetForm({
     mode: 'onChange',
   });
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || userProfile?.isAdmin;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const currentTemplate = useMemo(() => {
@@ -91,7 +91,7 @@ export default function AssetForm({
     if (!grant) return null;
     const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(category));
     return defKey ? grant.sheetDefinitions[defKey] : null;
-  }, [asset?.category, form, appSettings]);
+  }, [asset?.category, appSettings, form]);
 
   useEffect(() => {
     if (isOpen) {
@@ -142,6 +142,7 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
+        // Approval Logic Pulse
         if (!isAdmin && asset) {
           const changes: Partial<Asset> = {};
           const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];

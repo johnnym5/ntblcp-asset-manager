@@ -2,7 +2,8 @@
 
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
- * Phase 2010: Hardened handleSyncFolderPulse and handleSyncAssetPulse for absolute parity.
+ * Phase 2011: Fixed syntax error in maintenance dialogs (Accordion vs AlertDialog tags).
+ * Phase 2012: Hardened handleSyncFolderPulse and handleSyncAssetPulse for absolute parity.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -85,7 +86,8 @@ import { TactileMenu } from '@/components/TactileMenu';
 import type { Asset, SheetDefinition, DisplayField } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useToast } from '@/hooks/use-toast';
+
+const ITEMS_PER_PAGE = 24;
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -123,7 +125,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   } = useAppState();
   
   const { userProfile } = useAuth();
-  const { toast } = useToast();
   const isMobile = useIsMobile();
   
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
@@ -756,8 +757,45 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={activeFolderHeaders} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <ImportScannerDialog isOpen={isImportScannerOpen} onOpenChange={setIsImportScannerOpen} targetFolderName={targetFolderForImport} />
 
-      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}><AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl"><AlertDialogHeader><div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div><AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected?</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will permanently remove {selectedAssetIds.size} records. This action cannot be reversed.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="mt-6 flex gap-3"><AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Confirm Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}><AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl"><AlertDialogHeader><div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div><AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Clear Selected Folders?</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will delete all records within the {selectedCategories.length} selected folders.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="mt-6 flex gap-3"><AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel><AlertDialogAction onClick={handlePurgeFolders} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Confirm Clear</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner">
+              <Trash2 className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
+              This will permanently remove {selectedAssetIds.size} records. This action cannot be reversed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner">
+              <Trash2 className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Clear Selected Folders?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
+              This will delete all records within the {selectedCategories.length} selected folders.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePurgeFolders} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
+              Confirm Clear
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={selectedSheetDef} originalSheetName={originalSheetName} onSave={(orig, newDef, all) => {

@@ -73,13 +73,15 @@ export function ImportWorkstation() {
   const engineRef = useRef<ParserEngine | null>(null);
 
   const mergedSheetDefinitions = useMemo(() => {
-    const defs: Record<string, SheetDefinition> = {};
-    appSettings?.grants.forEach(g => {
-      Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
-        defs[name] = def as any;
+    const def: Record<string, SheetDefinition> = {};
+    if (appSettings?.grants) {
+      appSettings.grants.forEach(g => {
+        Object.entries(g.sheetDefinitions || {}).forEach(([name, definition]) => {
+          def[name] = definition as any;
+        });
       });
-    });
-    return defs;
+    }
+    return def;
   }, [appSettings?.grants]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

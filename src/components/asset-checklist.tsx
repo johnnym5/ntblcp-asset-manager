@@ -3,8 +3,7 @@
 /**
  * @fileOverview AssetDataChecklist - Template-Driven Fidelity Pulse.
  * Automatically tracks completion based on the folder's configured schema.
- * Phase 1210: Dynamically resolves items from the sheet definition.
- * Phase 2010: Fixed duplicate key prop warning during list rendering.
+ * Phase 1211: Fixed duplicate key prop warning by destructuring identifier.
  */
 
 import React from 'react';
