@@ -2,11 +2,7 @@
 
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
- * Optimized for High-Density Grid Pulse & Dual-Mode Setup Interface.
- * Phase 1520: Separated Card Setup Mode from Profile Setup Mode.
- * Phase 1525: Resolved optionsMap ReferenceError by implementing deterministic value discovery.
- * Phase 1530: Implemented unified handleUpdateHeader logic for in-place folder setup.
- * Phase 1805: Integrated UserPermissions for functional lockdown.
+ * Phase 2018: Synchronized sync logic and fixed syntax errors in maintenance dialogs.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -38,7 +34,9 @@ import {
   FileDown,
   ArrowRight,
   FileUp,
-  PlusCircle
+  PlusCircle,
+  CloudUpload,
+  RefreshCw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +52,7 @@ import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord, normalizeHeaderName } from '@/lib/registry-utils';
 import { cn, sanitizeSearch, getFuzzySignature } from '@/lib/utils';
 import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
 import { Input } from '@/components/ui/input';
 import { addNotification } from '@/hooks/use-notifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -82,11 +81,12 @@ import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-bat
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import { FirestoreService } from '@/services/firebase/firestore';
-import { storage } from '@/offline/storage';
 import { TactileMenu } from '@/components/TactileMenu';
-import type { Asset, SheetDefinition, DisplayField } from '@/types/domain';
+import type { Asset, SheetDefinition, DisplayField, Grant, AppSettings } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { useIsMobile } from '@/hooks/use-mobile';
+
+const ITEMS_PER_PAGE = 24;
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -119,7 +119,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     goBack,
     searchTerm,
     setSearchTerm,
-    isSyncing
+    isSyncing,
+    setIsSyncing
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -149,6 +150,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   
   const [isImportScannerOpen, setIsImportScannerOpen] = useState(false);
   const [targetFolderForImport, setTargetFolderForImport] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const perms = userProfile?.permissions;
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -451,6 +454,59 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleSyncFolderPulse = async (cat: string) => {
+    if (!isOnline) {
+      addNotification({ title: "Offline", description: "Internet required to sync folder.", variant: "destructive" });
+      return;
+    }
+    const folderAssets = assets.filter(a => a.category === cat && a.syncStatus === 'local');
+    if (folderAssets.length === 0) {
+      addNotification({ title: "Folder Synced", description: `"${cat}" is already in parity with the cloud.` });
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      for (const asset of folderAssets) {
+        await FirestoreService.saveAsset(asset);
+      }
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.map(a => (a.category === cat && a.syncStatus === 'local') ? { ...a, syncStatus: 'synced' as const } : a);
+      await storage.saveAssets(updatedLocal);
+
+      const queue = await storage.getQueue();
+      const folderAssetIds = new Set(folderAssets.map(a => a.id));
+      for (const entry of queue) {
+        if (folderAssetIds.has((entry.payload as any).id)) await storage.dequeue(entry.id);
+      }
+      await refreshRegistry();
+      addNotification({ title: "Folder Sync Complete", variant: "success" });
+    } catch (e) { addNotification({ title: "Sync Failure", variant: "destructive" }); }
+    finally { setIsSyncing(false); }
+  };
+
+  const handleSyncAssetPulse = async (id: string) => {
+    if (!isOnline) {
+      addNotification({ title: "Offline", description: "Internet required to sync record.", variant: "destructive" });
+      return;
+    }
+    const asset = assets.find(a => a.id === id);
+    if (!asset || asset.syncStatus === 'synced') return;
+    setIsSyncing(true);
+    try {
+      await FirestoreService.saveAsset(asset);
+      const currentLocal = await storage.getAssets();
+      const updatedLocal = currentLocal.map(a => a.id === id ? { ...a, syncStatus: 'synced' as const } : a);
+      await storage.saveAssets(updatedLocal);
+      const queue = await storage.getQueue();
+      for (const entry of queue) {
+        if ((entry.payload as any).id === id) await storage.dequeue(entry.id);
+      }
+      await refreshRegistry();
+      addNotification({ title: "Record Synced", variant: "success" });
+    } catch (e) { addNotification({ title: "Sync Failure", variant: "destructive" }); }
+    finally { setIsSyncing(false); }
+  };
+
   const handleExploreFolder = (cat: string) => {
     setSelectedCategories([cat]);
     setIsExplored(true);
@@ -466,12 +522,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     } catch (e) { addNotification({ title: "Export Failed", variant: "destructive" }); }
   };
 
+  const handleManualRefreshPulse = async () => {
+    setIsProcessing(true);
+    try {
+      await refreshRegistry();
+      addNotification({ title: "Registry Reconciled", variant: "success" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const isSelectionBarVisible = (showList && selectedAssetIds.size > 0) || (!showList && selectedCategories.length > 0);
 
   return (
     <div className="space-y-4 h-full flex flex-col relative">
       <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-background/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-border mb-4 -mx-1 shrink-0">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-1 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start min-w-0">
             <AnimatePresence mode="wait">
               {showList ? (
@@ -496,6 +562,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <div className="flex items-center justify-end gap-2 flex-1 min-w-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={handleManualRefreshPulse} 
+                      disabled={isProcessing}
+                      className="h-10 w-10 rounded-xl border-2 hover:bg-primary/10 text-primary transition-all shadow-sm shrink-0"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-[8px] font-black uppercase">Refresh Register</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {isQuickViewSetupActive && perms?.func_edit_headers && (
                 <Button onClick={handleSaveGlobalHeaders} disabled={isProcessing} className="h-10 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl animate-in fade-in zoom-in-95">
                   {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Commit Arrangement
@@ -549,7 +632,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           {!showList ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
               {categories.map(cat => (
-                <TactileMenu key={cat} title="Folder Actions" options={[{ label: 'Open Folder', icon: FolderOpen, onClick: () => handleExploreFolder(cat) }, { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onClick: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onClick: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); }, disabled: !perms?.func_import }, { label: 'Folder Setup', icon: Wrench, onClick: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } }, disabled: !perms?.func_edit_headers }, { label: 'Clear Records', icon: Trash2, onClick: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true, disabled: !perms?.func_delete_asset }] : [])]}>
+                <TactileMenu key={cat} title="Folder Actions" options={[
+                  { label: 'Open Folder', icon: FolderOpen, onSelect: () => handleExploreFolder(cat) }, 
+                  { label: 'Sync Folder', icon: CloudUpload, onSelect: () => handleSyncFolderPulse(cat), disabled: !isOnline },
+                  { label: selectedCategories.includes(cat) ? 'Deselect Folder' : 'Select Folder', icon: CheckCircle2, onSelect: () => setSelectedCategories(selectedCategories.includes(cat) ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat]) }, 
+                  ...(isAdmin ? [{ label: 'Import Into Folder', icon: FileUp, onSelect: () => { setTargetFolderForImport(cat); setIsImportScannerOpen(true); }, disabled: !perms?.func_import }, { label: 'Folder Setup', icon: Wrench, onSelect: () => { if (mergedSheetDefinitions[cat]) { setSelectedSheetDef(mergedSheetDefinitions[cat]); setOriginalSheetName(cat); setIsColumnSheetOpen(true); } }, disabled: !perms?.func_edit_headers }, { label: 'Clear Records', icon: Trash2, onSelect: () => { setSelectedCategories([cat]); setIsPurgeDialogOpen(true); }, destructive: true, disabled: !perms?.func_delete_asset }] : [])
+                ]}>
                   <Card onClick={() => handleExploreFolder(cat)} className={cn("bg-card border-2 rounded-[2rem] group hover:border-primary/40 transition-all shadow-xl p-6 relative cursor-pointer min-h-[220px] flex flex-col justify-between", selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-border")}>
                     <div>
                       <div className="flex justify-between items-start mb-6">
@@ -577,10 +665,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <AnimatePresence mode="popLayout">
                   {viewMode === 'grid' || isMobile ? paginatedAssets.map(asset => (
                     <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <RegistryCard record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} onInspect={handleEditAsset} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} onToggleExpand={() => handleToggleExpand(asset.id)} onManageLabels={handleManageLabels} onQuickUpdate={handleQuickUpdate} onUpdateHeader={handleUpdateHeader} isSetupMode={isQuickViewSetupActive} />
+                      <RegistryCard record={transformAssetToRecord(asset, activeFolderHeaders, appSettings?.sourceBranding)} onInspect={handleEditAsset} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} onToggleExpand={() => handleToggleExpand(asset.id)} onManageLabels={handleManageLabels} onQuickUpdate={handleQuickUpdate} onUpdateHeader={handleUpdateHeader} onSync={handleSyncAssetPulse} isSetupMode={isQuickViewSetupActive} />
                     </motion.div>
                   )) : (
-                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} />
+                    <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, activeFolderHeaders, appSettings?.sourceBranding))} onInspect={handleEditAsset} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} onToggleExpand={handleToggleExpand} onQuickUpdate={handleQuickUpdate} onSync={handleSyncAssetPulse} />
                   )}
                 </AnimatePresence>
               </div>
@@ -614,6 +702,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       onEdit={handleEditAsset} 
                       onQuickUpdate={handleQuickUpdate} 
                       onUpdateHeader={handleUpdateHeader} 
+                      onSync={handleSyncAssetPulse}
                       isHeaderEditingMode={isHeaderEditingMode} 
                     />
                   )}
@@ -629,7 +718,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <motion.div initial={{ opacity: 0, y: 40, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 40, x: "-50%" }} className="fixed bottom-8 left-1/2 z-50 w-[calc(100vw-1rem)] sm:w-auto bg-background/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3 pr-6 border-r border-border shrink-0"><div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-black font-black text-[10px] shadow-lg">{showList ? selectedAssetIds.size : selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-foreground tracking-widest hidden xs:block">Records</span></div>
             <ScrollArea className="flex-1 overflow-hidden"><div className="flex items-center gap-2 px-4 py-1">{showList && selectedAssetIds.size === 1 ? ((canEdit || isVerificationMode) && <Button onClick={() => handleEditAsset(Array.from(selectedAssetIds)[0])} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Edit</Button>) : (canEdit && <Button onClick={() => showList ? setIsAssetBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 shadow-xl shrink-0"><Edit3 className="h-4 w-4" /> Batch Update</Button>)}<Button variant="outline" onClick={handleSelectionExport} className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-border bg-muted/20 shrink-0 hover:border-primary/40 transition-all"><FileDown className="h-4 w-4" /> Export</Button>{isAdmin && perms?.func_delete_asset && <Button variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] gap-2 text-destructive border-destructive/20 shrink-0 hover:bg-destructive/5 transition-all" onClick={() => showList ? setIsAssetDeleteOpen(true) : setIsPurgeDialogOpen(true)}><Trash2 className="h-4 w-4" /> Clear</Button>}</div><ScrollBar orientation="horizontal" className="invisible" /></ScrollArea>
-            <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-muted-foreground hover:text-foreground rounded-xl transition-colors"><X className="h-5 w-5" /></button>
+            <button onClick={() => showList ? setSelectedAssetIds(new Set()) : setSelectedCategories([])} className="p-2.5 text-muted-foreground rounded-xl transition-colors"><X className="h-5 w-5" /></button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -641,28 +730,62 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={activeFolderHeaders} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <ImportScannerDialog isOpen={isImportScannerOpen} onOpenChange={setIsImportScannerOpen} targetFolderName={targetFolderForImport} />
 
-      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}><AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl"><AlertDialogHeader><div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div><AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected?</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will permanently remove {selectedAssetIds.size} records. This action cannot be reversed.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="mt-6 flex gap-3"><AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Confirm Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}><AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl"><AlertDialogHeader><div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner"><Trash2 className="h-8 w-8 text-destructive" /></div><AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Clear Selected Folders?</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">This will delete all records within the {selectedCategories.length} selected folders.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="mt-6 flex gap-3"><AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel><AlertDialogAction onClick={handlePurgeFolders} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">Confirm Clear</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isAssetDeleteOpen} onOpenChange={setIsAssetDeleteOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner">
+              <Trash2 className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Delete Selected?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
+              This will permanently remove {selectedAssetIds.size} records. This action cannot be reversed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDeleteAssets} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 bg-background text-foreground shadow-3xl">
+          <AlertDialogHeader>
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit mx-auto mb-4 border border-destructive/20 shadow-inner">
+              <Trash2 className="h-8 w-8 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-xl font-black uppercase text-destructive tracking-tight text-center">Clear Selected Folders?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground text-center leading-relaxed">
+              This will delete all records within the {selectedCategories.length} selected folders.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex gap-3">
+            <AlertDialogCancel className="flex-1 rounded-xl font-bold border-2 m-0 h-12">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePurgeFolders} disabled={isProcessing} className="flex-[2] bg-destructive text-white font-black uppercase text-[10px] tracking-widest px-8 rounded-xl m-0 h-12 shadow-xl shadow-destructive/30">
+              Confirm Clear
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={selectedSheetDef} originalSheetName={originalSheetName} onSave={(orig, newDef, all) => {
-          const grant = appSettings?.grants.find(g => g.sheetDefinitions[originalSheetName || ''] || g.sheetDefinitions[newDef.name]);
-          if (!grant) return;
-          const updatedGrants = appSettings!.grants.map(g => {
-            if (g.id === grant.id) {
-              const newSheetDefs = { ...g.sheetDefinitions, [newDef.name]: newDef };
+          if (!appSettings) return;
+          const updatedGrants = appSettings.grants.map(grant => {
+            if (activeGrantIdForSchema === grant.id) {
+              const newSheetDefs = { ...grant.sheetDefinitions, [newDef.name]: newDef };
               if (originalSheetName && originalSheetName !== newDef.name) delete newSheetDefs[originalSheetName];
               return { ...grant, sheetDefinitions: newSheetDefs };
             }
-            return g;
+            return grant;
           });
-          if (appSettings) {
-            const nextSettings = { ...appSettings, grants: updatedGrants };
-            setAppSettings(nextSettings);
-            storage.saveSettings(nextSettings);
-            if (isOnline) FirestoreService.updateSettings(nextSettings);
-            addNotification({ title: "Setup Updated", variant: "success" });
-          }
+          const nextSettings = { ...appSettings, grants: updatedGrants };
+          setAppSettings(nextSettings);
+          storage.saveSettings(nextSettings);
+          if (isOnline) FirestoreService.updateSettings(nextSettings);
+          addNotification({ title: "Setup Updated", variant: "success" });
         }} />
       )}
     </div>

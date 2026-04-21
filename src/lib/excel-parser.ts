@@ -1,8 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { Asset, AppSettings, SheetDefinition } from '@/types/domain';
-import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES } from './constants';
-import { Timestamp } from 'firebase/firestore';
 import { ParserEngine } from '@/parser/engine';
 import { normalizeHeaderName } from './registry-utils';
 import { sanitizeForFirestore } from './utils';
@@ -88,24 +86,21 @@ export async function parseExcelFile(
         const fileName = fileOrBuffer instanceof File ? fileOrBuffer.name : 'Ingested Workbook';
         const engine = new ParserEngine(fileName, existingAssets);
 
-        const targetSheets = sheetsToImport || workbook.SheetNames.map(s => ({ sheetName: s }));
+        const targetSheets = sheetsToImport || workbook.SheetNames.map((s: string) => ({ sheetName: s }));
 
         for (const { sheetName } of targetSheets) {
           const sheet = workbook.Sheets[sheetName];
           if (!sheet) continue;
 
           const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-          const groups = engine.discoverGroups(sheetName, data);
-          const groupContainers = engine.ingestGroups(sheetName, data, groups);
+          const groupContainers = engine.parseWorkbook(sheetName, data);
           
-          groupContainers.forEach(container => {
-             container.assets.forEach((asset: any) => {
-                if (asset.validation.isUpdate) {
-                  result.updatedAssets.push(asset as any);
-                } else {
-                  result.assets.push(asset as any);
-                }
-             });
+          groupContainers.flatMap(c => c.assets).forEach(asset => {
+            if (asset.validation.isUpdate) {
+              result.updatedAssets.push(asset as any);
+            } else {
+              result.assets.push(asset as any);
+            }
           });
         }
 

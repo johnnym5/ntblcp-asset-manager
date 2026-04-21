@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
- * Phase 1410: Integrated TactileMenu for forensic breakdown and navigation arrows.
+ * @fileOverview NotificationsSheet - Interactive Drill-Down Audit Panel.
+ * Phase 1980: Renamed component to avoid collision with NotificationsCenter.
  */
 
 import React from 'react';
@@ -38,12 +38,12 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useNotifications, removeNotification, clearAll, markAllAsRead } from '@/hooks/use-notifications';
 import { TactileMenu } from '@/components/TactileMenu';
 
-interface NotificationsCenterProps {
+interface NotificationsSheetProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCenterProps) {
+export function NotificationsSheet({ isOpen, onOpenChange }: NotificationsSheetProps) {
   const { notifications, unreadCount } = useNotifications();
   const { setActiveView, setSearchTerm } = useAppState();
 

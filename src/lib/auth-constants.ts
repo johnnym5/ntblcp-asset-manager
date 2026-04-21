@@ -14,12 +14,13 @@ export const getInitialAdminCreds = () => {
 
   if (process.env.NODE_ENV === 'production' && (!user || !pass)) {
     console.error("CRITICAL: Admin credentials missing in production environment variables.");
-    // Return non-guessable UUIDs to prevent unauthorized bootstrap access
+    // Return non-guessable IDs to prevent unauthorized bootstrap access
     return { u: 'DISABLED_SECURE_ID_UNSET', p: 'DISABLED_SECURE_PASS_UNSET' };
   }
 
+  // Only use defaults in development environments
   return {
-    u: user || 'admin',
-    p: pass || 'setup' // Default only allowed in development
+    u: user || (process.env.NODE_ENV === 'development' ? 'admin' : 'DISABLED_SECURE_ID_UNSET'),
+    p: pass || (process.env.NODE_ENV === 'development' ? 'setup' : 'DISABLED_SECURE_PASS_UNSET')
   };
 };

@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Authentication Gateway.
- * Updated with requested terminology: "Input Username" and "Passcode".
- * Phase 1925: Automatic login for Zonal Administrators.
+ * Hardened for production build and type-safe role access.
  */
 
 import React, { useState } from 'react';
@@ -26,23 +25,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Loader2, AlertCircle, Package, Zap } from 'lucide-react';
-import type { AuthorizedUser } from '@/lib/types';
+import type { AuthorizedUser } from '@/types/domain';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import { Separator } from './ui/separator';
-
-const superAdmin: AuthorizedUser = {
-  loginName: 'admin',
-  displayName: 'Super Admin',
-  email: 'admin',
-  password: 'setup',
-  states: ['All'],
-  isAdmin: true,
-  role: 'SUPERADMIN',
-  canAddAssets: true,
-  canEditAssets: true,
-};
 
 export default function UserProfileSetup() {
   const [email, setEmail] = useState('');
@@ -68,7 +55,7 @@ export default function UserProfileSetup() {
       return;
     }
 
-    const allUsers = [...(appSettings?.authorizedUsers || []), superAdmin];
+    const allUsers = [...(appSettings?.authorizedUsers || [])];
     const searchTerm = email.toLowerCase().trim();
 
     const user = allUsers.find(
@@ -81,18 +68,6 @@ export default function UserProfileSetup() {
       return;
     }
 
-    if (user.isGuest) {
-      setFoundUser(user);
-      if (user.states.length === 1 && user.states[0] !== 'All') {
-        setSelectedState(user.states[0]);
-        handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin || user.states.includes('All')) {
-        setSelectedState('All');
-        handleConfirm(user, 'All');
-      }
-      return; 
-    }
-    
     if (!password) {
       setError("Please enter your passcode.");
       return;
@@ -101,15 +76,12 @@ export default function UserProfileSetup() {
     if (user.password === password) {
       setFoundUser(user);
       
-      // Zonal Admin: Automatic login with full zone scope
-      if (user.isZonalAdmin) {
-        handleConfirm(user, user.assignedZone || 'Zonal Scope');
-      } else if (user.states.length === 1 && user.states[0] !== 'All') {
-        setSelectedState(user.states[0]);
-        handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin || user.states.includes('All')) {
+      if (user.role === 'SUPERADMIN' || user.states.includes('All')) {
         setSelectedState('All');
         handleConfirm(user, 'All');
+      } else if (user.states.length === 1) {
+        setSelectedState(user.states[0]);
+        handleConfirm(user, user.states[0]);
       }
     } else {
       setError("Invalid credentials.");
@@ -130,8 +102,8 @@ export default function UserProfileSetup() {
   
   const isMultiStateUser = foundUser && 
                            foundUser.states.length > 1 && 
+                           foundUser.role !== 'SUPERADMIN' && 
                            !foundUser.isAdmin && 
-                           !foundUser.isZonalAdmin && 
                            !foundUser.states.includes('All');
 
   if (!settingsLoaded) {

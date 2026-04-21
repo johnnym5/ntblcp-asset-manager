@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SchemaMapper - Interactive Data Engineering Interface.
- * Allows users to manually align Excel headers to Registry fields.
+ * Phase 1002: Hardened for production build and Next.js 15 PAR.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -42,7 +42,6 @@ const TARGET_FIELDS = [
 export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperProps) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
 
-  // Auto-suggest mapping logic
   useEffect(() => {
     const initialMap: Record<string, string> = {};
     headers.forEach(header => {
@@ -69,7 +68,7 @@ export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperP
       <div className="p-8 border-b bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h4 className="text-lg font-black uppercase tracking-tight">Technical Column Alignment</h4>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Mapping Logic Pulse v5.0.1</p>
+          <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Data Mapping Logic v5.0.1</p>
         </div>
         <div className="p-4 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 flex items-center gap-4">
           <div className="flex flex-col text-right">
@@ -145,7 +144,7 @@ export function SchemaMapper({ headers, onConfirm, isProcessing }: SchemaMapperP
             <div className="space-y-1">
               <h5 className="text-xs font-black uppercase tracking-tight">Engineering Hint</h5>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                All unmapped columns are automatically sequestered into the record&apos;s metadata pulse. You will never lose source data during the ingestion traversal.
+                All unmapped columns are automatically sequestered into the record&apos;s metadata. You will never lose source data during the ingestion traversal.
               </p>
             </div>
           </div>

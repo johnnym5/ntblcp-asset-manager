@@ -3,9 +3,10 @@
 /**
  * @fileOverview Reports Workstation - Executive Reporting & Data Quality.
  * Phase 1925: Regional scope enforcement for multi-state Zonal Admins.
+ * Phase 1926: Hardened runAuditPulse with useCallback for build stability.
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -64,9 +65,7 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
     return assets;
   }, [assets, userProfile]);
 
-  useEffect(() => { if (activeTab === 'quality') runAuditPulse(); }, [activeTab, scopedAssets]);
-
-  const runAuditPulse = async () => {
+  const runAuditPulse = useCallback(async () => {
     setIsScanning(true);
     try {
       const auditIssues = await IntegrityEngine.runFullAudit(scopedAssets);
@@ -74,7 +73,11 @@ export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolea
     } finally {
       setIsScanning(false);
     }
-  };
+  }, [scopedAssets]);
+
+  useEffect(() => { 
+    if (activeTab === 'quality') runAuditPulse(); 
+  }, [activeTab, runAuditPulse]);
 
   const handleFixCasing = async (issue: IntegrityIssue) => {
     setIsFixing(true);

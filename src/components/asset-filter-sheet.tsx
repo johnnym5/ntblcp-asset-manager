@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Filter Engine.
- * Supports multi-select criteria across all registry dimensions including Description and Category.
+ * Hardened for production build with absolute import paths.
  */
 
 import React from 'react';
@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Check, Search, Filter, LayoutGrid, FileText } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Label } from './ui/label';
-import type { OptionType } from '@/contexts/app-state-context';
+import type { OptionType } from '@/types/domain';
 
 interface AssetFilterSheetProps {
   isOpen: boolean;
@@ -116,7 +116,7 @@ const FilterSection = ({ title, options, selected, onChange, icon: Icon }: {
                         isSelected ? "bg-black/20 border-black/10" : "bg-black/40 border-white/5"
                       )}>
                         <span className={cn(
-                          "text-[9px] font-mono font-bold",
+                          "text-9px font-mono font-bold",
                           isSelected ? "text-black/60" : "text-white/20"
                         )}>{option.count}</span>
                       </div>

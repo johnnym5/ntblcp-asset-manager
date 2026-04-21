@@ -21,7 +21,9 @@
 - **Validation Layer:** Zod-based schemas for all ingestion and mutation paths.
 
 ## 4. Implementation Phases
-- **Phase 1: Foundation (Complete):** Global shell, Auth gateway, and core domain models.
-- **Phase 2: Ingestion Center (Complete):** Multi-profile parser with sandbox reconciliation.
-- **Phase 3: Registry & Audit (Complete):** Advanced grid, activity ledger, and verification queue.
-- **Phase 4: Governance (Complete):** Infrastructure mission control and role management.
+- **Phase 1: Foundation:** Global shell, Auth gateway, and core domain models are in place.
+- **Phase 2: Ingestion Center:** Multi-profile parser and data import are implemented for Excel workflows.
+- **Phase 3: Registry & Audit:** Asset registry, activity ledger, and verification queue are available.
+- **Phase 4: Governance:** Infrastructure controls and role management are part of the roadmap and are being refined.
+
+> Note: Current deployment focuses on the web shell, Firebase sync, and offline asset management. Planned enhancements include AI-assisted OCR, document scanning, and Google Sheets integration.

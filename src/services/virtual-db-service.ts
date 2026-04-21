@@ -1,7 +1,7 @@
 /**
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
- * Phase 86: Hardened with deterministic purge and preparation pulses.
+ * Phase 86: Hardened with deterministic sync cycles and consistency checks.
  * Phase 87: Implemented createNode and deleteNode for granular CRUD support.
  */
 
@@ -18,7 +18,7 @@ const PATH_MAPPING: Record<string, string> = {
   'config/settings': 'Governance Settings',
   'audit_logs': 'Activity Ledger',
   'error_logs': 'Resilience Audit',
-  'queue': 'Sync Pulse Log',
+  'queue': 'Update Transaction Log',
   'sandbox': 'Import Sandbox'
 };
 
@@ -76,7 +76,7 @@ export class VirtualDBService {
           sandbox.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'sandbox')));
         } else if (collectionPath === 'config/settings') {
           const settings = await storage.getSettings();
-          if (settings) nodes.push(this.mapToNode(settings, 'Local Settings Pulse', layer, 'settings', 'app-settings'));
+          if (settings) nodes.push(this.mapToNode(settings, 'App Settings', layer, 'settings', 'app-settings'));
         }
       }
     } catch (e) {

@@ -12,7 +12,7 @@ import { addNotification } from '@/hooks/use-notifications';
 import type { OfflineQueueEntry } from '@/types/domain';
 
 let isSyncing = false;
-const SYNC_CHUNK_SIZE = 50; // Parallel items per pulse
+const SYNC_CHUNK_SIZE = 50; // Parallel items per sync cycle
 
 /**
  * Processes a specific set of operations from the queue using parallel chunking.
@@ -28,7 +28,7 @@ export async function processSelectedSyncQueue(ids?: string[]): Promise<void> {
   if (targetOps.length === 0) return;
 
   isSyncing = true;
-  logger.info(`Sync Engine: High-Speed pulse initialized for ${targetOps.length} operations...`);
+  logger.info(`Sync Engine: High-speed sync cycle initialized for ${targetOps.length} operations...`);
 
   // Sort by timestamp to ensure chronological logical consistency
   const sortedOps = [...targetOps].sort((a, b) => a.timestamp - b.timestamp);
@@ -82,7 +82,7 @@ export async function processSelectedSyncQueue(ids?: string[]): Promise<void> {
   }
 
   isSyncing = false;
-  logger.info('Sync Engine: High-Speed pulse complete.');
+  logger.info('Sync Engine: High-speed sync cycle complete.');
 }
 
 /**

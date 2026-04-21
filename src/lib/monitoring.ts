@@ -1,12 +1,17 @@
 /**
  * @fileOverview Advanced Error Monitoring & Resilience Service.
- * Translates technical failures into layman-friendly pulses and logs audits to the cloud.
+ * Translates technical failures into user-friendly notifications and logs audits to the cloud.
+ * Phase 1980: Removed FirestoreService dependency to break circular module loop.
+ * Phase 1981: Added log method and fixed logger integration.
  */
 
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { FirestoreService } from '@/services/firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { sanitizeForFirestore } from '@/lib/utils';
+import { logger } from './logger';
 import type { ErrorLogEntry, ErrorSeverity } from '@/types/domain';
 
 export interface TraceContext {
@@ -37,11 +42,22 @@ class MonitoringService {
     });
 
     this.isInitialized = true;
-    console.log("🚀 Assetain Resilience Pulse Active");
+    logger.info("Asset Manager Resilience System Active");
+  }
+
+  /**
+   * Simple logging pulse for operational status.
+   */
+  log(message: string) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[MONITORING] ${message}`);
+    }
+    this.trackEvent('LOG_PULSE', { message });
   }
 
   /**
    * Captures, translates, and logs an error to the administrative audit ledger.
+   * Directly uses Firestore SDK to avoid circular service dependencies.
    */
   async trackError(error: any, context: TraceContext = {}, severity: ErrorSeverity = 'WARNING') {
     if (typeof window === 'undefined') return;
@@ -62,12 +78,12 @@ class MonitoringService {
       context: {
         page: window.location.pathname,
         module: context.module || 'System',
-        action: context.action || 'Operational Pulse',
+        action: context.action || 'Data Sync Event',
         browser: navigator.userAgent,
         isOnline: navigator.onLine
       },
       error: {
-        type: error?.name || 'PulseAnomaly',
+        type: error?.name || 'DataAnomaly',
         message: technicalMessage,
         technicalMessage,
         laymanExplanation,
@@ -87,11 +103,14 @@ class MonitoringService {
       console.groupEnd();
     }
 
-    // Direct cloud archival using the dedicated firestore service
-    try {
-      await FirestoreService.logErrorAudit(logEntry);
-    } catch (e) {
-      console.error("Monitoring: Failed to commit error pulse to cloud ledger", e);
+    // Direct cloud archival
+    if (db) {
+      try {
+        const logRef = doc(db, 'error_logs', logEntry.id);
+        await setDoc(logRef, sanitizeForFirestore(logEntry));
+      } catch (e) {
+        console.error("Monitoring: Failed to finalize error event to cloud ledger", e);
+      }
     }
   }
 
@@ -100,7 +119,7 @@ class MonitoringService {
    */
   trackEvent(name: string, data: any) {
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📊 OPERATIONAL PULSE [${name}]:`, data);
+      logger.info(`SYSTEM STATUS [${name}]:`, data);
     }
   }
 
@@ -132,7 +151,7 @@ class MonitoringService {
       return "Data fidelity check failed. Required parameters are missing.";
     }
 
-    return "An unexpected operational pulse anomaly occurred. Resilience protocols active.";
+    return "An unexpected data anomaly occurred. Recovery protocols active.";
   }
 }
 

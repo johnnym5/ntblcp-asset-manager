@@ -25,7 +25,7 @@ export const FirebaseStorageService = {
       logger.info(`Storage: Uploaded evidence for asset [${assetId}]`);
       return downloadUrl;
     } catch (e) {
-      logger.error("Storage: Failed to upload evidence pulse", e);
+      logger.error("Storage: Failed to upload evidence file", e);
       throw e;
     }
   },
@@ -45,7 +45,7 @@ export const FirebaseStorageService = {
       logger.info(`Storage: Uploaded signature for asset [${assetId}]`);
       return downloadUrl;
     } catch (e) {
-      logger.error("Storage: Failed to upload signature pulse", e);
+      logger.error("Storage: Failed to upload signature file", e);
       throw e;
     }
   },

@@ -3,7 +3,7 @@
 /**
  * @fileOverview AssetDataChecklist - Template-Driven Fidelity Pulse.
  * Automatically tracks completion based on the folder's configured schema.
- * Phase 1210: Dynamically resolves items from the sheet definition.
+ * Phase 1211: Fixed duplicate key prop warning by destructuring identifier.
  */
 
 import React from 'react';
@@ -50,7 +50,6 @@ const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCo
 export function AssetChecklist({ values }: AssetChecklistProps) {
   const { appSettings } = useAppState();
 
-  // 1. Resolve active template for this asset's category
   const activeTemplate = React.useMemo(() => {
     if (!values.category || !appSettings) return null;
     const grant = appSettings.grants.find(g => 
@@ -61,7 +60,6 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
     return defKey ? grant.sheetDefinitions[defKey] : null;
   }, [values.category, appSettings]);
 
-  // 2. Map completion status using template fields
   const checklistItems = React.useMemo(() => {
     if (!activeTemplate) return [];
 
@@ -69,21 +67,18 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
     return activeTemplate.displayFields
       .filter(f => f.inChecklist)
-      .map(field => {
+      .map((field, idx) => {
         const fieldName = field.key as keyof Asset;
         let val: any = undefined;
 
-        // Core prop match
         if (fieldName in values) {
           val = (values as any)[fieldName];
         } else {
-          // Metadata match
           val = (values.metadata as any)?.[field.label];
         }
 
         const isEmpty = !val || String(val).trim() === '' || String(val).trim().toLowerCase() === 'n/a' || String(val).trim().toLowerCase() === '---';
         
-        // Intelligence Pulse: Vehicles handle Serials differently
         let isCompleted = !isEmpty;
         if (isVehicle && field.key === 'serialNumber') {
           const hasChassis = !!values.chassisNo || !!(values.metadata as any)?.['Chasis no'] || !!(values.metadata as any)?.['Chassis no'];
@@ -92,6 +87,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
         }
 
         return {
+          id: `check-${field.key}-${idx}`,
           label: field.label,
           isCompleted,
           icon: isVehicle ? Car : Laptop
@@ -108,8 +104,8 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
       <div className="space-y-3">
         {checklistItems.length > 0 ? (
-          checklistItems.map((item) => (
-            <ChecklistItem key={item.label} {...item} />
+          checklistItems.map(({ id, ...itemProps }) => (
+            <ChecklistItem key={id} {...itemProps} id={id} />
           ))
         ) : (
           <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">

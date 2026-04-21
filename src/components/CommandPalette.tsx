@@ -28,7 +28,8 @@ import {
   ClipboardList,
   ShieldAlert,
   Search,
-  FolderOpen
+  FolderOpen,
+  ClipboardCheck
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -91,7 +92,7 @@ export function CommandPalette() {
 
         <CommandGroup heading="Audit & Reports">
           <CommandItem onSelect={() => runCommand(() => setActiveView('VERIFY'))}>
-            <CheckCircle2 className="mr-2 h-4 w-4" />
+            <ClipboardCheck className="mr-2 h-4 w-4" />
             <span>Verification Queue</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => setActiveView('REPORTS'))}>

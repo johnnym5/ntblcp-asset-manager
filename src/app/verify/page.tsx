@@ -3,6 +3,7 @@
 /**
  * @fileOverview Verification Queue - High-Speed Assessment Workspace.
  * Refined for Phase 25 with header-aware cards and one-tap status pulses.
+ * Phase 2010: Corrected activeGrantId destructuring and removed non-functional props.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -23,7 +24,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { Badge } from '@/components/ui/badge';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import AssetForm from '@/components/asset-form';
-import { VerificationPulse } from '@/components/registry/VerificationPulse';
+import { VerificationSync } from '@/components/registry/VerificationSync';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +34,7 @@ import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 
 export default function VerificationQueuePage() {
-  const { assets, refreshRegistry, settingsLoaded, activeGrantId } = useAppState();
+  const { assets, refreshRegistry, settingsLoaded } = useAppState();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,7 +42,6 @@ export default function VerificationQueuePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
 
-  // Initialize Headers
   useEffect(() => {
     const saved = localStorage.getItem('registry-header-prefs');
     if (saved) {
@@ -106,7 +106,6 @@ export default function VerificationQueuePage() {
   return (
     <AppLayout>
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-7xl mx-auto">
-        {/* Header Pulse */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
           <div className="space-y-2">
             <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
@@ -121,8 +120,7 @@ export default function VerificationQueuePage() {
           </Badge>
         </div>
 
-        {/* Global Progress Pulse */}
-        <VerificationPulse 
+        <VerificationSync 
           total={stats.total}
           verified={stats.verified}
           exceptions={stats.exceptions}
@@ -130,7 +128,6 @@ export default function VerificationQueuePage() {
           className="px-2"
         />
 
-        {/* Search & Filter Toolbar */}
         <div className="flex flex-col md:flex-row items-center gap-4 px-2">
           <div className="relative flex-1 w-full group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
@@ -146,7 +143,6 @@ export default function VerificationQueuePage() {
           </Button>
         </div>
 
-        {/* Queue Surface */}
         <div className="px-2">
           <AnimatePresence mode="popLayout">
             {unverified.length > 0 ? (
@@ -166,7 +162,6 @@ export default function VerificationQueuePage() {
                       densityMode="compact"
                     />
                     
-                    {/* High-Speed Action Pulse Overlay */}
                     <div className="absolute top-14 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0 z-20">
                       <Button 
                         size="icon" 

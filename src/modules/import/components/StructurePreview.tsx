@@ -1,6 +1,8 @@
 /**
  * @fileOverview StructurePreview - Strict Template Visualization Layer.
  * Phase 1205: Added indicator for Template matching status.
+ * Phase 1206: Integrated Header Exclusion Toggles.
+ * Phase 1207: Resolved Nested Button error by converting cards to semantic divs.
  */
 
 import React from 'react';
@@ -25,13 +27,15 @@ import {
   Wrench,
   Activity,
   XCircle,
-  PlusCircle
+  PlusCircle,
+  MousePointer2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DiscoveredGroup } from '@/parser/types';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StructurePreviewProps {
   groups: DiscoveredGroup[];
@@ -39,9 +43,19 @@ interface StructurePreviewProps {
   onToggleId: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
   onAction?: (group: DiscoveredGroup) => void;
+  excludedHeaders: Record<string, Set<string>>;
+  onToggleHeader: (groupId: string, header: string) => void;
 }
 
-export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll, onAction }: StructurePreviewProps) {
+export function StructurePreview({ 
+  groups, 
+  selectedIds, 
+  onToggleId, 
+  onSelectAll, 
+  onAction,
+  excludedHeaders,
+  onToggleHeader
+}: StructurePreviewProps) {
   const allSelected = groups.length > 0 && selectedIds.size === groups.filter(g => g.isTemplateMatched).length;
 
   return (
@@ -55,7 +69,7 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
             Registry Skeleton
           </h4>
           <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
-            Column A discovery pulse: identifying structural register blocks.
+            Column A discovery phase: identifying structural register blocks.
           </p>
         </div>
 
@@ -80,6 +94,7 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
           groups.map((group) => {
             const isSelected = selectedIds.has(group.id);
             const isMatched = group.isTemplateMatched;
+            const exclusions = excludedHeaders[group.id] || new Set();
 
             return (
               <Card 
@@ -125,43 +140,81 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
                     </div>
                   </div>
 
-                  {!isMatched ? (
-                    <Button 
-                      onClick={() => onAction?.(group)}
-                      className="h-12 px-8 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-orange-600/20"
-                    >
-                      <PlusCircle className="h-4 w-4" /> Define as Template
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-green-500/10 rounded-xl"><CheckCircle2 className="h-5 w-5 text-green-500" /></div>
-                      <span className="text-[10px] font-black uppercase text-green-600/60 tracking-widest">READY FOR INGESTION</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-4">
+                    {exclusions.size > 0 && isSelected && (
+                       <Badge variant="outline" className="h-8 px-4 border-orange-500/20 bg-orange-500/5 text-orange-500 font-black uppercase text-[10px]">
+                         {exclusions.size} Columns Skipped
+                       </Badge>
+                    )}
+                    {!isMatched ? (
+                      <Button 
+                        onClick={() => onAction?.(group)}
+                        className="h-12 px-8 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-orange-600/20"
+                      >
+                        <PlusCircle className="h-4 w-4" /> Define as Template
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-green-500/10 rounded-xl"><CheckCircle2 className="h-5 w-5 text-green-500" /></div>
+                        <span className="text-[10px] font-black uppercase text-green-600/60 tracking-widest">READY FOR INGESTION</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <CardContent className="p-0 bg-black">
+                  <div className="px-10 py-3 bg-white/[0.03] border-b border-white/5 flex items-center gap-4">
+                    <Info className="h-3 w-3 text-primary" />
+                    <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/40">Select individual columns to import or skip</span>
+                  </div>
                   <ScrollArea className="w-full">
                     <div className="flex items-center p-8 gap-4 min-w-max">
-                      {group.headerSet.map((header, hIdx) => (
-                        <div 
-                          key={`${group.id}-${hIdx}`}
-                          className={cn(
-                            "flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl border transition-all shadow-inner",
-                            isSelected ? "bg-white/[0.03] border-white/10" : "bg-white/[0.01] border-white/5"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[8px] font-black uppercase text-white/20 tracking-[0.2em]">
-                              COL {hIdx + 1}
-                            </span>
-                            <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
+                      {group.headerSet.map((header, hIdx) => {
+                        const isExcluded = exclusions.has(header);
+                        return (
+                          <div 
+                            key={`${group.id}-${hIdx}`}
+                            role="button"
+                            tabIndex={isSelected ? 0 : -1}
+                            onClick={() => isSelected && onToggleHeader(group.id, header)}
+                            onKeyDown={(e) => {
+                              if (isSelected && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                onToggleHeader(group.id, header);
+                              }
+                            }}
+                            className={cn(
+                              "flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl border transition-all shadow-inner text-left group/col relative overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                              !isSelected ? "opacity-20 grayscale cursor-not-allowed" : 
+                              isExcluded ? "bg-white/[0.01] border-white/5 opacity-40 cursor-pointer" : "bg-white/[0.03] border-white/10 hover:border-primary/40 shadow-xl cursor-pointer"
+                            )}
+                          >
+                            {isSelected && !isExcluded && (
+                              <div className="absolute top-2 right-2 opacity-0 group-hover/col:opacity-40 transition-opacity">
+                                <MousePointer2 className="h-3 w-3 text-primary" />
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[8px] font-black uppercase text-white/20 tracking-[0.2em]">
+                                COL {hIdx + 1}
+                              </span>
+                              <Checkbox 
+                                checked={!isExcluded} 
+                                disabled={!isSelected}
+                                onCheckedChange={() => {}} // Controlled by parent div click
+                                tabIndex={-1}
+                                className="h-4 w-4 rounded-md border-white/20 data-[state=checked]:bg-primary pointer-events-none"
+                              />
+                            </div>
+                            <p className={cn(
+                              "text-[10px] font-black uppercase leading-tight truncate transition-colors",
+                              isExcluded ? "text-white/20" : "text-white/80 group-hover/col:text-primary"
+                            )} title={header}>
+                              {header || 'EMPTY'}
+                            </p>
                           </div>
-                          <p className="text-[10px] font-black uppercase text-white/80 leading-tight truncate" title={header}>
-                            {header || 'EMPTY'}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <ScrollBar orientation="horizontal" className="bg-white/5 h-2" />
                   </ScrollArea>

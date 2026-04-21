@@ -1,10 +1,11 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
- * Authoritative type definitions for the entire application pulse.
+ * Authoritative type definitions for the entire asset management system.
+ * Hardened for strict production build and App Hosting support.
  */
 
-import { type Dispatch, type SetStateAction } from 'react';
-import type { RegistryHeader } from './registry';
+import type { RegistryHeader, HeaderFilter } from './registry';
+import { Dispatch, SetStateAction } from 'react';
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
@@ -24,6 +25,7 @@ export type ValidationGroup = 'electronics' | 'vehicles' | 'furniture' | 'medica
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
+  | 'VERIFY'
   | 'GROUPS'
   | 'IMPORT' 
   | 'REPORTS' 
@@ -38,7 +40,6 @@ export type WorkstationView =
   | 'VERIFY';
 
 export interface UserPermissions {
-  // Page Access
   page_dashboard: boolean;
   page_registry: boolean;
   page_groups: boolean;
@@ -50,7 +51,6 @@ export interface UserPermissions {
   page_infrastructure: boolean;
   page_database: boolean;
   page_settings: boolean;
-  // Function Access
   func_add_asset: boolean;
   func_edit_asset: boolean;
   func_delete_asset: boolean;
@@ -65,21 +65,6 @@ export interface OptionType {
   label: string;
   value: string;
   count?: number;
-}
-
-export interface SortConfig {
-  key: string;
-  direction: 'asc' | 'desc';
-}
-
-export interface DataActions {
-  onImport?: () => void;
-  onScanAndImport?: () => void;
-  onExport?: () => void;
-  onAddAsset?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
-  isImporting?: boolean;
 }
 
 export interface SectionHierarchy {
@@ -135,22 +120,15 @@ export interface AssetDiscrepancy {
 
 export interface Asset {
   id: string;
-  sn?: string; 
+  sn: string; 
   name?: string;
   description: string;
   category: string;
   grantId: string; 
-  
-  // Sync Pulse
   syncStatus?: SyncStatus;
-
-  // Hierarchical Context
   section: string;
   subsection: string;
   assetFamily: string;
-  assetClass?: string;
-  
-  // Location & Assignment
   location: string; 
   normalizedLocation?: string;
   normalizedState?: string;
@@ -158,73 +136,49 @@ export interface Asset {
   normalizedLga?: string;
   locationConfidence?: MatchConfidence;
   locationStatus?: LocationMatchStatus;
-  geotag?: { lat: number; lng: number; accuracy: number; };
-  
   custodian: string;
-  lga?: string;
-  site?: string;
-  
-  // State & Assessment
+  assignee?: string;
+  lga: string;
+  site: string;
   status: VerificationStatus;
+  verifiedStatus?: VerificationStatus;
   condition: string;
   conditionGroup: ConditionGroup;
   conditionNotes?: string;
   conditionHistory?: ConditionAuditEntry[];
   discrepancyFlag?: boolean;
   reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
-  
-  discrepancies?: AssetDiscrepancy[];
-  overallFidelityScore?: number;
-
-  // Financial & Technical
+  discrepancies: AssetDiscrepancy[];
+  overallFidelityScore: number;
   purchaseDate?: string;
   dateReceived?: any; // To support old logic
   value: number;
+  purchasePriceUsd: number;
   serialNumber: string;
-  assetIdCode?: string;
-  manufacturer?: string;
-  modelNumber?: string;
-  chassisNo?: string;
-  engineNo?: string;
-  supplier?: string;
-  remarks?: string;
-  
-  // Legacy fields
-  pvNo?: string;
-  grnNo?: string;
-  funder?: string;
-  costNgn?: string;
-  costUsd?: string;
-  usefulLifeYears?: string;
-  qty?: string;
-  imei?: string;
-
-  // Media
-  photoUrl?: string;
-  photoDataUri?: string;
-  signatureUrl?: string;
-  signatureDataUri?: string;
-  
+  assetIdCode: string;
+  manufacturer: string;
+  modelNumber: string;
+  chassisNo: string;
+  engineNo: string;
+  supplier: string;
+  remarks: string;
+  grnNo: string;
+  pvNo: string;
+  pvJvNo: string;
+  usefulLifeYears: string;
+  funder: string;
   classification?: AssetClassification;
-
-  hierarchy?: SectionHierarchy;
-  importMetadata?: ImportMetadata;
-  metadata?: Record<string, unknown>;
-  
-  lastModified?: string;
-  lastModifiedBy?: string;
+  hierarchy: SectionHierarchy;
+  importMetadata: ImportMetadata;
+  metadata: Record<string, unknown>;
+  lastModified: string;
+  lastModifiedBy: string;
   lastModifiedByState?: string;
-
-  updateCount?: number;
-  unseenUpdateFields?: string[];
-  previousState?: Partial<Asset> | null;
-  
-  sourceGroup?: string;
-  sourceColumnAGroup?: string;
-  templateId?: string;
-
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-  pendingChanges?: Partial<Asset>;
+  updateCount: number;
+  unseenUpdateFields: string[];
+  previousState?: any | null;
+  pendingChanges?: any;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   changeSubmittedBy?: {
     displayName: string;
     loginName: string;
@@ -232,21 +186,19 @@ export interface Asset {
   };
   adminComment?: string;
   yearBucket?: number;
-
-  // Custom fields from models.ts
-  customField1?: string;
-  customField2?: string;
-  customField3?: string;
-  customField4?: string;
-  customField5?: string;
-
-  // Compatibility fields
-  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
-  verifiedDate?: string;
+  photoDataUri?: string;
+  photoUrl?: string;
+  signatureDataUri?: string;
+  signatureUrl?: string;
+  geotag?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+  };
 }
 
 export interface DisplayField {
-  key: keyof Asset;
+  key: keyof Asset | 'name';
   label: string;
   table: boolean;
   quickView: boolean;
@@ -278,9 +230,9 @@ export interface AppSettings {
   authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
-  readAuthority?: AuthorityNode; // Optional to support legacy
-  activeGrantId: string | null;
-  activeGrantIds: string[]; // Enabled multiple projects
+  readAuthority: AuthorityNode;
+  activeGrantId: string | null; 
+  activeGrantIds: string[]; 
   grants: Grant[];
   uxMode?: UXMode;
   onboardingComplete?: boolean;
@@ -318,6 +270,7 @@ export interface AuthorizedUser {
   canEditAssets?: boolean;
   canVerifyAssets?: boolean;
   permissions?: UserPermissions;
+  isGuest?: boolean;
 }
 
 export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';
@@ -378,4 +331,84 @@ export interface ErrorLogEntry {
     result?: string; 
   };
   adminComment?: string;
+}
+
+export interface AppStateContextType {
+  assets: Asset[];
+  filteredAssets: Asset[];
+  sandboxAssets: Asset[];
+  dataSource: DataSource;
+  setDataSource: (source: DataSource) => void;
+  isOnline: boolean;
+  setIsOnline: (status: boolean) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  isSyncing: boolean;
+  setIsSyncing: (val: boolean) => void;
+  appSettings: AppSettings | null;
+  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
+  settingsLoaded: boolean;
+  isHydrated: boolean;
+  activeGrantIds: string[];
+  activeGrantId: string | null;
+  activeView: WorkstationView;
+  setActiveView: (view: WorkstationView) => void;
+  refreshRegistry: () => Promise<void>;
+  
+  manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
+  manualUpload: () => Promise<void>;
+  executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
+  syncSummary: SyncSummary | null;
+  isSyncConfirmOpen: boolean;
+  setIsSyncConfirmOpen: (open: boolean) => void;
+
+  setReadAuthority: (node: AuthorityNode) => Promise<void>;
+  
+  headers: RegistryHeader[];
+  setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
+  sortKey: string;
+  setSortKey: Dispatch<SetStateAction<string>>;
+  sortDir: 'asc' | 'desc';
+  setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
+
+  selectedLocations: string[];
+  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
+  selectedAssignees: string[];
+  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
+  selectedStatuses: string[];
+  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedConditions: string[];
+  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
+  missingFieldFilter: string;
+  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
+
+  locationOptions: OptionType[];
+  assigneeOptions: OptionType[];
+  conditionOptions: OptionType[];
+  statusOptions: OptionType[];
+  categoryOptions: OptionType[];
+
+  isFilterOpen: boolean;
+  setIsFilterOpen: (open: boolean) => void;
+  isSortOpen: boolean;
+  setIsSortOpen: (open: boolean) => void;
+  filters: HeaderFilter[];
+  setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
+
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+
+  selectedCategory: string | null;
+  selectedCategories: string[];
+  setSelectedCategories: (cats: string[]) => void;
+  setSelectedCategory: (cat: string | null) => void;
+  isExplored: boolean;
+  setIsExplored: (val: boolean) => void;
+  itemsPerPage: number | 'all';
+  setItemsPerPage: (val: number | 'all') => void;
+  goBack: () => void;
+  activeFilterCount: number;
+
+  groupsViewMode: 'category' | 'condition';
+  setGroupsViewMode: Dispatch<SetStateAction<'category' | 'condition'>>;
 }

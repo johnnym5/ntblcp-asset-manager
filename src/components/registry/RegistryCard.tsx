@@ -1,6 +1,8 @@
 /**
  * @fileOverview RegistryCard - High-Density UI Pulse.
  * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 1950: Removed fixed overlays; Description, Location, and LGA are now toggleable.
+ * Phase 1990: Added onSync prop and Sync Record menu option.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -22,7 +24,8 @@ import {
   Building, 
   Columns,
   PlusCircle,
-  X
+  X,
+  CloudUpload
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryHeader } from '@/types/registry';
@@ -55,6 +58,7 @@ interface RegistryCardProps {
   onManageLabels?: (id: string) => void;
   onQuickUpdate?: (id: string, updates: any) => void;
   onUpdateHeader?: (id: string, updates: Partial<RegistryHeader>) => void;
+  onSync?: (id: string) => void;
   densityMode?: 'compact' | 'comfortable' | 'expanded';
   isSetupMode?: boolean;
 }
@@ -64,13 +68,17 @@ const InlineField = ({
   value, 
   onSave, 
   icon: Icon,
-  disabled 
+  disabled,
+  isSetupMode,
+  onRemove
 }: { 
   label: string, 
   value: string, 
   onSave: (val: string) => void,
   icon: any,
-  disabled?: boolean
+  disabled?: boolean,
+  isSetupMode?: boolean,
+  onRemove?: () => void
 }) => {
   const [localVal, setLocalVal] = useState(value);
   const hasChanges = localVal !== value;
@@ -80,8 +88,18 @@ const InlineField = ({
   }, [value]);
 
   return (
-    <div className="flex flex-col gap-0.5 group/inline">
-      <span className="text-[7px] font-black uppercase text-muted-foreground opacity-40 group-hover/inline:text-primary transition-colors">{label}</span>
+    <div className="flex flex-col gap-0.5 group/inline relative">
+      <div className="flex items-center justify-between">
+        <span className="text-[7px] font-black uppercase text-muted-foreground opacity-40 group-hover/inline:text-primary transition-colors">{label}</span>
+        {isSetupMode && onRemove && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="p-0.5 rounded bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all shadow-sm"
+          >
+            <X className="h-2 w-2" />
+          </button>
+        )}
+      </div>
       <div className="flex items-center gap-1.5">
         <Input 
           value={localVal} 
@@ -119,10 +137,11 @@ export function RegistryCard({
   onManageLabels,
   onQuickUpdate,
   onUpdateHeader,
+  onSync,
   densityMode = 'comfortable',
   isSetupMode = false
 }: RegistryCardProps) {
-  const { appSettings } = useAppState();
+  const { appSettings, isOnline } = useAppState();
   const { userProfile } = useAuth();
   const [localRemark, setLocalRemark] = useState(String(record.rawRow.remarks || ''));
 
@@ -136,6 +155,11 @@ export function RegistryCard({
   const isSystemAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canEditBase = (isAdminMode || isVerificationMode) && perms?.func_edit_asset;
 
+  // Resolve headers for top sections
+  const descHeader = record.headers.find(h => h.normalizedName === 'description');
+  const locHeader = record.headers.find(h => h.normalizedName === 'location');
+  const lgaHeader = record.headers.find(h => h.normalizedName === 'lga');
+
   const activeHeaders = useMemo(() => {
     const folderHeaders = record.headers || [];
     const core = folderHeaders.filter(h => {
@@ -145,7 +169,8 @@ export function RegistryCard({
     const others = folderHeaders.filter(h => {
       if (!h.quickView) return false;
       const n = h.normalizedName.toLowerCase().replace(/_/g, '');
-      if (n === 'sn' || n === 'assetidcode' || n === 'description' || n === 'assetdescription') return false;
+      // Exclude fields handled in top sections
+      if (n === 'sn' || n === 'assetidcode' || n === 'description' || n === 'assetdescription' || n === 'location' || n === 'lga') return false;
       return true;
     });
     return [...core, ...others].slice(0, 7);
@@ -154,8 +179,9 @@ export function RegistryCard({
   const availableHeaders = useMemo(() => {
     return (record.headers || []).filter(h => {
       const n = h.normalizedName.toLowerCase().replace(/_/g, '');
-      const isEssential = ['sn', 'assetidcode', 'description', 'location', 'lga'].includes(n);
-      return !h.quickView && !isEssential;
+      const isSNOrID = ['sn', 'assetidcode'].includes(n);
+      // It's available if quickView is off and it's not a protected ID/SN field
+      return !h.quickView && !isSNOrID;
     });
   }, [record.headers]);
 
@@ -175,23 +201,27 @@ export function RegistryCard({
 
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
 
-  const menuOptions: TactileOption[] = [
-    { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() }
+  const menuOptions = [
+    { label: 'View Profile', icon: Maximize2, onSelect: () => onToggleExpand?.() }
   ];
 
   if (perms?.func_edit_asset || isSystemAdmin) {
-    menuOptions.push({ label: 'Edit Record', icon: Edit3, onClick: () => onInspect(record.id) });
+    menuOptions.push({ label: 'Edit Record', icon: Edit3, onSelect: () => onInspect(record.id) });
   }
 
   if (isSystemAdmin && perms?.func_edit_headers) {
-    menuOptions.push({ label: 'Manage Labels', icon: Columns, onClick: () => onManageLabels?.(record.id) });
+    menuOptions.push({ label: 'Manage Labels', icon: Columns, onSelect: () => onManageLabels?.(record.id) });
   }
 
-  menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onClick: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
-  menuOptions.push({ label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onClick: () => onToggleSelect?.(record.id) });
+  if (syncStatus === 'local') {
+    menuOptions.push({ label: 'Sync Record', icon: CloudUpload, onSelect: () => onSync?.(record.id), disabled: !isOnline } as any);
+  }
+
+  menuOptions.push({ label: status === 'VERIFIED' ? 'Mark Unverified' : 'Mark Verified', icon: status === 'VERIFIED' ? XCircle : CheckCircle2, onSelect: () => onQuickUpdate?.(record.id, { status: status === 'VERIFIED' ? 'UNVERIFIED' : 'VERIFIED' }) });
+  menuOptions.push({ label: selected ? 'Deselect Item' : 'Select Item', icon: Check, onSelect: () => onToggleSelect?.(record.id) });
 
   if (perms?.func_delete_asset || isSystemAdmin) {
-    menuOptions.push({ label: 'Clear Record', icon: Trash2, onClick: () => {}, destructive: true });
+    menuOptions.push({ label: 'Clear Record', icon: Trash2, onSelect: () => {}, destructive: true } as any);
   }
 
   return (
@@ -204,12 +234,7 @@ export function RegistryCard({
         )}
       >
         <CardContent className="p-0 flex flex-col flex-1">
-          <div className="p-4 flex flex-col gap-3 border-b border-border/40 bg-muted/10 relative">
-            {isSetupMode && (
-              <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                <Badge className="bg-primary text-black font-black uppercase text-[8px] tracking-widest">Fixed Identity</Badge>
-              </div>
-            )}
+          <div className="p-4 flex flex-col gap-3 border-b border-border/40 bg-muted/10 relative min-h-[60px]">
             <div className="flex items-center justify-between">
               <div 
                 onClick={(e) => { e.stopPropagation(); onToggleSelect?.(record.id); }}
@@ -243,41 +268,63 @@ export function RegistryCard({
               </Badge>
             </div>
 
-            <InlineField 
-              label="Asset Name" 
-              value={String(record.rawRow.description || 'Untitled Asset')} 
-              onSave={(v) => onQuickUpdate?.(record.id, { description: v })} 
-              icon={Tag}
-              disabled={!canEditBase}
-            />
-          </div>
-
-          <div className="p-4 grid grid-cols-2 gap-4 bg-background relative">
-            {isSetupMode && (
-              <div className="absolute inset-0 bg-primary/5 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                <Badge className="bg-primary text-black font-black uppercase text-[8px] tracking-widest">Fixed Regional</Badge>
+            {descHeader?.quickView && (
+              <InlineField 
+                label={descHeader.displayName} 
+                value={String(record.rawRow.description || 'Untitled Asset')} 
+                onSave={(v) => onQuickUpdate?.(record.id, { description: v })} 
+                icon={Tag}
+                disabled={!canEditBase}
+                isSetupMode={isSetupMode}
+                onRemove={() => handleToggleQuickView(descHeader.id, false)}
+              />
+            )}
+            
+            {isSetupMode && !descHeader?.quickView && (
+              <div className="py-2 text-center border border-dashed border-primary/20 rounded-lg">
+                <span className="text-[7px] font-black uppercase text-primary/40">Description Hidden</span>
               </div>
             )}
-            <InlineField 
-              label="Location" 
-              value={String(record.rawRow.location || 'Global')} 
-              onSave={(v) => onQuickUpdate?.(record.id, { location: v })} 
-              icon={MapPin}
-              disabled={!canEditBase}
-            />
-            <InlineField 
-              label="LGA" 
-              value={String(record.rawRow.lga || 'N/A')} 
-              onSave={(v) => onQuickUpdate?.(record.id, { lga: v })} 
-              icon={Building}
-              disabled={!canEditBase}
-            />
           </div>
 
+          {(locHeader?.quickView || lgaHeader?.quickView) && (
+            <div className="p-4 grid grid-cols-2 gap-4 bg-background">
+              {locHeader?.quickView ? (
+                <InlineField 
+                  label={locHeader.displayName} 
+                  value={String(record.rawRow.location || 'Global')} 
+                  onSave={(v) => onQuickUpdate?.(record.id, { location: v })} 
+                  icon={MapPin}
+                  disabled={!canEditBase}
+                  isSetupMode={isSetupMode}
+                  onRemove={() => handleToggleQuickView(locHeader.id, false)}
+                />
+              ) : isSetupMode ? (
+                <div className="flex flex-col gap-0.5 border border-dashed border-primary/20 rounded-lg p-2 items-center justify-center opacity-40">
+                  <span className="text-[7px] font-black uppercase">Location Hidden</span>
+                </div>
+              ) : <div />}
+
+              {lgaHeader?.quickView ? (
+                <InlineField 
+                  label={lgaHeader.displayName} 
+                  value={String(record.rawRow.lga || 'N/A')} 
+                  onSave={(v) => onQuickUpdate?.(record.id, { lga: v })} 
+                  icon={Building}
+                  disabled={!canEditBase}
+                  isSetupMode={isSetupMode}
+                  onRemove={() => handleToggleQuickView(lgaHeader.id, false)}
+                />
+              ) : isSetupMode ? (
+                <div className="flex flex-col gap-0.5 border border-dashed border-primary/20 rounded-lg p-2 items-center justify-center opacity-40">
+                  <span className="text-[7px] font-black uppercase">LGA Hidden</span>
+                </div>
+              ) : <div />}
+            </div>
+          )}
+
           <div className="divide-y divide-border/20 bg-muted/5 flex-1">
-            {activeHeaders
-              .filter(h => !['description', 'location', 'lga'].includes(h.normalizedName.toLowerCase().replace(/_/g, '')))
-              .map((header) => {
+            {activeHeaders.map((header) => {
                 const field = record.fields.find(f => f.headerId === header.id);
                 const isIdentity = header.normalizedName.toLowerCase().replace(/_/g, '') === 'sn' || header.normalizedName.toLowerCase().replace(/_/g, '') === 'assetidcode';
                 
@@ -303,16 +350,16 @@ export function RegistryCard({
                 );
               })}
 
-            {isSetupMode && activeHeaders.length < 7 && availableHeaders.length > 0 && (
+            {isSetupMode && activeHeaders.length < 10 && availableHeaders.length > 0 && (
               <div className="p-3 flex justify-center bg-primary/[0.03]">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-7 px-4 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 text-primary border border-primary/20 hover:bg-primary/10">
-                      <PlusCircle className="h-3.5 w-3.5" /> Add technical Field
+                      <PlusCircle className="h-3.5 w-3.5" /> Add Field to Card
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56 bg-card border-border shadow-3xl">
-                    <DropdownMenuLabel className="text-[8px] font-black uppercase text-muted-foreground opacity-40">Select Field</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-[8px] font-black uppercase text-muted-foreground opacity-40">Available Headers</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <ScrollArea className="h-48">
                       {availableHeaders.map(h => (

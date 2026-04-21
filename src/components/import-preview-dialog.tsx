@@ -53,7 +53,22 @@ export function ImportPreviewDialog({
         </div>
 
         <ScrollArea className="flex-1 p-8 bg-background">
-          <ReconciliationView assets={assets} summary={summary} />
+          <ReconciliationView 
+            assets={assets} 
+            summary={{
+              workbookName: 'Import Preview',
+              sheetName: 'Sheet',
+              profileId: 'preview',
+              totalRows: assets.length,
+              groupCount: 0,
+              dataRowsImported: assets.length,
+              rowsRejected: 0,
+              duplicatesDetected: 0,
+              templatesDiscovered: 0,
+              sectionBreakdown: {},
+              groups: []
+            }}
+          />
         </ScrollArea>
 
         <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center justify-between gap-4">

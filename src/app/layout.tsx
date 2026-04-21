@@ -1,11 +1,19 @@
 import type {Metadata, Viewport} from 'next';
 import './globals.css';
+import { Inter } from 'next/font/google';
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800', '900'],
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: 'Assetain | Professional Asset Intelligence',
@@ -21,8 +29,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#000000',
 };
@@ -33,16 +39,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className="antialiased">
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <link rel="apple-touch-icon" href="https://picsum.photos/seed/assetain/180/180" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-sans select-none overflow-hidden overscroll-none" suppressHydrationWarning>
+      <body className="font-sans select-none antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

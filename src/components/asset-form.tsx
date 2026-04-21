@@ -2,11 +2,11 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 2018: Strict administrative governance. Non-admin updates are sequestered for review.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -52,7 +52,7 @@ import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
 import { getCanonicalGroup } from "@/lib/condition-logic";
 import type { Asset } from "@/types/domain";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { addNotification } from "@/hooks/use-notifications";
 
 interface AssetFormProps {
@@ -72,19 +72,18 @@ export default function AssetForm({
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { activeGrantId, appSettings, headers: globalHeaders } = useAppState();
+  const { activeGrantIds, appSettings, headers: globalHeaders } = useAppState();
   
   const form = useForm<Asset>({
     resolver: zodResolver(AssetSchema),
     mode: 'onChange',
   });
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
-  const canUserEditFull = !!userProfile?.canEditAssets;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || userProfile?.isAdmin;
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const currentTemplate = useMemo(() => {
-    const category = asset?.category || form.watch('category');
+    const category = asset?.category || form.getValues('category');
     if (!category || !appSettings) return null;
     const grant = appSettings.grants.find(g => 
       Object.keys(g.sheetDefinitions).some(k => getFuzzySignature(k) === getFuzzySignature(category))
@@ -92,16 +91,19 @@ export default function AssetForm({
     if (!grant) return null;
     const defKey = Object.keys(grant.sheetDefinitions).find(k => getFuzzySignature(k) === getFuzzySignature(category));
     return defKey ? grant.sheetDefinitions[defKey] : null;
-  }, [asset?.category, form.watch('category'), appSettings]);
+  }, [asset?.category, appSettings, form]);
 
   useEffect(() => {
     if (isOpen) {
       if (asset) {
         form.reset(asset);
       } else {
+        const defaultGrantId = activeGrantIds[0] || (appSettings?.grants[0]?.id) || '';
         form.reset({
           id: crypto.randomUUID(),
-          grantId: activeGrantId || '',
+          sn: "",
+          assetIdCode: "",
+          grantId: defaultGrantId,
           status: 'UNVERIFIED',
           condition: 'New',
           conditionGroup: 'Good',
@@ -117,13 +119,18 @@ export default function AssetForm({
           metadata: {},
           conditionHistory: [],
           discrepancies: [],
-          updateCount: 0
-        } as Asset);
+          updateCount: 0,
+          section: 'General',
+          subsection: 'Base Register',
+          assetFamily: 'Uncategorized',
+          overallFidelityScore: 100,
+          unseenUpdateFields: []
+        } as unknown as Asset);
       }
     }
-  }, [isOpen, asset, form, userProfile, activeGrantId]);
+  }, [isOpen, asset, form, userProfile, activeGrantIds, appSettings]);
 
-  const onSubmit = async (data: Asset) => {
+  const onSubmit: SubmitHandler<Asset> = async (data) => {
     setIsSaving(true);
     try {
         const nextGroup = getCanonicalGroup(data.condition);
@@ -135,18 +142,23 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
-        if (!isAdmin && !canUserEditFull && asset) {
+        // Approval Logic Pulse
+        if (!isAdmin && asset) {
           const changes: Partial<Asset> = {};
-          (Object.keys(data) as Array<keyof Asset>).forEach(key => {
-            if (JSON.stringify(data[key]) !== JSON.stringify((asset as any)[key])) {
-              (changes as any)[key] = data[key];
+          const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
+          
+          keysToCheck.forEach(key => {
+            const currentVal = (data as any)[key];
+            const originalVal = (asset as any)[key];
+            if (JSON.stringify(currentVal) !== JSON.stringify(originalVal)) {
+              (changes as any)[key] = currentVal;
             }
           });
 
           if (Object.keys(changes).length > 0) {
             nextAsset = {
               ...asset,
-              approvalStatus: 'PENDING',
+              approvalStatus: 'pending',
               pendingChanges: changes,
               changeSubmittedBy: {
                 displayName: userProfile?.displayName || 'Unknown',
@@ -155,7 +167,12 @@ export default function AssetForm({
               },
               lastModified: new Date().toISOString()
             };
-            addNotification({ title: "Update Submitted", description: "Changes awaiting administrative review.", variant: "default", assetId: asset.id });
+            addNotification({ 
+              title: "Update Staged", 
+              description: "Changes enqueued for administrative adjudication.", 
+              variant: "default", 
+              assetId: asset.id 
+            });
           }
         }
 
@@ -170,7 +187,6 @@ export default function AssetForm({
     if (isAdmin) return false;
     const assessmentFields = ['status', 'condition', 'remarks'];
     if (isVerificationMode && assessmentFields.includes(fieldName)) return false;
-    if (canUserEditFull) return false;
     return true;
   };
 
@@ -180,15 +196,17 @@ export default function AssetForm({
       <div className="flex items-center gap-2 mb-1.5">
         <FormLabel className="text-[9px] font-black uppercase text-white/40 mb-0">{label}</FormLabel>
         {header?.guidance && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40" /></div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
-              <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
-              <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help"><Info className="h-3 w-3 text-primary opacity-40" /></div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[240px] p-4 rounded-xl border-primary/20 bg-black shadow-2xl">
+                <p className="text-[10px] font-black uppercase text-primary mb-1">Guidance</p>
+                <p className="text-[11px] font-medium text-white italic leading-relaxed">{header.guidance}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     );
@@ -200,9 +218,14 @@ export default function AssetForm({
         <div className="flex flex-col h-full overflow-hidden">
           <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
             <div className="space-y-1">
-              <DialogTitle className="text-xl sm:text-2xl font-black uppercase text-white leading-none">
-                {asset ? 'Record Update' : 'New Asset Pulse'}
-              </DialogTitle>
+              <div className="flex items-center gap-3">
+                <DialogTitle className="text-xl sm:text-2xl font-black uppercase text-white leading-none">
+                  {asset ? 'Record Update' : 'New Asset Pulse'}
+                </DialogTitle>
+                {!isAdmin && asset && (
+                  <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[8px] font-black uppercase tracking-widest">Approval Required</Badge>
+                )}
+              </div>
               <DialogDescription className="text-[10px] font-bold text-white/40 uppercase tracking-widest truncate">
                 {asset ? `System ID: ${asset.id.split('-')[0]}` : 'Manual Register Entry'}
               </DialogDescription>
@@ -235,7 +258,7 @@ export default function AssetForm({
                                     <FormControl>
                                       <Input 
                                         {...formField} 
-                                        value={formField.value || ''}
+                                        value={String(formField.value || '')}
                                         readOnly={isFieldDisabled(fieldName)} 
                                         className="h-12 bg-white/[0.03] border-white/5 rounded-xl font-black text-sm uppercase shadow-inner" 
                                         placeholder={`Enter ${field.label}...`}
@@ -315,7 +338,7 @@ export default function AssetForm({
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 font-black uppercase text-[9px] text-white/40 hover:text-white px-10">Discard</Button>
             <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-              {isAdmin || canUserEditFull ? 'Save Profile' : 'Submit Update'}
+              {isAdmin ? 'Save Profile' : asset ? 'Submit for Review' : 'Create Record'}
             </Button>
           </div>
         </div>

@@ -96,7 +96,7 @@ export function RegistryTable({
             </TableHead>
             <SortHeader label="Physical Identification" sortKey="description" currentSort={sortConfig} onSort={onSort} />
             <SortHeader label="Scope & Assignee" sortKey="location" currentSort={sortConfig} onSort={onSort} />
-            <SortHeader label="Pulse Status" sortKey="status" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Verification Status" sortKey="status" currentSort={sortConfig} onSort={onSort} />
             <TableHead className="py-4 px-6 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">View</TableHead>
           </TableRow>
         </TableHeader>
@@ -105,7 +105,7 @@ export function RegistryTable({
             <TableRow 
               key={asset.id} 
               className={cn(
-                "hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0 tactile-pulse",
+                "hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0 tactile-feedback",
                 selectedIds.has(asset.id) ? "bg-primary/[0.05]" : "bg-card/30"
               )}
               onClick={() => onInspect(asset)}

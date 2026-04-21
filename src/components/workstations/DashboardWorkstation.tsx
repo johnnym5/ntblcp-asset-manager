@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Dashboard Center - Registry Overview.
- * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 1980: Resolved TypeError by adding data safety checks and fixing CSS typo.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -105,6 +105,8 @@ export function DashboardWorkstation() {
   // Handle Non-Deterministic Sorting client-side only
   useEffect(() => {
     const generateSamples = () => {
+      if (!assets || assets.length === 0) return;
+
       // 1. Glance Assets
       const gList = [...assets].sort(() => 0.5 - Math.random()).slice(0, 8);
       setGlanceAssets(gList);
@@ -211,7 +213,7 @@ export function DashboardWorkstation() {
           </div>
           <div className="relative group min-h-[200px]">
             <AnimatePresence mode="wait">
-              {glanceAssets.length > 0 ? (
+              {glanceAssets.length > 0 && glanceAssets[glanceIndex] ? (
                 <motion.div 
                   key={`glance-${glanceIndex}-${randomSeed}`} 
                   initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -273,7 +275,7 @@ export function DashboardWorkstation() {
           </div>
           <div className="relative group min-h-[200px]">
             <AnimatePresence mode="wait">
-              {issueAssets.length > 0 ? (
+              {issueAssets.length > 0 && issueAssets[issueIndex] ? (
                 <motion.div 
                   key={`issue-${issueIndex}-${randomSeed}`}
                   initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
@@ -362,7 +364,7 @@ export function DashboardWorkstation() {
                   <div className="space-y-2 mb-4">
                     {pendingSync.slice(0, 3).map(q => (
                       <div key={q.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
-                        <span className="text-10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Profile Update'}</span>
+                        <span className="text-[10px] font-black uppercase truncate max-w-[200px]">{(q.payload as any).description || 'Profile Update'}</span>
                         <Badge variant="outline" className="text-[7px] font-mono">{q.operation}</Badge>
                       </div>
                     ))}

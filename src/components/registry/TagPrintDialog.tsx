@@ -3,6 +3,7 @@
 /**
  * @fileOverview TagPrintDialog - Professional Asset Label Generator.
  * Phase 54: High-fidelity bulk tag printing with QR identity pulses.
+ * Phase 55: Migrated from <img> to next/image for better LCP.
  */
 
 import React, { useState } from 'react';
@@ -26,6 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
+import Image from 'next/image';
 
 interface TagPrintDialogProps {
   isOpen: boolean;
@@ -90,14 +92,15 @@ export function TagPrintDialog({ isOpen, onOpenChange, records }: TagPrintDialog
                 </div>
 
                 {/* QR Pulse - Zero Dependency API */}
-                <div className="shrink-0 flex items-center justify-center bg-muted/10 rounded-xl p-2 print:p-0 border-2 border-dashed border-border/40 print:border-none">
-                  <img 
+                <div className="shrink-0 flex items-center justify-center bg-muted/10 rounded-xl p-2 print:p-0 border-2 border-dashed border-border/40 print:border-none relative w-24 h-24">
+                  <Image 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.id}`} 
                     alt="Asset QR Pulse"
+                    fill
                     className={cn(
-                      "mix-blend-multiply transition-transform group-hover:scale-105",
-                      tagSize === 'sm' ? "h-16 w-16" : "h-24 w-24"
+                      "mix-blend-multiply transition-transform group-hover:scale-105 object-contain",
                     )}
+                    unoptimized
                   />
                 </div>
 

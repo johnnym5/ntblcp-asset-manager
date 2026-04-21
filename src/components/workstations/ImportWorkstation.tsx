@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Import Center - Excel Data Setup.
- * Phase 1914: Updated with simple terminology (Import, Scan, Groups).
+ * Phase 2010: Hardened for production build and App Hosting parity.
  */
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ import { cn, getFuzzySignature } from '@/lib/utils';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { normalizeHeaderName } from '@/lib/registry-utils';
 import type { SheetDefinition } from '@/types/domain';
+import { useToast } from '@/hooks/use-toast';
 
 type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 type MergeStrategy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
@@ -62,6 +63,7 @@ export function ImportWorkstation() {
   const [stagedAssets, setStagedAssets] = useState<ParsedAsset[]>([]);
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
   const [selectedGroupIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [headerExclusions, setHeaderExclusions] = useState<Record<string, Set<string>>>({});
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
   
@@ -72,13 +74,15 @@ export function ImportWorkstation() {
   const engineRef = useRef<ParserEngine | null>(null);
 
   const mergedSheetDefinitions = useMemo(() => {
-    const defs: Record<string, SheetDefinition> = {};
-    appSettings?.grants.forEach(g => {
-      Object.entries(g.sheetDefinitions || {}).forEach(([name, def]) => {
-        defs[name] = def as any;
+    const def: Record<string, SheetDefinition> = {};
+    if (appSettings?.grants) {
+      appSettings.grants.forEach(g => {
+        Object.entries(g.sheetDefinitions || {}).forEach(([name, definition]) => {
+          def[name] = definition as any;
+        });
       });
-    });
-    return defs;
+    }
+    return def;
   }, [appSettings?.grants]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +100,7 @@ export function ImportWorkstation() {
       const allGroups: DiscoveredGroup[] = [];
       const wbData: Record<string, any[][]> = {};
       
-      engineRef.current = new ParserEngine(file.name, existingAssets, mergedSheetDefinitions as any);
+      engineRef.current = new ParserEngine(file.name, existingAssets as any, mergedSheetDefinitions as any);
 
       for (let i = 0; i < workbook.SheetNames.length; i++) {
         const sheetName = workbook.SheetNames[i];
@@ -112,6 +116,7 @@ export function ImportWorkstation() {
 
       setWorkbookData(wbData);
       setDiscoveredGroups(allGroups);
+      
       setSelectedIds(new Set(allGroups.filter(g => g.isTemplateMatched).map(g => g.id)));
 
       setTimeout(() => {
@@ -124,8 +129,19 @@ export function ImportWorkstation() {
     }
   };
 
+  const handleToggleHeader = (groupId: string, header: string) => {
+    setHeaderExclusions(prev => {
+      const next = { ...prev };
+      const set = new Set(next[groupId] || []);
+      if (set.has(header)) set.delete(header);
+      else set.add(header);
+      next[groupId] = set;
+      return next;
+    });
+  };
+
   const handleCreateTemplate = async (group: DiscoveredGroup) => {
-    const targetGrantId = activeGrantIds[0];
+    const targetGrantId = activeGrantIds[0] || appSettings?.grants[0]?.id;
     if (!targetGrantId || !appSettings) return;
 
     setIsProcessing(true);
@@ -180,7 +196,13 @@ export function ImportWorkstation() {
     setProgress(0);
 
     try {
-      const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
+      const selectedGroups = discoveredGroups
+        .filter(g => selectedGroupIds.has(g.id))
+        .map(g => ({
+          ...g,
+          excludedHeaders: headerExclusions[g.id] ? Array.from(headerExclusions[g.id]) : []
+        }));
+
       const groupsBySheet: Record<string, DiscoveredGroup[]> = {};
       selectedGroups.forEach(g => {
         if (!groupsBySheet[g.sheetName]) groupsBySheet[g.sheetName] = [];
@@ -221,7 +243,7 @@ export function ImportWorkstation() {
   };
 
   const handleCommit = async () => {
-    const targetGrantId = activeGrantIds[0];
+    const targetGrantId = activeGrantIds[0] || appSettings?.grants[0]?.id;
     if (!targetGrantId || !appSettings) return;
 
     setIsProcessing(true);
@@ -273,7 +295,7 @@ export function ImportWorkstation() {
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
                 <div className="p-10 bg-primary/10 rounded-full mb-8 shadow-inner"><FileSpreadsheet className="h-16 w-16 text-primary" /></div>
                 <h3 className="text-3xl font-black uppercase text-white tracking-tight leading-none">Start New Import</h3>
-                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">Select an Excel file to scan for asset folders and records.</p>
+                <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic mt-4 leading-relaxed">&quot;Select an Excel file to scan for asset folders and records.&quot;</p>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Excel File</Button>
               </Card>
             </motion.div>
@@ -296,8 +318,8 @@ export function ImportWorkstation() {
                 <div className="p-6 rounded-3xl bg-orange-500/5 border-2 border-dashed border-orange-500/20 flex items-start gap-6 mb-10">
                   <div className="p-3 bg-orange-500 rounded-xl"><FileWarning className="h-6 w-6 text-black" /></div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-black uppercase text-orange-600">New Folders Found</h4>
-                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found {unrecognizedCount} folders that need a setup. Please define them before importing data.</p>
+                    <h4 className="text-base font-black uppercase text-orange-600">{unrecognizedCount} New Folders Detected</h4>
+                    <p className="text-[11px] font-medium text-white/60 leading-relaxed italic">System found folders that are not yet defined in your settings. Please use &quot;Define as Template&quot; to map their columns before importing.</p>
                   </div>
                 </div>
               )}
@@ -305,6 +327,8 @@ export function ImportWorkstation() {
               <StructurePreview 
                 groups={discoveredGroups} 
                 selectedIds={selectedGroupIds} 
+                excludedHeaders={headerExclusions}
+                onToggleHeader={handleToggleHeader}
                 onToggleId={(id) => {
                   const group = discoveredGroups.find(g => g.id === id);
                   if (group?.isTemplateMatched) {
