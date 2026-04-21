@@ -10,20 +10,20 @@ runConfig:
   maxInstances: 10
 
 # Environment variables available at build and runtime.
-# Deployment Reroute: Assetain Production Site
+# These values should be configured in the Firebase Console or local .env.local file.
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU"
+    value: "FIREBASE_API_KEY_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "assetain.firebaseapp.com"
+    value: "FIREBASE_AUTH_DOMAIN_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: "https://ntblcp-asset-manager-default-rtdb.firebaseio.com"
+    value: "FIREBASE_DATABASE_URL_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
@@ -33,27 +33,27 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "ntblcp-asset-manager.firebasestorage.app"
+    value: "FIREBASE_STORAGE_BUCKET_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "573481845773"
+    value: "FIREBASE_SENDER_ID_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:573481845773:web:5040ae77a51681c05bc144"
+    value: "FIREBASE_APP_ID_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_INITIAL_ADMIN_USER
-    value: "admin"
+    value: "ADMIN_USERNAME_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD
-    value: "setup"
+    value: "ADMIN_PASSWORD_PLACEHOLDER"
     availability:
       - BUILD
       - RUNTIME
