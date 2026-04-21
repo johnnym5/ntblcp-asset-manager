@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 2015: Synchronized for strict production build and App Hosting support.
+ * Phase 2017: Removed unnecessary dependency from filteredAssets useMemo.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -181,11 +182,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (missingFieldFilter) results = results.filter(a => !a[missingFieldFilter as keyof Asset]);
 
     if (searchTerm) {
-      const isVehicle = (a: Asset) => {
-        const cat = getFuzzySignature(a.category);
-        return cat.includes('motor') || cat.includes('vehicle');
-      };
-
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
@@ -223,7 +219,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
 
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, filters, appSettings]);
+  }, [assets, sandboxAssets, dataSource, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, selectedCategories, sortKey, sortDir, headers, appSettings]);
 
   const locationOptions = useMemo(() => {
     const map = new Map<string, { label: string, count: number }>();

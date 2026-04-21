@@ -4,6 +4,7 @@
  * @fileOverview Legacy Asset List Component.
  * Fixed for production build: synchronized property accessors with domain Asset interface.
  * Phase 2015: assignee -> custodian, verifiedStatus -> status.
+ * Phase 2016: Escaped reserved characters for ESLint compliance.
  */
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -89,7 +90,6 @@ import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
 import { SyncConfirmationDialog } from "./sync-confirmation-dialog";
-import type { SyncSummary } from '@/types/domain';
 
 const SPECIAL_LOCATIONS = ["Head Office", "Federal Ministry of Health", "PMU"];
 
@@ -535,7 +535,7 @@ export default function AssetList() {
          <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Delete all assets in '{categoryToDelete}'?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete all assets in &apos;{categoryToDelete}&apos;?</AlertDialogTitle>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
