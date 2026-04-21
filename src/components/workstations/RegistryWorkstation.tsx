@@ -118,7 +118,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     goBack,
     searchTerm,
     setSearchTerm,
-    isSyncing
+    isSyncing,
+    setIsSyncing
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -463,7 +464,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       addNotification({ title: "Folder Synced", description: `"${cat}" is already in parity with the cloud.` });
       return;
     }
-    setIsProcessing(true);
+    setIsSyncing(true);
     try {
       addNotification({ title: "Syncing Folder...", description: `Uploading ${folderAssets.length} changes from ${cat}.` });
       
@@ -494,7 +495,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     } catch (e) {
       addNotification({ title: "Sync Failure", variant: "destructive" });
     } finally {
-      setIsProcessing(false);
+      setIsSyncing(false);
     }
   };
 
@@ -508,7 +509,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         if (asset?.syncStatus === 'synced') addNotification({ title: "Asset Synced", description: "Record already in parity." });
         return;
     }
-    setIsProcessing(true);
+    setIsSyncing(true);
     try {
       await FirestoreService.saveAsset(asset);
       
@@ -528,7 +529,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     } catch (e) {
       addNotification({ title: "Sync Failure", variant: "destructive" });
     } finally {
-      setIsProcessing(false);
+      setIsSyncing(false);
     }
   };
 

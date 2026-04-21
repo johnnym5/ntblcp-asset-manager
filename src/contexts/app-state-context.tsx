@@ -420,7 +420,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   return (
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
-      searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
+      searchTerm, setSearchTerm, isSyncing, setIsSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantIds, activeGrantId, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload, executeSync, syncSummary, isSyncConfirmOpen, setIsSyncConfirmOpen,
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },

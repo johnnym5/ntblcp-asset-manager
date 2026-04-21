@@ -323,6 +323,7 @@ export interface AppStateContextType {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   isSyncing: boolean;
+  setIsSyncing: (val: boolean) => void;
   appSettings: AppSettings | null;
   setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
