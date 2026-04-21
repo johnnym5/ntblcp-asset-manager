@@ -2,14 +2,16 @@
  * @fileOverview Advanced Error Monitoring & Resilience Service.
  * Translates technical failures into user-friendly notifications and logs audits to the cloud.
  * Phase 1980: Removed FirestoreService dependency to break circular module loop.
+ * Phase 1981: Added log method and fixed logger integration.
  */
 
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { doc, setDoc, collection } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { sanitizeForFirestore } from '@/lib/utils';
+import { logger } from './logger';
 import type { ErrorLogEntry, ErrorSeverity } from '@/types/domain';
 
 export interface TraceContext {
@@ -41,6 +43,16 @@ class MonitoringService {
 
     this.isInitialized = true;
     logger.info("Asset Manager Resilience System Active");
+  }
+
+  /**
+   * Simple logging pulse for operational status.
+   */
+  log(message: string) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[MONITORING] ${message}`);
+    }
+    this.trackEvent('LOG_PULSE', { message });
   }
 
   /**
@@ -79,8 +91,8 @@ class MonitoringService {
       },
       recovery: {
         attempted: !!context.recoveryAttempted,
-        action: context.recoveryAction || null,
-        result: context.recoveryResult || null
+        action: context.recoveryAction || undefined,
+        result: context.recoveryResult || undefined
       }
     };
 
@@ -107,7 +119,7 @@ class MonitoringService {
    */
   trackEvent(name: string, data: any) {
     if (process.env.NODE_ENV !== 'production') {
-      logger.debug(`SYSTEM STATUS [${name}]:`, data);
+      logger.info(`SYSTEM STATUS [${name}]:`, data);
     }
   }
 
