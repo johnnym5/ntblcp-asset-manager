@@ -3,6 +3,7 @@
 /**
  * @fileOverview Governance Inbox - Request & Approval Pop-up Window.
  * Converted from Sheet to Dialog for focused workstation parity.
+ * Phase 2006: Corrected functional call to adjudicateAssetUpdate.
  */
 
 import React, { useState } from 'react';
@@ -56,7 +57,7 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
       setIsProcessing(true);
       try {
         for (const id of assetIds) {
-          await FirestoreService.adjudicateAssetPulse(id, action);
+          await FirestoreService.adjudicateAssetUpdate(id, action);
         }
         await refreshRegistry();
         toast({ 

@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
  * Phase 1915: Removed redundant TooltipProvider.
+ * Phase 2005: Enforced strict governance - only Admins bypass approval.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -60,7 +61,6 @@ interface AssetFormProps {
   onOpenChange: (open: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
-  onQuickSave?: (assetId: string, data: any) => Promise<void>;
   isReadOnly: boolean;
 }
 
@@ -80,8 +80,7 @@ export default function AssetForm({
     mode: 'onChange',
   });
 
-  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN' || !!userProfile?.isZonalAdmin;
-  const canUserEditFull = !!userProfile?.canEditAssets;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isVerificationMode = appSettings?.appMode === 'verification';
 
   const currentTemplate = useMemo(() => {
@@ -142,11 +141,17 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
-        if (!isAdmin && !canUserEditFull && asset) {
+        // GOVERNANCE PULSE: Only Admins can save directly.
+        // Everyone else generates a PENDING record for the inbox.
+        if (!isAdmin && asset) {
           const changes: Partial<Asset> = {};
-          (Object.keys(data) as Array<keyof Asset>).forEach(key => {
-            if (JSON.stringify((data as any)[key]) !== JSON.stringify((asset as any)[key])) {
-              (changes as any)[key] = (data as any)[key];
+          const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
+          
+          keysToCheck.forEach(key => {
+            const currentVal = (data as any)[key];
+            const originalVal = (asset as any)[key];
+            if (JSON.stringify(currentVal) !== JSON.stringify(originalVal)) {
+              (changes as any)[key] = currentVal;
             }
           });
 
@@ -162,7 +167,12 @@ export default function AssetForm({
               },
               lastModified: new Date().toISOString()
             };
-            addNotification({ title: "Update Submitted", description: "Changes awaiting administrative review.", variant: "default", assetId: asset.id });
+            addNotification({ 
+              title: "Update Staged", 
+              description: "Changes enqueued for administrative adjudication.", 
+              variant: "default", 
+              assetId: asset.id 
+            });
           }
         }
 
@@ -175,9 +185,9 @@ export default function AssetForm({
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
+    // Verification mode allows condition/remarks/status edits by Verifiers
     const assessmentFields = ['status', 'condition', 'remarks'];
     if (isVerificationMode && assessmentFields.includes(fieldName)) return false;
-    if (canUserEditFull) return false;
     return true;
   };
 
@@ -207,9 +217,14 @@ export default function AssetForm({
         <div className="flex flex-col h-full overflow-hidden">
           <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
             <div className="space-y-1">
-              <DialogTitle className="text-xl sm:text-2xl font-black uppercase text-white leading-none">
-                {asset ? 'Record Update' : 'New Asset Pulse'}
-              </DialogTitle>
+              <div className="flex items-center gap-3">
+                <DialogTitle className="text-xl sm:text-2xl font-black uppercase text-white leading-none">
+                  {asset ? 'Record Update' : 'New Asset Pulse'}
+                </DialogTitle>
+                {!isAdmin && asset && (
+                  <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[8px] font-black uppercase tracking-widest">Approval Required</Badge>
+                )}
+              </div>
               <DialogDescription className="text-[10px] font-bold text-white/40 uppercase tracking-widest truncate">
                 {asset ? `System ID: ${asset.id.split('-')[0]}` : 'Manual Register Entry'}
               </DialogDescription>
@@ -322,7 +337,7 @@ export default function AssetForm({
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 font-black uppercase text-[9px] text-white/40 hover:text-white px-10">Discard</Button>
             <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}
-              {isAdmin || canUserEditFull ? 'Save Profile' : 'Submit Update'}
+              {isAdmin ? 'Save Profile' : asset ? 'Submit for Review' : 'Create Record'}
             </Button>
           </div>
         </div>
