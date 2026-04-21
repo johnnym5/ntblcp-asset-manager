@@ -136,9 +136,11 @@ export interface Asset {
   locationConfidence?: MatchConfidence;
   locationStatus?: LocationMatchStatus;
   custodian: string;
+  assignee?: string;
   lga: string;
   site: string;
   status: VerificationStatus;
+  verifiedStatus?: VerificationStatus;
   condition: string;
   conditionGroup: ConditionGroup;
   conditionNotes?: string;
@@ -174,7 +176,7 @@ export interface Asset {
   unseenUpdateFields: string[];
   previousState?: any | null;
   pendingChanges?: any;
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   changeSubmittedBy?: {
     displayName: string;
     loginName: string;
@@ -194,7 +196,7 @@ export interface Asset {
 }
 
 export interface DisplayField {
-  key: keyof Asset;
+  key: keyof Asset | 'name';
   label: string;
   table: boolean;
   quickView: boolean;

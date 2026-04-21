@@ -45,13 +45,14 @@ export interface Asset {
 
   // Status fields
   status: VerificationStatus;
+  verifiedStatus?: VerificationStatus;
   syncStatus?: SyncStatus;
   lastModified: string;
   lastModifiedBy: string;
   lastModifiedByState?: string;
 
   // Approval Workflow Fields
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   pendingChanges?: any;
   changeSubmittedBy?: { 
     displayName: string;
@@ -71,7 +72,7 @@ export interface AuthorizedUser {
 }
 
 export interface DisplayField {
-  key: keyof Asset;
+  key: keyof Asset | 'name';
   label: string;
   table: boolean;
   quickView: boolean;

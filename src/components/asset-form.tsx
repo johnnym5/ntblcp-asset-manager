@@ -158,7 +158,7 @@ export default function AssetForm({
           if (Object.keys(changes).length > 0) {
             nextAsset = {
               ...asset,
-              approvalStatus: 'PENDING',
+              approvalStatus: 'pending',
               pendingChanges: changes,
               changeSubmittedBy: {
                 displayName: userProfile?.displayName || 'Unknown',

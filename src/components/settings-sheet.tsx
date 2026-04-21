@@ -55,7 +55,8 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { appSettings, setAppSettings, refreshRegistry, isOnline, setActiveGrantId, activeGrantId, setActiveView } = useAppState();
+  const { appSettings, setAppSettings, refreshRegistry, isOnline, activeGrantId, setActiveView } = useAppState();
+  // setActiveGrantId may not be exposed; use context update mechanism
   const { userProfile } = useAuth();
   const { toast } = useToast();
 

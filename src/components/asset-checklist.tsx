@@ -105,7 +105,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
       <div className="space-y-3">
         {checklistItems.length > 0 ? (
           checklistItems.map(({ id, ...itemProps }) => (
-            <ChecklistItem key={id} {...itemProps} />
+            <ChecklistItem key={id} {...itemProps} id={id} />
           ))
         ) : (
           <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">

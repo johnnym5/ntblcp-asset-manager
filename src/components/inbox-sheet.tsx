@@ -50,7 +50,7 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pendingAssets = assets
-    .filter(asset => asset.approvalStatus === 'PENDING')
+    .filter(asset => asset.approvalStatus === 'pending')
     .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime());
 
   const handleAction = async (assetIds: string[], action: 'APPROVE' | 'REJECT') => {
