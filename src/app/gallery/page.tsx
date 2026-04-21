@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';

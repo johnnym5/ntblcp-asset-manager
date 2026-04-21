@@ -174,7 +174,7 @@ export function RegistryTable({
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="text-[13px] font-black uppercase text-foreground leading-none truncate">{String(record.rawRow.description || 'Untitled Asset')}</span>
-                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {record.rawRow.assetIdCode || 'UNSET'}</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {String(record.rawRow.assetIdCode || 'UNSET')}</span>
                   </div>
                 </div>
 

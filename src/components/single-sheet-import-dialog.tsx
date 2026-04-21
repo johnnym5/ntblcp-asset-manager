@@ -22,7 +22,8 @@ import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { cn, getFuzzySignature } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
-import type { DiscoveredGroup, SheetDefinition } from '@/parser/types';
+import type { DiscoveredGroup } from '@/parser/types';
+import type { SheetDefinition } from '@/types/domain';
 
 interface ImportScannerDialogProps {
   isOpen: boolean;

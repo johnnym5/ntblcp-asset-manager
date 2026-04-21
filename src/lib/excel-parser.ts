@@ -95,14 +95,17 @@ export async function parseExcelFile(
           if (!sheet) continue;
 
           const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-          const groupContainer = engine.parseWorkbook(sheetName, data);
+          const groups = engine.discoverGroups(sheetName, data);
+          const groupContainers = engine.ingestGroups(sheetName, data, groups);
           
-          groupContainer.assets.forEach(asset => {
-            if (asset.validation.isUpdate) {
-              result.updatedAssets.push(asset as any);
-            } else {
-              result.assets.push(asset as any);
-            }
+          groupContainers.forEach(container => {
+             container.assets.forEach((asset: any) => {
+                if (asset.validation.isUpdate) {
+                  result.updatedAssets.push(asset as any);
+                } else {
+                  result.assets.push(asset as any);
+                }
+             });
           });
         }
 

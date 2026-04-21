@@ -101,7 +101,7 @@ export const storage = {
   // Settings Store
   async getSettings(): Promise<AppSettings | null> {
     const db = await getDb();
-    return db ? db.get('settings', 'app-settings') : null;
+    return db ? ((await db.get('settings', 'app-settings')) || null) : null;
   },
   async saveSettings(settings: AppSettings): Promise<void> {
     const db = await getDb();

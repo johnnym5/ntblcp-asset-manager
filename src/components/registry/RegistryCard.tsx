@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
-import { TactileMenu } from '@/components/TactileMenu';
+import { TactileMenu, type TactileOption } from '@/components/TactileMenu';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -175,7 +175,7 @@ export function RegistryCard({
 
   const hasUnsavedRemark = localRemark !== (record.rawRow.remarks || '');
 
-  const menuOptions = [
+  const menuOptions: TactileOption[] = [
     { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand?.() }
   ];
 

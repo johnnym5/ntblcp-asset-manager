@@ -61,7 +61,7 @@ export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: bo
     return flaggedAssets.filter(a => 
       (a.description || '').toLowerCase().includes(term) || 
       (a.assetIdCode || '').toLowerCase().includes(term) ||
-      a.discrepancies.some(d => d.reason.toLowerCase().includes(term))
+      (a.discrepancies || []).some(d => d.reason.toLowerCase().includes(term))
     );
   }, [flaggedAssets, searchTerm]);
 
@@ -73,7 +73,7 @@ export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: bo
 
   const stats = useMemo(() => {
     const totalFlagged = flaggedAssets.length;
-    const critical = flaggedAssets.filter(a => a.discrepancies.some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH')).length;
+    const critical = flaggedAssets.filter(a => (a.discrepancies || []).some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH')).length;
     const resolved = assets.filter(a => a.discrepancies && a.discrepancies.some(d => d.status === 'RESOLVED' || d.status === 'CORRECTED')).length;
     return { totalFlagged, critical, resolved };
   }, [flaggedAssets, assets]);
@@ -231,7 +231,7 @@ export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                 <div className="absolute -top-3 -right-3 z-20">
                   <div className={cn(
                     "h-10 w-10 rounded-2xl flex items-center justify-center text-white shadow-2xl border-2 border-black",
-                    asset.discrepancies.some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH') ? "bg-red-600" : "bg-primary text-black"
+                    (asset.discrepancies || []).some(d => d.severity === 'CRITICAL' || d.severity === 'HIGH') ? "bg-red-600" : "bg-primary text-black"
                   )}>
                     <FileWarning className="h-5 w-5" />
                   </div>
@@ -248,7 +248,7 @@ export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
-                      {asset.discrepancies.slice(0, 2).map((d, i) => (
+                      {(asset.discrepancies || []).slice(0, 2).map((d, i) => (
                         <div key={i} className="flex items-start gap-3">
                           <div className={cn("h-1.5 w-1.5 rounded-full mt-1.5", d.severity === 'HIGH' || d.severity === 'CRITICAL' ? "bg-red-500" : "bg-primary")} />
                           <p className="text-[10px] font-medium text-white/60 leading-relaxed italic">{d.reason}</p>
@@ -269,9 +269,9 @@ export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: bo
 
         {totalPages > 1 && (
           <div className="flex justify-center mt-12 gap-6 items-center">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-6 w-6" /></button>
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-6 w-6" /></button>
             <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Page {currentPage} of {totalPages}</span>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-6 w-6" /></button>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="p-2 text-white/40 hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-6 w-6" /></button>
           </div>
         )}
 

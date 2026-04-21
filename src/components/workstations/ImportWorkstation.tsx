@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { addNotification } from '@/hooks/use-notifications';
 import * as XLSX from 'xlsx';
 import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
+import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StructurePreview } from '@/modules/import/components/StructurePreview';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
@@ -54,6 +55,7 @@ export function ImportWorkstation() {
     isOnline
   } = useAppState();
   const { userProfile } = useAuth();
+  const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');
   const [isProcessing, setIsProcessing] = useState(false);

@@ -223,7 +223,6 @@ export default function VerificationQueuePage() {
           toast({ title: "Assessment Committed" });
           setIsFormOpen(false);
         }}
-        onQuickSave={async () => {}}
         isReadOnly={false}
       />
     </AppLayout>

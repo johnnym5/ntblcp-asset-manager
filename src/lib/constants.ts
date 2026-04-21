@@ -93,6 +93,13 @@ export const NIGERIAN_ZONES: Record<string, string[]> = {
 
 export const ZONAL_STORES = Object.keys(NIGERIAN_ZONES);
 
+export const SPECIAL_LOCATIONS = [
+  "National Store",
+  "HQ",
+  "Federal Ministry of Health",
+  "Zonal Office"
+];
+
 export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],

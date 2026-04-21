@@ -59,7 +59,7 @@ export const PdfService = {
         ['Condition State', asset.condition || 'UNASSESSED'],
         ['Verification Status', asset.status],
         ['Source Row', String(asset.importMetadata?.rowNumber || 'MANUAL')],
-        ['GPS Coordinates', (asset.metadata?.geotag as any) ? `${(asset.metadata.geotag as any).lat?.toFixed(4)}, ${(asset.metadata.geotag as any).lng?.toFixed(4)}` : 'NOT ANCHORED']
+        ['GPS Coordinates', (asset.metadata?.geotag as any) ? `${(asset.metadata?.geotag as any)?.lat?.toFixed(4)}, ${(asset.metadata?.geotag as any)?.lng?.toFixed(4)}` : 'NOT ANCHORED']
       ],
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },

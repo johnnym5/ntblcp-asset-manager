@@ -768,7 +768,7 @@ export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boole
       </AlertDialog>
 
       {/* Node Delete Confirmation */}
-      <AlertDialog open={!!nodeToDelete} onOpenChange={setNodeToDelete}>
+      <AlertDialog open={!!nodeToDelete} onOpenChange={(open) => !open && setNodeToDelete(null)}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Trash2 className="h-10 w-10 text-destructive" /></div>

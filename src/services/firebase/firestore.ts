@@ -169,7 +169,7 @@ export const FirestoreService = {
         assetId: asset.id,
         assetDescription: asset.description,
         operation,
-        performedBy: asset.lastModifiedBy,
+        performedBy: asset.lastModifiedBy || 'System',
         userState: asset.lastModifiedByState || 'Unknown',
         changes: Object.keys(changes).length > 0 ? changes : undefined
       });
@@ -246,6 +246,24 @@ export const FirestoreService = {
     }
     await clearRtdb();
     return total;
+  },
+
+  async deleteAsset(id: string): Promise<void> {
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, 'assets', id));
+      await this.logActivity({
+        assetId: id,
+        assetDescription: 'Deleted Asset',
+        operation: 'DELETE',
+        performedBy: 'System',
+        userState: 'System',
+        changes: undefined
+      });
+    } catch (err: any) {
+      this.handlePermissionError(doc(db, 'assets', id), 'delete', err);
+      throw err;
+    }
   },
 
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {

@@ -188,11 +188,11 @@ export function AssetDossier({
             <div className="p-2 bg-primary/10 rounded-xl"><Tag className="h-5 w-5 text-primary" /></div>
             <div className="space-y-0.5 min-w-0 flex-1">
               <h3 className="text-xl font-black uppercase text-foreground tracking-tight leading-none truncate">{String(record.rawRow.description || 'Untitled')}</h3>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest truncate">ID: {record.rawRow.assetIdCode || 'UNSET'}</p>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest truncate">ID: {String(record.rawRow.assetIdCode || 'UNSET')}</p>
             </div>
           </div>
           
-          {(record.rawRow.photoUrl || record.rawRow.photoDataUri) && (
+          {!!(record.rawRow.photoUrl || record.rawRow.photoDataUri) && (
             <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-border/60 shadow-xl group">
               <Image 
                 src={(record.rawRow.photoUrl || record.rawRow.photoDataUri) as string} 

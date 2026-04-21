@@ -24,10 +24,10 @@ const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || staticConfig.apiKey,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || staticConfig.authDomain,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || staticConfig.projectId,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || staticConfig.storageBucket,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || (staticConfig as any).storageBucket,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || staticConfig.messagingSenderId,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || staticConfig.appId,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || staticConfig.databaseURL,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || (staticConfig as any).databaseURL,
 };
 
 export const isConfigValid = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;

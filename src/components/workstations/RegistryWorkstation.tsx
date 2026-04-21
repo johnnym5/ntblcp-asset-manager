@@ -648,7 +648,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={selectedSheetDef} originalSheetName={originalSheetName} onSave={(orig, newDef, all) => {
           const grant = appSettings?.grants.find(g => g.sheetDefinitions[originalSheetName || ''] || g.sheetDefinitions[newDef.name]);
           if (!grant) return;
-          const updatedGrants = appSettings?.grants.map(g => {
+          const updatedGrants = appSettings!.grants.map(g => {
             if (g.id === grant.id) {
               const newSheetDefs = { ...g.sheetDefinitions, [newDef.name]: newDef };
               if (originalSheetName && originalSheetName !== newDef.name) delete newSheetDefs[originalSheetName];

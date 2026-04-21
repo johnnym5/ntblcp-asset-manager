@@ -48,6 +48,8 @@ interface AppStateContextType {
   settingsLoaded: boolean;
   isHydrated: boolean;
   activeGrantIds: string[];
+  activeGrantId: string | null;
+  setActiveGrantId: (id: string | null) => Promise<void>;
   activeView: WorkstationView;
   setActiveView: (view: WorkstationView) => void;
   refreshRegistry: () => Promise<void>;
@@ -162,6 +164,16 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
   const activeGrantIds = useMemo(() => appSettings?.activeGrantIds || [], [appSettings]);
+  const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
+
+  const setActiveGrantId = useCallback(async (id: string | null) => {
+    if (!appSettings) return;
+    const next = { ...appSettings, activeGrantId: id || undefined };
+    setAppSettings(next);
+    await storage.saveSettings(next);
+    if (isOnline) await FirestoreService.updateSettings({ activeGrantId: id || undefined });
+    await refreshRegistry();
+  }, [appSettings, isOnline]);
 
   const refreshRegistry = useCallback(async () => {
     try {
@@ -438,8 +450,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           newItems.push(remote);
         } else {
           if (!areAssetsIdentical(local, remote)) {
-            const remoteTime = new Date(remote.lastModified).getTime();
-            const localTime = new Date(local.lastModified).getTime();
+            const remoteTime = new Date(remote.lastModified || 0).getTime();
+            const localTime = new Date(local.lastModified || 0).getTime();
             
             if (remoteTime > localTime) {
               autoUpdateItems.push(remote);
@@ -549,10 +561,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     <AppStateContext.Provider value={{
       assets, filteredAssets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
-      activeGrantIds, activeView, setActiveView: setActiveViewStatus,
+      activeGrantIds, activeGrantId, setActiveGrantId, activeView, setActiveView: setActiveViewStatus,
       refreshRegistry, manualDownload, manualUpload, executeSync, syncSummary, isSyncConfirmOpen, setIsSyncConfirmOpen,
       setReadAuthority: async (node) => { if (!appSettings) return; const next = { ...appSettings, readAuthority: node }; setAppSettings(next); await storage.saveSettings(next); if (isOnline) await FirestoreService.updateSettings({ readAuthority: node }); await refreshRegistry(); },
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
+      selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
+      selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
+      missingFieldFilter, setMissingFieldFilter,
       locationOptions, assigneeOptions, conditionOptions, statusOptions, categoryOptions,
       isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
       isCommandPaletteOpen, setIsCommandPaletteOpen,

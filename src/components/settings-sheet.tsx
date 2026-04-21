@@ -337,7 +337,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          originalSheetName={originalSheetName}
+          originalSheetName={selectedSheetDef.name}
           onSave={(orig, newDef, all) => {
             const updatedGrants = appSettings.grants.map(grant => {
               if (grant.id === activeGrantForSchema) {

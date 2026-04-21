@@ -29,7 +29,7 @@ export function ErrorBoundary({ children, module = 'Application Shell', isGlobal
 
   return (
     <ReactErrorBoundary
-      FallbackComponent={({ error, resetErrorBoundary }) => (
+      FallbackComponent={({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => (
         <ErrorFallback 
           error={error} 
           resetErrorBoundary={resetErrorBoundary} 

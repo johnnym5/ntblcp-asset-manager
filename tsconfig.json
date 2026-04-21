@@ -30,6 +30,9 @@
     "stable version", 
     "stable-version", 
     "backup",
-    "android"
+    "android",
+    "**/__tests__/*",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

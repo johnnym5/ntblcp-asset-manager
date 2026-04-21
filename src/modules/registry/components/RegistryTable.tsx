@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
-import type { SortConfig } from '@/app/assets/page';
+import type { SortConfig } from "@/types/domain";
 
 interface RegistryTableProps {
   assets: Asset[];
@@ -124,7 +124,7 @@ export function RegistryTable({
                       "text-[11px] font-black tracking-tight transition-colors uppercase truncate max-w-[240px]",
                       selectedIds.has(asset.id) ? "text-primary" : "text-foreground group-hover:text-primary"
                     )}>
-                      {asset.description || asset.name}
+                      {String(asset.description || asset.name || 'Untitled')}
                     </span>
                     {asset.photoDataUri && <Camera className="h-3 w-3 text-primary opacity-60 shrink-0" />}
                   </div>

@@ -62,6 +62,7 @@ import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SelectItem } from '@/components/ui/select';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -229,7 +230,7 @@ export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: bo
                 <div className="mt-4 self-center bg-background/80 border border-border rounded-full px-4 py-1.5 flex items-center gap-4 backdrop-blur-xl">
                   <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5 transition-all"><ChevronLeft className="h-4 w-4" /></button>
                   <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Page {currentPage} of {totalPages}</span>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-4 w-4" /></button>
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-1 text-muted-foreground hover:text-primary disabled:opacity-5 transition-all"><ChevronRight className="h-4 w-4" /></button>
                 </div>
               )}
             </div>

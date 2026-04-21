@@ -11,9 +11,9 @@ export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type ConditionGroup = 'Good' | 'Bad' | 'Stolen' | 'Obsolete' | 'Unsalvageable' | 'Discrepancy';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
-export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
+export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL' | 'INDEXED_DB' | 'MEMORY';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
-export type SyncStatus = 'synced' | 'local';
+export type SyncStatus = 'synced' | 'local' | 'syncing';
 export type SyncStrategy = 'UPDATE' | 'SKIP';
 
 export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
@@ -34,7 +34,8 @@ export type WorkstationView =
   | 'INFRASTRUCTURE' 
   | 'DATABASE' 
   | 'SETTINGS'
-  | 'ANOMALIES';
+  | 'ANOMALIES'
+  | 'VERIFY';
 
 export interface UserPermissions {
   // Page Access
@@ -147,6 +148,7 @@ export interface Asset {
   section: string;
   subsection: string;
   assetFamily: string;
+  assetClass?: string;
   
   // Location & Assignment
   location: string; 
@@ -156,6 +158,7 @@ export interface Asset {
   normalizedLga?: string;
   locationConfidence?: MatchConfidence;
   locationStatus?: LocationMatchStatus;
+  geotag?: { lat: number; lng: number; accuracy: number; };
   
   custodian: string;
   lga?: string;
@@ -170,11 +173,12 @@ export interface Asset {
   discrepancyFlag?: boolean;
   reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
   
-  discrepancies: AssetDiscrepancy[];
-  overallFidelityScore: number;
+  discrepancies?: AssetDiscrepancy[];
+  overallFidelityScore?: number;
 
   // Financial & Technical
   purchaseDate?: string;
+  dateReceived?: any; // To support old logic
   value: number;
   serialNumber: string;
   assetIdCode?: string;
@@ -185,18 +189,34 @@ export interface Asset {
   supplier?: string;
   remarks?: string;
   
+  // Legacy fields
+  pvNo?: string;
+  grnNo?: string;
+  funder?: string;
+  costNgn?: string;
+  costUsd?: string;
+  usefulLifeYears?: string;
+  qty?: string;
+  imei?: string;
+
+  // Media
+  photoUrl?: string;
+  photoDataUri?: string;
+  signatureUrl?: string;
+  signatureDataUri?: string;
+  
   classification?: AssetClassification;
 
-  hierarchy: SectionHierarchy;
-  importMetadata: ImportMetadata;
-  metadata: Record<string, unknown>;
+  hierarchy?: SectionHierarchy;
+  importMetadata?: ImportMetadata;
+  metadata?: Record<string, unknown>;
   
-  lastModified: string;
-  lastModifiedBy: string;
+  lastModified?: string;
+  lastModifiedBy?: string;
   lastModifiedByState?: string;
 
-  updateCount: number;
-  unseenUpdateFields: string[];
+  updateCount?: number;
+  unseenUpdateFields?: string[];
   previousState?: Partial<Asset> | null;
   
   sourceGroup?: string;
@@ -248,6 +268,7 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   readAuthority: AuthorityNode;
+  activeGrantId?: string;
   activeGrantIds: string[]; // Enabled multiple projects
   grants: Grant[];
   uxMode: UXMode;
@@ -265,6 +286,7 @@ export interface AuthorizedUser {
   states: string[];
   role: UserRole;
   isAdmin: boolean;
+  isGuest?: boolean;
   isSuperAdmin?: boolean; 
   isZonalAdmin?: boolean;
   assignedZone?: string;

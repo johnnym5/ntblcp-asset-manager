@@ -66,12 +66,13 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
-import { AssetForm } from "./asset-form";
-import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import AssetForm from "./asset-form";
+import type { Asset, SheetDefinition, DisplayField, AppSettings, DataSource } from "@/types/domain";
 import { useToast } from "@/hooks/use-toast";
-import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
+import { parseExcelFile } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
-import { useAppState, type SortConfig } from "@/contexts/app-state-context";
+import { useAppState } from "@/contexts/app-state-context";
+import type { SortConfig } from "@/types/domain";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
@@ -221,7 +222,7 @@ export default function AssetList() {
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
-  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
+  const activeAssets = useMemo(() => (dataSource as any) === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -442,7 +443,7 @@ export default function AssetList() {
   }, [appSettings.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
-    const currentAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
+    const currentAssets = ((dataSource as any) === 'cloud' ? assets : offlineAssets) || [];
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
         const zones: Record<string, string[]> = NIGERIAN_ZONES;
         const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
@@ -485,7 +486,7 @@ export default function AssetList() {
   
   useEffect(() => {
     const locations = new Map<string, number>();
-    allAssetsForFiltering.forEach(asset => {
+    allAssetsForFiltering.forEach((asset: any) => {
       const normalized = normalizeAssetLocation(asset.location);
       if (normalized) {
         locations.set(normalized, (locations.get(normalized) || 0) + 1);
@@ -494,7 +495,7 @@ export default function AssetList() {
     setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => (b.count || 0) - (a.count || 0)));
 
     const assigneeMap = new Map<string, number>();
-    allAssetsForFiltering.forEach(asset => {
+    allAssetsForFiltering.forEach((asset: any) => {
       if (asset.assignee) {
         const assigneeName = asset.assignee.trim();
         if (assigneeName) {
@@ -517,8 +518,8 @@ export default function AssetList() {
             return 0;
         }
         
-        const aVal = a[config.key] ?? '';
-        const bVal = b[config.key] ?? '';
+        const aVal = (a as any)[config.key as any] ?? '';
+        const bVal = (b as any)[config.key as any] ?? '';
         if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return config.direction === 'asc' ? 1 : -1;
         return 0;
@@ -526,13 +527,13 @@ export default function AssetList() {
   };
 
   const displayedAssets = useMemo(() => {
-    let results = (allAssetsForFiltering || []).filter(asset => enabledSheets.includes(asset.category));
+    let results = (allAssetsForFiltering || []).filter((asset: any) => enabledSheets.includes(asset.category));
 
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
-        results = results.filter(asset => {
+        results = results.filter((asset: any) => {
             const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
-            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map((a: any) => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
             const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
             return locationMatch && assigneeMatch && statusMatch && missingFieldMatch;
@@ -542,7 +543,7 @@ export default function AssetList() {
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
-            results = results.filter(asset => {
+            results = results.filter((asset: any) => {
                 const assetHaystack = Object.values(asset)
                     .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
                     .join(' ').toLowerCase();
@@ -576,7 +577,7 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to add new assets.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
       addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' source to add.", variant: "destructive" });
       return;
     }
@@ -596,7 +597,7 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
         return;
     }
@@ -615,7 +616,7 @@ export default function AssetList() {
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
 
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       if (lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
@@ -648,7 +649,7 @@ export default function AssetList() {
   };
 
   const handleBatchDelete = async () => {
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
@@ -656,7 +657,7 @@ export default function AssetList() {
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
 
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
       const idsToDelete = new Set(selectedAssetIds);
       currentAssets = currentAssets.filter(a => !idsToDelete.has(a.id));
@@ -690,7 +691,7 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to batch edit.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
         return;
     }
@@ -698,44 +699,44 @@ export default function AssetList() {
   }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
     
-    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
-    const assetsToUpdate = sourceAssets.filter(asset => selectedAssetIds.includes(asset.id));
+    const sourceAssets = ((dataSource as any) === 'cloud' ? assets : offlineAssets) || [];
+    const assetsToUpdate = sourceAssets.filter((asset: any) => selectedAssetIds.includes(asset.id));
     
-    const updatedAssets = assetsToUpdate.map(asset => {
-        const updatedAsset: Asset = { 
+    const updatedAssets = assetsToUpdate.map((asset: any) => {
+        const updatedAsset: any = { 
             ...asset, 
             ...data, 
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
             lastModifiedByState: userProfile?.state,
-            syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+            syncStatus: (dataSource as any) === 'cloud' ? 'local' : undefined,
         };
-        if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
+        if (data.verifiedStatus === 'VERIFIED' && !asset.verifiedDate) {
             updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
-        } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
+        } else if (data.verifiedStatus && data.verifiedStatus !== 'VERIFIED') {
             updatedAsset.verifiedDate = '';
         }
         return sanitizeForFirestore(updatedAsset);
     });
 
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
-      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-      currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      const updatedAssetMap = new Map((updatedAssets as any[]).map((a: any) => [a.id, a]));
+      currentAssets = currentAssets.map(asset => (updatedAssetMap.get(asset.id) as Asset) || asset);
       await saveAssets(currentAssets);
       setAssets(currentAssets);
       addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
-      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-      currentOfflineAssets = currentOfflineAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      const updatedAssetMap = new Map((updatedAssets as any[]).map((a: any) => [a.id, a]));
+      currentOfflineAssets = currentOfflineAssets.map(asset => (updatedAssetMap.get(asset.id) as Asset) || asset);
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
       addNotification({ title: 'Updated in Offline Store', description: `Updated ${assetsToUpdateCount} assets.` });
@@ -745,9 +746,9 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    const isNewAsset = !assets.some(a => a.id === assetToSave.id);
+    const isNewAsset = !assets.some((a: any) => a.id === assetToSave.id);
 
-    if (dataSource === 'cloud' && lockAssetList && isAdmin) {
+    if ((dataSource as any) === 'cloud' && lockAssetList && isAdmin) {
       if (isNewAsset) {
           addNotification({ title: "Add Disabled", description: "Cannot add new assets to the locked main list.", variant: "destructive" });
       } else {
@@ -756,8 +757,8 @@ export default function AssetList() {
       return;
     }
 
-    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
-    const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
+    const sourceAssets = ((dataSource as any) === 'cloud' ? assets : offlineAssets) || [];
+    const originalAsset = sourceAssets.find((a: any) => a.id === assetToSave.id);
 
     const changes: Partial<Asset> = {};
     if (originalAsset) {
@@ -777,7 +778,7 @@ export default function AssetList() {
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
                 lastModifiedByState: userProfile?.state,
-                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+                syncStatus: (dataSource as any) === 'cloud' ? 'local' : undefined,
                 approvalStatus: undefined,
                 pendingChanges: undefined,
                 changeSubmittedBy: undefined,
@@ -801,7 +802,7 @@ export default function AssetList() {
             addNotification({ title: 'Submitted for Approval', description: 'Your changes have been sent to an administrator for review.' });
         }
       
-      if (dataSource === 'cloud') {
+      if ((dataSource as any) === 'cloud') {
         const currentAssets = await getLocalAssetsFromDb();
         const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
         if (existingIndex > -1) {
@@ -835,11 +836,11 @@ export default function AssetList() {
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
-    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
-    const asset = sourceAssets.find(a => a.id === assetId);
+    const sourceAssets = ((dataSource as any) === 'cloud' ? assets : offlineAssets) || [];
+    const asset = sourceAssets.find((a: any) => a.id === assetId);
     if (!asset) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
       addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
       return;
     }
@@ -854,10 +855,10 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+        syncStatus: (dataSource as any) === 'cloud' ? 'local' : undefined,
     });
 
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       const currentAssets = await getLocalAssetsFromDb();
       const existingIndex = currentAssets.findIndex(a => a.id === assetId);
       if (existingIndex > -1) {
@@ -887,14 +888,15 @@ export default function AssetList() {
 
     // Enforce Sandbox-First Imports: All imports now go to the locked offline store first for review.
     const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets);
+    const sheetDefinitions = (appSettings as any)?.sheetDefinitions || (appSettings as any)?.grants?.[0]?.sheetDefinitions || {};
+    const { assets: newAssets, updatedAssets: importedUpdatedAssets, skipped, errors } = await parseExcelFile(file, sheetDefinitions, baseAssets);
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
         addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
     }
 
-    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
+    const allChanges = [...newAssets, ...importedUpdatedAssets].map(asset => ({
         ...asset,
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
@@ -903,14 +905,14 @@ export default function AssetList() {
     }));
 
     if (allChanges.length > 0) {
-        const assetMap = new Map(baseAssets.map(a => [a.id, a]));
+        const assetMap = new Map(baseAssets.map((a: any) => [a.id, a]));
         allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
         
         await saveLockedOfflineAssets(combinedAssets);
         setOfflineAssets(combinedAssets);
         addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved. Review and merge to main list when ready.` });
-        setDataSource('local_locked'); // Switch to the offline view to show the imported data
+        setDataSource('local_locked' as any); // Switch to the offline view to show the imported data
         
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
@@ -949,7 +951,7 @@ export default function AssetList() {
   const handleClearAllAssets = useCallback(async () => {
     setIsClearAllDialogOpen(false);
     
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       addNotification({ title: 'Clearing Main Assets...', description: 'Removing all assets from your device.' });
       await clearLocalAssets();
       setAssets([]);
@@ -1039,7 +1041,7 @@ export default function AssetList() {
       return;
     }
 
-    if (dataSource === 'local_locked') {
+    if ((dataSource as any) === 'local_locked') {
         handleMergeToMainList();
         return;
     }
@@ -1095,13 +1097,13 @@ export default function AssetList() {
 
     setIsSyncing(true);
     try {
-        const offlineAssetsToMerge = offlineAssets.filter(a => idsToMerge.includes(a.id));
-        const remainingOfflineAssets = offlineAssets.filter(a => !idsToMerge.includes(a.id));
+        const offlineAssetsToMerge = offlineAssets.filter((a: any) => idsToMerge.includes(a.id));
+        const remainingOfflineAssets = offlineAssets.filter((a: any) => !idsToMerge.includes(a.id));
 
         const mainAssets = await getLocalAssetsFromDb();
-        const mainAssetsMap = new Map(mainAssets.map(a => [a.id, a]));
+        const mainAssetsMap = new Map(mainAssets.map((a: any) => [a.id, a]));
 
-        offlineAssetsToMerge.forEach(asset => {
+        offlineAssetsToMerge.forEach((asset: any) => {
             mainAssetsMap.set(asset.id, { ...asset, syncStatus: 'local' });
         });
 
@@ -1122,7 +1124,7 @@ export default function AssetList() {
     }
   };
 
-  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+  const handleSaveCategoryBatchEdit = async (data: any) => {
     let assetsToUpdate: Asset[] = [];
     selectedCategories.forEach(category => {
         assetsToUpdate.push(...(assetsByCategory[category] || []));
@@ -1131,7 +1133,7 @@ export default function AssetList() {
     if (data.hide && isAdmin) {
         const newSettings = { 
           ...appSettings,
-          enabledSheets: appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet))
+          enabledSheets: (appSettings as any)?.enabledSheets?.filter((sheet: any) => !selectedCategories.includes(sheet))
         };
         // await updateSettings(newSettings);
         addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
@@ -1143,15 +1145,15 @@ export default function AssetList() {
         addNotification({ title: 'Batch Updating Categories...', description: `Applying status to ${assetsToUpdateCount} assets.` });
 
         const updatedAssets = assetsToUpdate.map(asset => {
-            const updatedAsset: Asset = { 
+            const updatedAsset: any = { 
                 ...asset, 
                 verifiedStatus: data.status,
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
                 lastModifiedByState: userProfile?.state,
-                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+                syncStatus: (dataSource as any) === 'cloud' ? 'local' : undefined,
             };
-            if (data.status === 'Verified' && !asset.verifiedDate) {
+            if (data.status === 'Verified' && !(asset as any).verifiedDate) {
                 updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
             } else if (data.status !== 'Verified') {
                 updatedAsset.verifiedDate = '';
@@ -1159,7 +1161,7 @@ export default function AssetList() {
             return sanitizeForFirestore(updatedAsset);
         });
         
-        if (dataSource === 'cloud') {
+        if ((dataSource as any) === 'cloud') {
           let currentAssets = await getLocalAssetsFromDb();
           const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
           currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
@@ -1188,14 +1190,14 @@ export default function AssetList() {
 
     if (idsToDelete.length === 0) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
     
     setIsBatchDeleting(true);
 
-    if (dataSource === 'cloud') {
+    if ((dataSource as any) === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
       currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
       await saveAssets(currentAssets);
@@ -1222,23 +1224,31 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
-  const handleSaveColumnSettings = async (newDefinition: SheetDefinition) => {
-    if (!currentCategory) return;
-    const newSettings = {
+  const handleSaveColumnSettings = async (originalName: string | null, newDefinition: any, applyToAll: boolean) => {
+    if (!appSettings) return;
+    
+    let nextSheetDefinitions = { ...(appSettings as any).sheetDefinitions };
+    if (applyToAll) {
+      Object.keys(nextSheetDefinitions).forEach(k => {
+        nextSheetDefinitions[k] = { ...newDefinition, name: k };
+      });
+    } else {
+      nextSheetDefinitions[newDefinition.name] = newDefinition;
+      if (originalName && originalName !== newDefinition.name) delete nextSheetDefinitions[originalName];
+    }
+
+    const nextSettings = {
       ...appSettings,
-      sheetDefinitions: {
-        ...appSettings.sheetDefinitions,
-        [currentCategory]: newDefinition,
-      }
-    };
-    setAppSettings(newSettings);
-    await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
-    addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
+      sheetDefinitions: nextSheetDefinitions
+    } as any;
+    setAppSettings(nextSettings);
+    await updateSettings({ sheetDefinitions: (nextSettings as any).sheetDefinitions } as any);
+    addNotification({ title: "Setup Updated", variant: "success" });
   };
 
   const clearAllDialogDescription = useMemo(() => {
-    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
-    if (isAdmin && isOnline && dataSource === 'cloud') {
+    let message = `This will permanently delete all asset records from the ${(dataSource as any) === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
+    if (isAdmin && isOnline && (dataSource as any) === 'cloud') {
       message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
     }
     return message;
@@ -1258,7 +1268,7 @@ export default function AssetList() {
 
   const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {
       const total = categoryAssets.length;
-      const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+      const verified = categoryAssets.filter(a => (a as any).verifiedStatus === 'VERIFIED' || a.status === 'VERIFIED').length;
       const percentage = total > 0 ? (verified / total) * 100 : 0;
       const isSelected = selectedCategories.includes(category);
       
@@ -1292,12 +1302,12 @@ export default function AssetList() {
                       <div className="text-2xl font-bold">{total}</div>
                       <p className="text-xs text-muted-foreground">Total assets in this category</p>
                   </div>
-                  {appSettings.appMode === 'verification' && (
+                  {(appSettings as any)?.appMode === 'verification' ? (
                     <div className="space-y-2">
                         <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
                         <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
                     </div>
-                  )}
+                  ) : null}
               </CardContent>
               <CardFooter className="pt-0 pb-4">
                 <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
@@ -1310,13 +1320,13 @@ export default function AssetList() {
   if (view === 'dashboard') {
     const totalAssetsInScope = (allAssetsForFiltering || []).length;
     const currentlyDisplayedAssets = (displayedAssets || []).length;
-    const verifiedStateAssets = (displayedAssets || []).filter(asset => asset.verifiedStatus === 'Verified').length;
+    const verifiedStateAssets = (displayedAssets || []).filter(asset => (asset as any).verifiedStatus === 'VERIFIED' || (asset as any).status === 'VERIFIED').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
-    const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.size === Object.keys(assetsByCategory).length;
+    const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
-    const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
-    const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+    const contextualButtonText = (dataSource as any) === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
+    const ContextualButtonIcon = (dataSource as any) === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
     const mainCategories = Object.keys(assetsByCategory).sort((a,b) => a.localeCompare(b));
 
@@ -1327,16 +1337,16 @@ export default function AssetList() {
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className='flex-1'>
                     <CardTitle className="flex items-center gap-2">
-                       <span>{appSettings.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
+                       <span>{(appSettings as any)?.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
-                                {dataSource === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(((prev: any) => (prev as string) === 'cloud' ? 'local_locked' : 'cloud') as any)}>
+                                {(dataSource as any) === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
                              </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Data Source: {dataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
+                            <p>Data Source: {(dataSource as string) === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -1361,14 +1371,14 @@ export default function AssetList() {
                         <SelectContent>
                             <ScrollArea className="h-[400px]">
                                 <SelectItem value="All">
-                                    <LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} />
+                                    <LocationProgress locationName="All" allAssets={activeAssets} appMode={(appSettings as any)?.appMode || 'management'} />
                                 </SelectItem>
                                 <SelectSeparator />
                                 <SelectGroup>
-                                    <SelectLabel>Special Locations</SelectLabel>
-                                    {SPECIAL_LOCATIONS.map((loc) => (
-                                        <SelectItem key={loc} value={loc} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} />
+                                    <SelectLabel>Project Stores</SelectLabel>
+                                    {(appSettings as any)?.grants.map((grant: any) => (
+                                        <SelectItem key={grant.id} value={grant.id} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
+                                            <LocationProgress locationName={grant.name} allAssets={activeAssets} appMode={(appSettings as any)?.appMode || 'management'} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1377,7 +1387,7 @@ export default function AssetList() {
                                     <SelectLabel>Zonal Stores</SelectLabel>
                                     {ZONAL_STORES.map((zone) => (
                                         <SelectItem key={zone} value={zone} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} />
+                                            <LocationProgress locationName={zone} allAssets={activeAssets} appMode={(appSettings as any)?.appMode || 'management'} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1386,7 +1396,7 @@ export default function AssetList() {
                                     <SelectLabel>States</SelectLabel>
                                     {NIGERIAN_STATES.map((state) => (
                                         <SelectItem key={state} value={state} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} />
+                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={(appSettings as any)?.appMode || 'management'} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1409,7 +1419,7 @@ export default function AssetList() {
                   </div>
               </CardHeader>
                <CardContent className="pt-2 space-y-2">
-                  {appSettings.appMode === 'verification' ? (
+                  {(appSettings as any)?.appMode === 'verification' ? (
                     <>
                       <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                       <p className="text-sm text-muted-foreground">
@@ -1428,7 +1438,7 @@ export default function AssetList() {
                 <CardFooter className="bg-muted/50 p-2 border-t flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">{selectedCategories.length} selected</span>
                     <Separator orientation="vertical" className="h-6"/>
-                    <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                    <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && (dataSource as string) !== 'local_locked')}>
                         {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
                         {contextualButtonText}
                     </Button>
@@ -1464,7 +1474,6 @@ export default function AssetList() {
           onOpenChange={setIsFormOpen} 
           asset={selectedAsset} 
           onSave={handleSaveAsset}
-          onQuickSave={handleQuickSaveAsset}
           isReadOnly={isFormReadOnly} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
@@ -1517,22 +1526,23 @@ export default function AssetList() {
 
   // TABLE VIEW
   const paginatedCategoryAssets = (categoryFilteredAssets || []).slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (currentPage - 1) * (itemsPerPage as number),
+    currentPage * (itemsPerPage as number)
   );
-  const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
+  const allSelected = displayedAssets.length > 0 && displayedAssets.every((a: any) => selectedAssetIds.includes(a.id));
+  const allCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every((a: any) => selectedAssetIds.includes(a.id));
 
-  const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
-  const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+  const contextualButtonText = (dataSource as any) === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
+  const ContextualButtonIcon = (dataSource as any) === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
-  const currentSheetDefinition = sheetDefinitions[currentCategory!];
+  const currentSheetDefinition = (sheetDefinitions as any)[currentCategory!];
   
-  let tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
-  let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.quickView) || [];
+  let tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter((f: any) => f.table) || [];
+  let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter((f: any) => f.quickView) || [];
 
-  if (appSettings.appMode === 'management') {
-    tableFields = tableFields.filter(f => f.key !== 'verifiedStatus');
-    quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
+  if ((appSettings as any)?.appMode === 'management') {
+    tableFields = tableFields.filter((f: any) => (f.key as string) !== 'verifiedStatus');
+    quickViewFields = quickViewFields.filter((f: any) => (f.key as string) !== 'verifiedStatus');
   }
   
   const backButtonTarget = 'dashboard';
@@ -1551,7 +1561,7 @@ export default function AssetList() {
                 <div className="md:hidden flex items-center space-x-2">
                     <Checkbox
                         id="select-all-in-table-mobile"
-                        checked={areAllCategoryResultsSelected}
+                        checked={allCategoryResultsSelected}
                         onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                         aria-label="Select all in this category"
                         disabled={isGuest}
@@ -1568,12 +1578,12 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                     <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && (dataSource as any) !== 'local_locked')}>
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
                        {contextualButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find((a: any) => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
@@ -1599,7 +1609,7 @@ export default function AssetList() {
                         <TableRow>
                             <TableHead className="w-[50px]">
                                 <Checkbox
-                                    checked={areAllCategoryResultsSelected}
+                                    checked={allCategoryResultsSelected}
                                     onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                                     aria-label="Select all in this category"
                                     disabled={isGuest}
@@ -1629,12 +1639,12 @@ export default function AssetList() {
                                     />
                                 </TableCell>
                                 {tableFields.map(field => (
-                                  <TableCell key={field.key} onClick={field.key === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
-                                    {field.key === 'verifiedStatus' && appSettings.appMode === 'verification' ? (
+                                  <TableCell key={field.key} onClick={(field.key as string) === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
+                                    {(field.key as string) === 'verifiedStatus' && (appSettings as any)?.appMode === 'verification' ? (
                                       <Select
-                                        value={asset.verifiedStatus || 'Unverified'}
+                                        value={(asset as any).verifiedStatus || asset.status || 'Unverified'}
                                         onValueChange={async (status) => {
-                                          if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                          if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
                                               addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
                                               return;
                                           }
@@ -1648,7 +1658,7 @@ export default function AssetList() {
                                           addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                         }}
                                       >
-                                        <SelectTrigger className={cn("w-[130px] h-8 text-xs font-medium", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                        <SelectTrigger className={cn("w-[130px] h-8 text-xs font-medium", getStatusClasses(((asset as any).verifiedStatus || asset.status || 'Unverified') as any))}>
                                           <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1661,7 +1671,7 @@ export default function AssetList() {
                                         {field.key === 'description' && asset.syncStatus === 'local' && (
                                             <TooltipProvider><Tooltip><TooltipTrigger><CloudOff className="h-4 w-4 text-blue-500" /></TooltipTrigger><TooltipContent><p>Local changes not synced</p></TooltipContent></Tooltip></TooltipProvider>
                                         )}
-                                        {String(asset[field.key] ?? 'N/A')}
+                                        {String(asset[field.key as keyof typeof asset] ?? 'N/A')}
                                       </span>
                                     )}
                                   </TableCell>
@@ -1750,22 +1760,22 @@ export default function AssetList() {
                       <CardContent className="p-4 pt-0" onClick={() => handleViewAsset(asset)}>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                               {quickViewFields.map(field => {
-                                  if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
+                                  if (['description', 'category', 'verifiedStatus'].includes(field.key as any)) return null;
                                   return (
-                                      <div key={field.key} className="space-y-1">
-                                          <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                                          <p className="text-sm font-medium truncate">{String(asset[field.key] ?? 'N/A')}</p>
+                                      <div key={field.key as any} className="space-y-1">
+                                          <span className="text-xs font-medium">{(asset as any).verifiedStatus || asset.status || 'Unverified'}</span>
+                                          <p className="text-sm font-medium truncate">{String(asset[field.key as keyof Asset] ?? 'N/A')}</p>
                                       </div>
                                   )
                               })}
                           </div>
-                          {appSettings.appMode === 'verification' && (
+                          {(appSettings as any)?.appMode === 'verification' && (
                             <div className="mt-4" onClick={e => e.stopPropagation()}>
                                 <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
-                                <Select
-                                    value={asset.verifiedStatus || 'Unverified'}
+                                    <Select
+                                        value={(asset as any).verifiedStatus || asset.status || 'Unverified'}
                                     onValueChange={async (status) => {
-                                      if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                      if (lockAssetList && isAdmin && (dataSource as any) === 'cloud') {
                                           addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
                                           return;
                                       }
@@ -1774,7 +1784,7 @@ export default function AssetList() {
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                     }}
                                   >
-                                  <SelectTrigger className={cn("h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                  <SelectTrigger className={cn("h-9 text-sm", getStatusClasses((asset.status || 'Unverified') as any))}>
                                     <SelectValue placeholder="Select status" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1795,7 +1805,7 @@ export default function AssetList() {
             <CardFooter className="border-t pt-4">
                <PaginationControls 
                     currentPage={currentPage}
-                    totalPages={Math.ceil(categoryFilteredAssets.length / itemsPerPage)}
+                    totalPages={itemsPerPage === 'all' ? 1 : Math.ceil(categoryFilteredAssets.length / (itemsPerPage as number))}
                     onPageChange={setCurrentPage}
                     itemsPerPage={itemsPerPage}
                     setItemsPerPage={setItemsPerPage}
@@ -1808,7 +1818,6 @@ export default function AssetList() {
           onOpenChange={setIsFormOpen} 
           asset={selectedAsset} 
           onSave={handleSaveAsset} 
-          onQuickSave={handleQuickSaveAsset}
           isReadOnly={isFormReadOnly}
         />
         <AssetBatchEditForm 
@@ -1822,8 +1831,10 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the asset
-                        from your {dataSource === 'cloud' ? (isOnline ? 'online database and ' : '') : ''}local storage.
+                        {(() => {
+                            const dbLabel = (dataSource as any) === 'cloud' ? (isOnline ? 'online database and ' : '') : '';
+                            return `This will permanently delete the assets from your ${dbLabel}local storage.`;
+                        })()}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1837,6 +1848,7 @@ export default function AssetList() {
             isOpen={isColumnSheetOpen}
             onOpenChange={setIsColumnSheetOpen}
             sheetDefinition={currentSheetDefinition}
+            originalSheetName={currentCategory}
             onSave={handleSaveColumnSettings}
           />
         )}

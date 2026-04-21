@@ -93,7 +93,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
         return {
           label: field.label,
-          completed: isCompleted,
+          isCompleted,
           icon: isVehicle ? Car : Laptop
         };
       });

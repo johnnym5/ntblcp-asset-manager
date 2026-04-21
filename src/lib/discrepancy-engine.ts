@@ -157,7 +157,8 @@ export const DiscrepancyEngine = {
   /**
    * Scans unmapped metadata for a value that passes a logical check.
    */
-  huntForValue(metadata: Record<string, any>, validator: (val: any) => boolean): string | undefined {
+  huntForValue(metadata: Record<string, unknown> | undefined, validator: (val: any) => boolean): string | undefined {
+    if (!metadata) return undefined;
     for (const [key, value] of Object.entries(metadata)) {
       if (value && validator(value)) {
         return String(value);

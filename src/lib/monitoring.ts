@@ -71,12 +71,12 @@ class MonitoringService {
         message: technicalMessage,
         technicalMessage,
         laymanExplanation,
-        stack: error?.stack || null
+        stack: error?.stack || undefined
       },
       recovery: {
         attempted: !!context.recoveryAttempted,
-        action: context.recoveryAction || null,
-        result: context.recoveryResult || null
+        action: context.recoveryAction || undefined,
+        result: context.recoveryResult || undefined
       }
     };
 

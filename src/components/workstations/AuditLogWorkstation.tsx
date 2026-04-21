@@ -299,7 +299,7 @@ export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boole
         )}
       </div>
 
-      <AlertDialog open={!!entryToRestore} onOpenChange={setEntryToRestore}>
+      <AlertDialog open={!!entryToRestore} onOpenChange={(open) => !open && setEntryToRestore(null)}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-3xl bg-black">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-primary/10 rounded-2xl w-fit">

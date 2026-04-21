@@ -17,7 +17,7 @@ import {
 import { useLongPress } from "@/hooks/use-long-press";
 import { cn } from "@/lib/utils";
 
-interface TactileOption {
+export interface TactileOption {
   label: string;
   icon?: any;
   onClick: () => void;
@@ -66,7 +66,7 @@ export function TactileMenu({ children, title, options, className }: TactileMenu
           {options.map((opt, i) => (
             <ContextMenuItem 
               key={`${opt.label}-${i}`} 
-              onClick={(e) => { e.stopPropagation(); opt.onClick(); }}
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); opt.onClick(); }}
               disabled={opt.disabled}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest cursor-pointer transition-colors",

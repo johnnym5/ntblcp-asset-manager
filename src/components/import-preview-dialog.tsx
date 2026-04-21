@@ -17,13 +17,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DatabaseZap, ShieldCheck, X, Loader2 } from 'lucide-react';
+import { DatabaseZap, ShieldCheck, X, Loader2, Maximize2 } from 'lucide-react';
 import type { Asset } from '@/types/domain';
+import type { ImportRunSummary } from '@/parser/types';
 
 interface ImportPreviewDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   assets: Asset[];
+  summary: ImportRunSummary;
   onConfirm: () => Promise<void>;
   isProcessing: boolean;
 }
@@ -32,6 +34,7 @@ export function ImportPreviewDialog({
   isOpen,
   onOpenChange,
   assets,
+  summary,
   onConfirm,
   isProcessing
 }: ImportPreviewDialogProps) {
@@ -50,7 +53,7 @@ export function ImportPreviewDialog({
         </div>
 
         <ScrollArea className="flex-1 p-8 bg-background">
-          <ReconciliationView assets={assets} />
+          <ReconciliationView assets={assets} summary={summary} />
         </ScrollArea>
 
         <DialogFooter className="p-8 bg-muted/20 border-t flex flex-row items-center justify-between gap-4">

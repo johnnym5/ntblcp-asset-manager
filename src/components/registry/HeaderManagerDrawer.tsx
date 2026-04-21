@@ -138,7 +138,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
             <Input 
               placeholder="Search registry fields..." 
               value={search}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-12 rounded-2xl bg-background border-none shadow-inner text-xs font-bold"
             />
           </div>

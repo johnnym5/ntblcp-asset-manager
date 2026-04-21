@@ -26,7 +26,7 @@ interface QRScannerDialogProps {
 }
 
 export function QRScannerDialog({ isOpen, onOpenChange, onScanSuccess }: QRScannerDialogProps) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const { toast } = useToast();
 
@@ -35,8 +35,9 @@ export function QRScannerDialog({ isOpen, onOpenChange, onScanSuccess }: QRScann
       setIsInitializing(true);
       const timer = setTimeout(() => {
         try {
-          scannerRef.current = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-          scannerRef.current.render((decodedText) => {
+          const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+          scannerRef.current = scanner as any;
+          scanner.render((decodedText: string) => {
             onScanSuccess(decodedText);
             scannerRef.current?.clear();
             onOpenChange(false);
