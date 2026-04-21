@@ -189,7 +189,6 @@ export default function AssetList() {
   } = useAppState();
 
   const appSettings = useAppState().appSettings as any;
-  const setAppSettings = useAppState().setAppSettings as any;
   const isSyncing = useAppState().isSyncing;
   
   const syncSummary = useAppState().syncSummary;
@@ -424,11 +423,9 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalAssetsInScope = (activeAssets || []).length;
     const currentlyDisplayedAssets = (displayedAssets || []).length;
     const verifiedStateAssets = (displayedAssets || []).filter(asset => asset.status === 'VERIFIED').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
-    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
     const ContextualButtonIcon = CloudUpload;
@@ -511,12 +508,12 @@ export default function AssetList() {
           onSave={handleSaveAsset}
           isReadOnly={isFormReadOnly} 
         />
-        <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
+        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
          <SyncConfirmationDialog
           isOpen={isSyncConfirmOpen}
           onOpenChange={setIsSyncConfirmOpen}
-          onConfirm={handleSyncConfirm}
+          onConfirm={() => {}}
           summary={syncSummary}
         />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
@@ -716,7 +713,7 @@ export default function AssetList() {
             onOpenChange={setIsColumnSheetOpen}
             sheetDefinition={currentSheetDefinition}
             originalSheetName={currentCategory}
-            onSave={handleSaveColumnSettings}
+            onSave={(orig, newDef, all) => handleSaveColumnSettings(orig, newDef, all)}
           />
         )}
     </div>

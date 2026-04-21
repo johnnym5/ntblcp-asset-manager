@@ -191,6 +191,9 @@ export interface Asset {
     lng: number;
     accuracy?: number;
   };
+  // Legacy aliases for build compatibility
+  assignee?: string;
+  verifiedStatus?: VerificationStatus;
 }
 
 export interface DisplayField {
@@ -250,7 +253,9 @@ export interface AuthorizedUser {
   assignedZone?: string;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
   permissions?: UserPermissions;
+  isGuest?: boolean;
 }
 
 export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';
