@@ -1,7 +1,7 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Authoritative type definitions for the entire asset management system.
- * Updated Phase 2010: Final alignment for production build and App Hosting support.
+ * Updated Phase 2015: Synchronized for strict type parity in AssetForm and legacy lists.
  */
 
 import type { RegistryHeader, HeaderFilter } from './registry';

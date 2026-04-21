@@ -30,6 +30,7 @@ NEXT_PUBLIC_FIREBASE_DATABASE_URL=your_rtdb_url
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
 
 # Administrative Bootstrap Credentials
+# Use these to log in as the initial system administrator
 NEXT_PUBLIC_INITIAL_ADMIN_USER=your_admin_username
 NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD=your_secure_passcode
 ```

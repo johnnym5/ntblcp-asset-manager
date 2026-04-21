@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Phase 2011: Implemented strict Governance Pulse. User updates are enqueued for approval.
+ * Phase 2015: Synchronized with domain.ts and implemented strict administrative governance.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -145,7 +145,7 @@ export default function AssetForm({
         // Approval Logic Pulse
         if (!isAdmin && asset) {
           const changes: Partial<Asset> = {};
-          const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
+          const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'status', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
           
           keysToCheck.forEach(key => {
             const currentVal = (data as any)[key];

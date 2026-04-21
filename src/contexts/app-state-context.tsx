@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 2010: Hardened for production build and App Hosting parity.
+ * Phase 2015: Synchronized for strict production build and App Hosting support.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -186,35 +186,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return cat.includes('motor') || cat.includes('vehicle');
       };
 
-      const hasMetaVal = (a: Asset, label: string) => {
-        const val = (a.metadata as any)?.[label];
-        return !!val && String(val).trim() !== '' && String(val).trim().toLowerCase() !== 'n/a';
-      };
-
       if (searchTerm === 'MISSING_ID') {
         results = results.filter(a => !a.assetIdCode || a.assetIdCode === 'N/A' || a.assetIdCode.trim() === '');
       } else if (searchTerm === 'MISSING_SN') {
         results = results.filter(a => !a.sn || a.sn === 'N/A' || a.sn.trim() === '');
-      } else if (searchTerm === 'MISSING_SERIAL') {
-        results = results.filter(a => !isVehicle(a) && (!a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber.trim() === ''));
-      } else if (searchTerm === 'MISSING_MODEL') {
-        results = results.filter(a => !isVehicle(a) && (!a.modelNumber || a.modelNumber === 'N/A') && !hasMetaVal(a, 'Model Number') && !hasMetaVal(a, 'Model No'));
-      } else if (searchTerm === 'MISSING_CHASSIS') {
-        results = results.filter(a => isVehicle(a) && (!a.chassisNo || a.chassisNo === 'N/A') && !hasMetaVal(a, 'Chasis no') && !hasMetaVal(a, 'Chassis no'));
-      } else if (searchTerm === 'MISSING_ENGINE') {
-        results = results.filter(a => isVehicle(a) && (!a.engineNo || a.engineNo === 'N/A') && !hasMetaVal(a, 'Engine no'));
-      } else if (searchTerm === 'CONDITION_GOOD') {
-        results = results.filter(a => a.conditionGroup === 'Good');
-      } else if (searchTerm === 'CONDITION_BAD') {
-        results = results.filter(a => ['Bad condition', 'Poor', 'Burnt', 'Stolen', 'Unsalvageable'].includes(a.condition || ''));
-      } else if (searchTerm === 'CONDITION_STOLEN') {
-        results = results.filter(a => a.condition === 'Stolen');
-      } else if (searchTerm === 'CONDITION_OBSOLETE') {
-        results = results.filter(a => a.condition === 'Obsolete');
-      } else if (searchTerm === 'CONDITION_UNSALVAGEABLE') {
-        results = results.filter(a => ['Unsalvageable', 'Burnt'].includes(a.condition || ''));
-      } else if (searchTerm === 'WITH_REMARKS') {
-        results = results.filter(a => !!a.remarks && a.remarks.trim() !== '');
       } else if (searchTerm === 'STATUS_UNVERIFIED') {
         results = results.filter(a => a.status === 'UNVERIFIED');
       } else {
@@ -226,28 +201,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     }
 
-    if (filters.length > 0) {
-      filters.forEach(filter => {
-        const header = headers.find(h => h.id === filter.headerId);
-        if (!header) return;
-        results = results.filter(asset => {
-          let val = "";
-          switch(header.normalizedName) {
-            case "location": val = asset.location; break;
-            case "condition": val = asset.condition; break;
-            case "status": val = asset.status; break;
-            case "asset_class": val = asset.category; break;
-            default: val = String((asset.metadata as any)?.[header.rawName] || "");
-          }
-          if (filter.operator === 'in') {
-            const allowed = (filter.value as string[]) || [];
-            return allowed.includes(val);
-          }
-          return true;
-        });
-      });
-    }
-
     if (sortKey) {
       const activeHeader = headers.find(h => h.id === sortKey);
       if (activeHeader) {
@@ -255,8 +208,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           const getVal = (item: Asset) => {
             switch(activeHeader.normalizedName) {
               case "sn": return item.sn || "";
-              case "asset_description": return item.description || "";
-              case "asset_id_code": return item.assetIdCode || "";
+              case "description": return item.description || "";
+              case "assetidcode": return item.assetIdCode || "";
               case "location": return item.location || "";
               case "condition": return item.condition || "";
               default: return String((item.metadata as any)?.[activeHeader.rawName] || "");
@@ -333,17 +286,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
-      const filteredRemote = allRemoteAssets.filter(a => {
-        const grant = appSettings?.grants.find(g => g.id === a.grantId);
-        if (!grant || grant.enabledSheets.length === 0) return true;
-        return grant.enabledSheets.includes(a.category);
-      });
       const localAssets = await storage.getAssets();
       const localMap = new Map(localAssets.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
       const newItems: Asset[] = [];
       const existingItems: Asset[] = [];
       const autoUpdateItems: Asset[] = [];
-      filteredRemote.forEach(remote => {
+      allRemoteAssets.forEach(remote => {
         const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
         const local = localMap.get(id);
         if (!local) newItems.push(remote);

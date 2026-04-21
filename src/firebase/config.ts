@@ -1,3 +1,8 @@
+/**
+ * @fileOverview Firebase Configuration.
+ * Phase 2015: Security hardening - migrated to environment variables for deployment.
+ */
+
 export const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",

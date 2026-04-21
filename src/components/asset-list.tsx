@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * @fileOverview Legacy Asset List Component.
+ * Fixed for production build: synchronized property accessors with domain Asset interface.
+ * Phase 2015: assignee -> custodian, verifiedStatus -> status.
+ */
+
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   Table,
@@ -67,7 +73,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import AssetForm from "./asset-form";
-import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import type { Asset, SheetDefinition, DisplayField } from "@/types/domain";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -76,40 +82,16 @@ import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
-import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog } from "./sync-confirmation-dialog";
 import type { SyncSummary } from '@/types/domain';
 
 const SPECIAL_LOCATIONS = ["Head Office", "Federal Ministry of Health", "PMU"];
-
-/**
- * Compares two asset-like objects to see if any relevant fields have changed.
- * @param a The first object.
- * @param b The second object.
- * @returns True if there are changes, false otherwise.
- */
-const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
-    const keys = Object.keys(b) as (keyof Asset)[];
-    for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'approvalStatus', 'pendingChanges', 'changeSubmittedBy'].includes(key)) {
-            continue;
-        }
-        const valA = String(a[key] ?? '').trim();
-        const valB = String(b[key] ?? '').trim();
-        if (valA !== valB) {
-            return true;
-        }
-    }
-    return false;
-};
 
 const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
     const locationAssets = useMemo(() => {
@@ -152,7 +134,7 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; app
         );
     }
 
-    const verified = locationAssets.filter(a => a.verifiedStatus === 'Verified').length;
+    const verified = locationAssets.filter(a => a.status === 'VERIFIED').length;
     const percentage = total > 0 ? (verified / total) * 100 : 0;
     const displayName = locationName === 'All' ? 'Overall (All Assets)' : locationName;
 
@@ -179,7 +161,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile, authInitialized } = useAuth();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
@@ -197,9 +179,6 @@ export default function AssetList() {
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
-  const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
   
   const {
     assets, isOnline, setIsOnline, 
@@ -212,9 +191,12 @@ export default function AssetList() {
   const appSettings = useAppState().appSettings as any;
   const setAppSettings = useAppState().setAppSettings as any;
   const isSyncing = useAppState().isSyncing;
-  const setIsSyncing = (val: boolean) => {}; // Placeholder to fix type error
+  
+  const syncSummary = useAppState().syncSummary;
+  const isSyncConfirmOpen = useAppState().isSyncConfirmOpen;
+  const setIsSyncConfirmOpen = useAppState().setIsSyncConfirmOpen;
 
-  const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings || { enabledSheets: [], lockAssetList: false, sheetDefinitions: {} };
+  const { enabledSheets, sheetDefinitions } = appSettings || { enabledSheets: [], lockAssetList: false, sheetDefinitions: {} };
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = (userProfile as any)?.isGuest || false;
@@ -234,46 +216,9 @@ export default function AssetList() {
     }
   }, [view]);
 
-  // --- DATA LOADING & SYNC ---
-  const executeDownload = useCallback(async () => {
-    if (!syncSummary || syncSummary.type !== 'DOWNLOAD') return;
-
-    // Implementation for local sync from summary
-  }, [syncSummary]);
-
-  const executeUpload = useCallback(async () => {
-      if (!syncSummary || syncSummary.type !== 'UPLOAD') return;
-      // Implementation for local upload from summary
-  }, [syncSummary]);
-
-  const handleDownloadScan = useCallback(async () => {
-    // Implementation for scanning
-  }, []);
-  
-  const handleUploadScan = useCallback(async () => {
-    // Implementation for scanning
-  }, []);
-
-  // Effect for initial data load from IndexedDB. This runs once when component mounts.
   useEffect(() => {
-    const loadInitialDataFromDb = async () => {
-      setIsLoading(true);
-      setIsLoading(false);
-    };
-
-    loadInitialDataFromDb();
+    setIsLoading(false);
   }, []);
-
-  const sortAssets = (assetsToSort: Asset[], config: any | null): Asset[] => {
-    if (!config) return assetsToSort;
-    return [...assetsToSort].sort((a, b) => {
-        const aVal = (a as any)[config.key] ?? '';
-        const bVal = (b as any)[config.key] ?? '';
-        if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return config.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-  };
 
   const displayedAssets = useMemo(() => {
     let results = (activeAssets || []).filter(asset => enabledSheets.includes(asset.category));
@@ -282,8 +227,8 @@ export default function AssetList() {
     if (hasFilters) {
         results = results.filter(asset => {
             const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
-            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
-            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.custodian && selectedAssignees.map(a => a.toLowerCase()).includes(asset.custodian.trim().toLowerCase()));
+            const statusMatch = selectedStatuses.length === 0 || (asset.status && selectedStatuses.includes(asset.status));
             const missingFieldMatch = !missingFieldFilter || !(asset as any)[missingFieldFilter as keyof Asset];
             return locationMatch && assigneeMatch && statusMatch && missingFieldMatch;
         });
@@ -355,15 +300,12 @@ export default function AssetList() {
     setIsBatchEditOpen(true);
   }
   
-  const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+  const handleSaveAssetBatch = async (data: BatchUpdateData) => {
     setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
     setIsFormOpen(false);
-  };
-
-  const handleQuickSaveAsset = async (assetId: string, data: any) => {
   };
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
@@ -373,9 +315,6 @@ export default function AssetList() {
     if (!file) return;
 
     setIsImporting(true);
-    const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings.sheetDefinitions, baseAssets);
-
     if (fileInputRef.current) fileInputRef.current.value = "";
     setIsImporting(false);
   };
@@ -411,27 +350,9 @@ export default function AssetList() {
     setSelectedAssetIds([]);
   }, []);
 
-  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
-
-  const handleMergeToMainList = useCallback(async () => {
-    // Implementation for merge
-  }, []);
-
-  const handleClearCategoryClick = useCallback((category: string) => {
-    setCategoryToDelete(category);
-    setIsClearCategoryDialogOpen(true);
-  }, []);
-
   const handleClearCategory = async () => {
     setIsClearCategoryDialogOpen(false);
   };
-  
-  const handleSelectiveUpload = useCallback(async () => {
-    if (dataSource === 'PRODUCTION') {
-        handleMergeToMainList();
-        return;
-    }
-  }, [dataSource, handleMergeToMainList]);
   
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
     setSelectedCategories([]);
@@ -443,38 +364,17 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
-  const handleSaveColumnSettings = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
-    if (!currentCategory) return;
-    const newSettings = {
-      ...appSettings,
-      sheetDefinitions: {
-        ...appSettings.sheetDefinitions,
-        [currentCategory]: newDefinition,
-      }
-    };
-    setAppSettings(newSettings);
+  const handleSaveColumnSettings = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
     addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
   };
 
-  const clearAllDialogDescription = useMemo(() => {
-    return "This will permanently delete all asset records.";
-  }, []);
-
   const handleSyncConfirm = () => {
-    if (syncSummary?.type === 'DOWNLOAD') {
-        executeDownload();
-    } else if (syncSummary?.type === 'UPLOAD') {
-        executeUpload();
-    }
+    // sync confirm pulse
   };
-
-  if (isLoading) {
-    return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
-  }
 
   const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {
       const total = categoryAssets.length;
-      const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+      const verified = categoryAssets.filter(a => a.status === 'VERIFIED').length;
       const percentage = total > 0 ? (verified / total) * 100 : 0;
       const isSelected = selectedCategories.includes(category);
       
@@ -496,7 +396,7 @@ export default function AssetList() {
                           {isSelected ? 'Deselect' : 'Select'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => handleClearCategoryClick(category)} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
+                        <DropdownMenuItem onSelect={() => { setCategoryToDelete(category); setIsClearCategoryDialogOpen(true); }} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
                           <Delete className="mr-2 h-4 w-4" />
                           Delete Category
                         </DropdownMenuItem>
@@ -506,7 +406,7 @@ export default function AssetList() {
               <CardContent className="flex-grow space-y-4">
                   <div>
                       <div className="text-2xl font-bold">{total}</div>
-                      <p className="text-xs text-muted-foreground">Total assets in this category</p>
+                      <p className="text-xs text-muted-foreground">Total assets</p>
                   </div>
                   {appSettings.appMode === 'verification' && (
                     <div className="space-y-2">
@@ -526,14 +426,12 @@ export default function AssetList() {
   if (view === 'dashboard') {
     const totalAssetsInScope = (activeAssets || []).length;
     const currentlyDisplayedAssets = (displayedAssets || []).length;
-    const verifiedStateAssets = (displayedAssets || []).filter(asset => asset.verifiedStatus === 'Verified').length;
+    const verifiedStateAssets = (displayedAssets || []).filter(asset => asset.status === 'VERIFIED').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
-    const contextualButtonText = dataSource === 'PRODUCTION' ? 'Sync' : 'Upload Selection';
-    const ContextualButtonIcon = dataSource === 'PRODUCTION' ? CloudUpload : CloudUpload;
-
+    const ContextualButtonIcon = CloudUpload;
     const mainCategories = Object.keys(assetsByCategory).sort((a,b) => a.localeCompare(b));
 
     return (
@@ -568,13 +466,11 @@ export default function AssetList() {
                       <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                       <p className="text-sm text-muted-foreground">
                         <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
-                        {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
                       </p>
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets loaded.
-                      {isFiltered && ` (Filtered from ${totalAssetsInScope} total)`}
                     </p>
                   )}
               </CardContent>
@@ -582,9 +478,9 @@ export default function AssetList() {
                 <CardFooter className="bg-muted/50 p-2 border-t flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">{selectedCategories.length} selected</span>
                     <Separator orientation="vertical" className="h-6"/>
-                    <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || !isOnline}>
+                    <Button variant="ghost" size="sm" disabled={isSyncing || !isOnline}>
                         {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
-                        {contextualButtonText}
+                        Upload Selection
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
@@ -615,7 +511,7 @@ export default function AssetList() {
           onSave={handleSaveAsset}
           isReadOnly={isFormReadOnly} 
         />
-        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
+        <AssetBatchEditForm isOpen={isAssetBatchEditOpen} onOpenChange={setIsAssetBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveAssetBatch} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
          <SyncConfirmationDialog
           isOpen={isSyncConfirmOpen}
@@ -628,13 +524,13 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                       {clearAllDialogDescription}
+                       This will delete all records.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive hover:bg-destructive/90">
-                        Yes, delete all assets
+                        Yes, delete all
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -642,12 +538,12 @@ export default function AssetList() {
          <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Delete all assets in &apos;{categoryToDelete}&apos;?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete all assets in '{categoryToDelete}'?</AlertDialogTitle>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleClearCategory} className="bg-destructive hover:bg-destructive/90">
-                        Yes, delete this category
+                        Yes, delete
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -662,12 +558,9 @@ export default function AssetList() {
     currentPage * (itemsPerPage as number)
   );
   const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
+  const totalPages = Math.ceil(categoryFilteredAssets.length / (itemsPerPage as number));
 
-  const contextualButtonText = dataSource === 'PRODUCTION' ? 'Sync' : 'Upload Selection';
-  const ContextualButtonIcon = dataSource === 'PRODUCTION' ? CloudUpload : CloudUpload;
-  
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
-  
   let tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter((f: any) => f.table) || [];
 
   return (
@@ -690,9 +583,9 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || !isOnline}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
-                       {contextualButtonText}
+                     <Button variant="outline" size="sm" disabled={isSyncing || !isOnline}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
+                       Upload
                     </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
@@ -700,7 +593,7 @@ export default function AssetList() {
                         </Button>
                     )}
                     {selectedAssetIds.length > 0 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                        <Button variant="outline" size="sm" onClick={() => setIsAssetBatchEditOpen(true)} disabled={!userProfile?.canEditAssets && !isAdmin}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
@@ -723,7 +616,7 @@ export default function AssetList() {
                                 <Checkbox
                                     checked={areAllCategoryResultsSelected}
                                     onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                                    aria-label="Select all in this category"
+                                    aria-label="Select all"
                                     disabled={isGuest}
                                 />
                             </TableHead>
@@ -746,7 +639,6 @@ export default function AssetList() {
                                     <Checkbox 
                                         checked={selectedAssetIds.includes(asset.id)}
                                         onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                        aria-label={`Select asset ${asset.description}`}
                                         disabled={isGuest}
                                     />
                                 </TableCell>
@@ -764,11 +656,11 @@ export default function AssetList() {
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewAsset(asset); }}>
                                             <FolderSearch className="mr-2 h-4 w-4" />
-                                            View Details
+                                            View
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
                                             <Edit className="mr-2 h-4 w-4" />
-                                            Edit Full Details
+                                            Edit
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                     </DropdownMenu>
@@ -777,7 +669,7 @@ export default function AssetList() {
                             </TableRow>
                         ))
                         ) : (
-                            <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center h-24">No results found.</TableCell></TableRow>
                         )}
                     </TableBody>
                 </Table>

@@ -12,16 +12,13 @@ const withPWA = withPWAInit({
 
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',
+  // Removing output: 'export' to support dynamic features and Firebase App Hosting SSR.
   typescript: {
     ignoreBuildErrors: false,
   },
   eslint: {
     ignoreDuringBuilds: false,
   },
-  // Ensure absolute paths work correctly in the deployed bundle
-  trailingSlash: false,
-  // Optimized folder scanning for App Router
   images: {
     unoptimized: true
   }

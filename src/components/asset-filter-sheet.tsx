@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Filter Engine.
- * Phase 2011: Fixed OptionType import to point to domain types.
+ * Phase 2015: Synchronized OptionType import with central domain models.
  */
 
 import React from 'react';
@@ -116,7 +116,7 @@ const FilterSection = ({ title, options, selected, onChange, icon: Icon }: {
                         isSelected ? "bg-black/20 border-black/10" : "bg-black/40 border-white/5"
                       )}>
                         <span className={cn(
-                          "text-[9px] font-mono font-bold",
+                          "text-9px font-mono font-bold",
                           isSelected ? "text-black/60" : "text-white/20"
                         )}>{option.count}</span>
                       </div>

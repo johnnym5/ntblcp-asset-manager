@@ -2,8 +2,7 @@
 
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
- * Phase 2011: Fixed syntax error in maintenance dialogs (Accordion vs AlertDialog tags).
- * Phase 2012: Hardened handleSyncFolderPulse and handleSyncAssetPulse for absolute parity.
+ * Phase 2015: Synchronized sync logic and fixed syntax errors in maintenance dialogs.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -467,37 +466,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
     setIsSyncing(true);
     try {
-      addNotification({ title: "Syncing Folder...", description: `Uploading ${folderAssets.length} changes from ${cat}.` });
-      
       for (const asset of folderAssets) {
         await FirestoreService.saveAsset(asset);
       }
-
       const currentLocal = await storage.getAssets();
-      const updatedLocal = currentLocal.map(a => {
-        if (a.category === cat && a.syncStatus === 'local') {
-          return { ...a, syncStatus: 'synced' as const };
-        }
-        return a;
-      });
+      const updatedLocal = currentLocal.map(a => (a.category === cat && a.syncStatus === 'local') ? { ...a, syncStatus: 'synced' as const } : a);
       await storage.saveAssets(updatedLocal);
 
       const queue = await storage.getQueue();
       const folderAssetIds = new Set(folderAssets.map(a => a.id));
       for (const entry of queue) {
-        const payloadId = (entry.payload as any).id;
-        if (folderAssetIds.has(payloadId)) {
-          await storage.dequeue(entry.id);
-        }
+        if (folderAssetIds.has((entry.payload as any).id)) await storage.dequeue(entry.id);
       }
-
       await refreshRegistry();
       addNotification({ title: "Folder Sync Complete", variant: "success" });
-    } catch (e) {
-      addNotification({ title: "Sync Failure", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-    }
+    } catch (e) { addNotification({ title: "Sync Failure", variant: "destructive" }); }
+    finally { setIsSyncing(false); }
   };
 
   const handleSyncAssetPulse = async (id: string) => {
@@ -506,32 +490,21 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       return;
     }
     const asset = assets.find(a => a.id === id);
-    if (!asset || asset.syncStatus === 'synced') {
-        if (asset?.syncStatus === 'synced') addNotification({ title: "Asset Synced", description: "Record already in parity." });
-        return;
-    }
+    if (!asset || asset.syncStatus === 'synced') return;
     setIsSyncing(true);
     try {
       await FirestoreService.saveAsset(asset);
-      
       const currentLocal = await storage.getAssets();
       const updatedLocal = currentLocal.map(a => a.id === id ? { ...a, syncStatus: 'synced' as const } : a);
       await storage.saveAssets(updatedLocal);
-
       const queue = await storage.getQueue();
       for (const entry of queue) {
-        if ((entry.payload as any).id === id) {
-          await storage.dequeue(entry.id);
-        }
+        if ((entry.payload as any).id === id) await storage.dequeue(entry.id);
       }
-
       await refreshRegistry();
       addNotification({ title: "Record Synced", variant: "success" });
-    } catch (e) {
-      addNotification({ title: "Sync Failure", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-    }
+    } catch (e) { addNotification({ title: "Sync Failure", variant: "destructive" }); }
+    finally { setIsSyncing(false); }
   };
 
   const handleExploreFolder = (cat: string) => {
