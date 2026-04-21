@@ -174,6 +174,7 @@ export interface Asset {
   unseenUpdateFields: string[];
   previousState?: any | null;
   pendingChanges?: any;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   changeSubmittedBy?: {
     displayName: string;
     loginName: string;
