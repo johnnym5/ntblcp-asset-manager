@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Filter Engine.
- * Phase 2018: Fixed OptionType import path for build stability.
+ * Hardened for production build with absolute import paths.
  */
 
 import React from 'react';

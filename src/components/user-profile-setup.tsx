@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Authentication Gateway.
- * Phase 2015: Security hardening - removed hardcoded credentials.
+ * Hardened for production build and type-safe role access.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,

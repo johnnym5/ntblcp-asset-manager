@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 2015: Synchronized for strict production build and App Hosting support.
- * Phase 2017: Removed unnecessary dependency from filteredAssets useMemo.
+ * Hardened for strict production build and App Hosting support.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';

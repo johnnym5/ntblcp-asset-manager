@@ -89,8 +89,8 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] overflow-hidden shadow-3xl bg-background/95 backdrop-blur-xl">
-        <div className="p-10 border-b bg-white/[0.02]">
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 border-none rounded-[2.5rem] overflow-hidden shadow-3xl bg-background/95 backdrop-blur-xl text-foreground">
+        <div className="p-10 border-b bg-muted/20">
             <DialogHeader>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -98,8 +98,8 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                             <Inbox className="text-primary h-8 w-8" />
                         </div>
                         <div className="space-y-1">
-                          <DialogTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Approval Queue</DialogTitle>
-                          <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-white/40">
+                          <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Approval Queue</DialogTitle>
+                          <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
                               Adjudicate field modifications
                           </DialogDescription>
                         </div>
@@ -107,7 +107,7 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="h-10 px-6 font-black text-[9px] uppercase tracking-widest border-white/10 bg-white/5 hover:bg-primary/5 rounded-xl"
+                        className="h-10 px-6 font-black text-[9px] uppercase tracking-widest border-border bg-muted/20 hover:bg-primary/5 rounded-xl"
                         onClick={refreshRegistry}
                         disabled={isSyncing}
                     >
@@ -140,13 +140,13 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
           </div>
         )}
         
-        <ScrollArea className="flex-1 px-10 py-8 bg-black">
+        <ScrollArea className="flex-1 px-10 py-8 bg-background">
           {pendingAssets.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
               {pendingAssets.map((asset) => (
                 <Card key={asset.id} className={cn(
-                  "border-2 transition-all rounded-[2rem] overflow-hidden bg-white/[0.02] shadow-xl",
-                  selectedIds.has(asset.id) ? "border-primary bg-primary/[0.02]" : "border-white/5 hover:border-white/10"
+                  "border-2 transition-all rounded-[2rem] overflow-hidden bg-card/50 shadow-xl",
+                  selectedIds.has(asset.id) ? "border-primary bg-primary/[0.02]" : "border-border/40 hover:border-primary/20"
                 )}>
                   <div className="p-6 space-y-6">
                     <div className="flex items-start justify-between gap-4">
@@ -154,18 +154,18 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                         <Checkbox 
                           checked={selectedIds.has(asset.id)} 
                           onCheckedChange={() => toggleSelect(asset.id)}
-                          className="h-5 w-5 rounded-full border-2 border-white/10"
+                          className="h-5 w-5 rounded-full border-2 border-border/40"
                         />
                         <div className="space-y-1">
-                          <h4 className="text-base font-black uppercase text-white tracking-tight truncate max-w-[200px]">{asset.description}</h4>
+                          <h4 className="text-base font-black uppercase text-foreground tracking-tight truncate max-w-[200px]">{asset.description}</h4>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-white/10 text-white/40">{asset.category}</Badge>
+                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest border-border text-muted-foreground">{asset.category}</Badge>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border-2 border-dashed border-white/5 p-5 bg-black/40">
+                    <div className="space-y-3 rounded-2xl border-2 border-dashed border-border/40 p-5 bg-muted/20">
                        <h4 className="font-black text-[9px] uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
                           <GitPullRequest className="h-3.5 w-3.5"/> Modifications
                        </h4>
@@ -180,12 +180,12 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                                   />
                               ))
                           ) : (
-                              <div className="text-[9px] font-bold text-white/20 uppercase p-4 text-center">Status Update Only</div>
+                              <div className="text-[9px] font-bold text-muted-foreground/40 uppercase p-4 text-center">Status Update Only</div>
                           )}
                        </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[9px] font-black uppercase text-white/30 pt-2 border-t border-white/5">
+                    <div className="flex items-center justify-between text-[9px] font-black uppercase text-muted-foreground/60 pt-2 border-t border-border/40">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3" /> <span>{asset.changeSubmittedBy?.displayName}</span>
                       </div>
@@ -194,7 +194,7 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                       </div>
                     </div>
                   </div>
-                  <div className="p-4 bg-white/[0.02] flex gap-2 border-t border-white/5">
+                  <div className="p-4 bg-muted/30 flex gap-2 border-t border-border/40">
                     <Button variant="ghost" onClick={() => handleAction([asset.id], 'REJECT')} className="flex-1 h-10 text-[9px] font-black uppercase text-red-500 hover:bg-red-500/10">Reject</Button>
                     <Button onClick={() => handleAction([asset.id], 'APPROVE')} className="flex-1 h-10 text-[9px] font-black uppercase bg-primary text-black">Approve</Button>
                   </div>
@@ -203,14 +203,14 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
-              <Inbox className="h-20 w-20 mb-6 text-white" />
-              <h3 className="text-2xl font-black uppercase tracking-widest text-white">Queue Clear</h3>
+              <Inbox className="h-20 w-20 mb-6 text-foreground" />
+              <h3 className="text-2xl font-black uppercase tracking-widest">Queue Clear</h3>
             </div>
           )}
         </ScrollArea>
         
-        <div className="p-8 bg-[#050505] border-t border-white/5 text-center">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-black uppercase text-xs tracking-widest text-white/40 hover:text-white">Dismiss Workspace</Button>
+        <div className="p-8 bg-muted/20 border-t border-border/40 text-center">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-black uppercase text-xs tracking-widest text-muted-foreground hover:text-foreground">Dismiss Workspace</Button>
         </div>
       </DialogContent>
     </Dialog>

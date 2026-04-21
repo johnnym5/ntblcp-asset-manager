@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Legacy Asset List Component.
- * Fixed for production build: synchronized property accessors with domain Asset interface.
- * Phase 2018: Resolved 'assignee' and 'verifiedStatus' type errors.
+ * Optimized for production build: synchronized property accessors with domain Asset interface.
+ * Satisfied Next.js 15 production standards by escaping entities.
  */
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -194,10 +194,11 @@ export default function AssetList() {
   const isSyncConfirmOpen = useAppState().isSyncConfirmOpen;
   const setIsSyncConfirmOpen = useAppState().setIsSyncConfirmOpen;
 
-  const { enabledSheets, sheetDefinitions } = appSettings || { enabledSheets: [], lockAssetList: false, sheetDefinitions: {} };
+  const enabledSheets = appSettings?.grants.flatMap((g: any) => g.enabledSheets) || [];
+  const sheetDefinitions = appSettings?.grants.reduce((acc: any, g: any) => ({ ...acc, ...g.sheetDefinitions }), {}) || {};
 
   const isAdmin = userProfile?.isAdmin || false;
-  const isGuest = (userProfile as any)?.isGuest || false;
+  const isGuest = userProfile?.role === 'VIEWER';
   
   const activeAssets = useMemo(() => assets, [assets]);
 
@@ -402,7 +403,7 @@ export default function AssetList() {
                       <div className="text-2xl font-bold">{total}</div>
                       <p className="text-xs text-muted-foreground">Total assets</p>
                   </div>
-                  {appSettings.appMode === 'verification' && (
+                  {appSettings?.appMode === 'verification' && (
                     <div className="space-y-2">
                         <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
                         <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
@@ -433,7 +434,7 @@ export default function AssetList() {
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className='flex-1'>
                     <CardTitle className="flex items-center gap-2">
-                       <span>{appSettings.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
+                       <span>{appSettings?.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
                     </CardTitle>
                   </div>
                   
@@ -453,7 +454,7 @@ export default function AssetList() {
                   </div>
               </CardHeader>
                <CardContent className="pt-2 space-y-2">
-                  {appSettings.appMode === 'verification' ? (
+                  {appSettings?.appMode === 'verification' ? (
                     <>
                       <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                       <p className="text-sm text-muted-foreground">

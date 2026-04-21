@@ -67,7 +67,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
     return activeTemplate.displayFields
       .filter(f => f.inChecklist)
-      .map(field => {
+      .map((field, idx) => {
         const fieldName = field.key as keyof Asset;
         let val: any = undefined;
 
@@ -87,10 +87,10 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
         }
 
         return {
+          id: `check-${field.key}-${idx}`,
           label: field.label,
           isCompleted,
-          icon: isVehicle ? Car : Laptop,
-          key: field.key
+          icon: isVehicle ? Car : Laptop
         };
       });
   }, [activeTemplate, values]);
@@ -104,8 +104,8 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
 
       <div className="space-y-3">
         {checklistItems.length > 0 ? (
-          checklistItems.map(({ key, ...itemProps }) => (
-            <ChecklistItem key={key} {...itemProps} />
+          checklistItems.map(({ id, ...itemProps }) => (
+            <ChecklistItem key={id} {...itemProps} />
           ))
         ) : (
           <div className="py-10 rounded-2xl border-2 border-dashed border-border/40 text-center flex flex-col items-center gap-3">

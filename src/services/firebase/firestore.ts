@@ -188,6 +188,16 @@ export const FirestoreService = {
     }
   },
 
+  async deleteAsset(assetId: string): Promise<void> {
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, 'assets', assetId));
+    } catch (err: any) {
+      this.handlePermissionError(`assets/${assetId}`, 'delete', err);
+      throw err;
+    }
+  },
+
   async restoreAsset(assetId: string, performedBy: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
