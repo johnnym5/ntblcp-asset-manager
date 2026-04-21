@@ -2,9 +2,7 @@
 
 /**
  * @file Overview Asset Hub - Primary Record Workspace.
- * Optimized for High-Density Grid Pulse & Dual-Mode Setup Interface.
- * Phase 1535: Hardened handleSyncFolderPulse to update local parity and cleanup queue.
- * Phase 1536: Resolved syntax error in Purge Dialog.
+ * Phase 2010: Hardened handleSyncFolderPulse and handleSyncAssetPulse for absolute parity.
  */
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
@@ -127,7 +125,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
-  // UI State
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);

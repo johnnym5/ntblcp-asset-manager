@@ -1,7 +1,7 @@
 /**
  * @fileOverview Registry Validation Rules.
  * Strict deterministic Zod schemas for system data.
- * Updated Phase 1999: Optimized recursive fields to resolve strict ConditionGroup mismatches.
+ * Updated Phase 2010: Final alignment for production build and App Hosting support.
  */
 
 import { z } from 'zod';
@@ -106,7 +106,6 @@ export const AssetSchema = z.object({
   lastModifiedByState: z.string().optional(),
   
   // Restoration Buffer & Governance
-  // Note: Using any to prevent recursive type inference conflicts in useForm
   previousState: z.any().nullable().optional(),
   pendingChanges: z.any().optional(),
 

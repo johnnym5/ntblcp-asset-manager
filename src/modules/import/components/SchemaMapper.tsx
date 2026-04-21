@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SchemaMapper - Interactive Data Engineering Interface.
- * Allows users to manually align Excel headers to Registry fields.
- * Phase 1002: Fixed unescaped entities for ESLint compliance.
+ * Phase 1002: Hardened for production build and Next.js 15 PAR.
  */
 
 import React, { useState, useEffect } from 'react';

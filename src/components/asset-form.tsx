@@ -2,8 +2,6 @@
 
 /**
  * @fileOverview AssetForm - Dynamic Record Workstation.
- * Phase 1915: Removed redundant TooltipProvider.
- * Phase 2005: Enforced strict governance - only Admins bypass approval.
  * Phase 2010: Synchronized validation resolver with Asset domain interface.
  */
 

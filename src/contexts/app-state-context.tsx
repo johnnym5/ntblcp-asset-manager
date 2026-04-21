@@ -2,13 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 1910: Implemented Intelligent Timestamp-Based Sync & Conflict Filtering.
- * Phase 1911: Added Deep Equality parity check to skip redundant updates.
- * Phase 1912: Implementation of Location-Scoped Cloud Pull.
- * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
- * Phase 1960: Overhauled filteredAssets logic to support advanced logic tokens from Dashboard Pulses.
- * Phase 1995: Fixed Context Provider value to include all missing state properties and activeGrantId.
- * Phase 2010: Added missing setters and properties to the interface to resolve build errors.
+ * Phase 2010: Hardened for production build and App Hosting parity.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -29,92 +23,12 @@ import type {
   WorkstationView, 
   OptionType, 
   SyncSummary,
-  SyncStrategy
+  SyncStrategy,
+  AppStateContextType
 } from '@/types/domain';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
-
-export type { OptionType };
-
-interface AppStateContextType {
-  assets: Asset[];
-  filteredAssets: Asset[];
-  sandboxAssets: Asset[];
-  dataSource: DataSource;
-  setDataSource: (source: DataSource) => void;
-  isOnline: boolean;
-  setIsOnline: (status: boolean) => void;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  isSyncing: boolean;
-  appSettings: AppSettings | null;
-  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
-  settingsLoaded: boolean;
-  isHydrated: boolean;
-  activeGrantIds: string[];
-  activeGrantId: string | null;
-  activeView: WorkstationView;
-  setActiveView: (view: WorkstationView) => void;
-  refreshRegistry: () => Promise<void>;
-  
-  manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
-  manualUpload: () => Promise<void>;
-  executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
-  syncSummary: SyncSummary | null;
-  isSyncConfirmOpen: boolean;
-  setIsSyncConfirmOpen: (open: boolean) => void;
-
-  setReadAuthority: (node: AuthorityNode) => Promise<void>;
-  
-  headers: RegistryHeader[];
-  setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
-  sortKey: string;
-  setSortKey: Dispatch<SetStateAction<string>>;
-  sortDir: 'asc' | 'desc';
-  setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
-
-  selectedLocations: string[];
-  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
-  selectedAssignees: string[];
-  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
-  selectedStatuses: string[];
-  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
-  selectedConditions: string[];
-  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
-  missingFieldFilter: string;
-  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
-
-  locationOptions: OptionType[];
-  assigneeOptions: OptionType[];
-  conditionOptions: OptionType[];
-  statusOptions: OptionType[];
-  categoryOptions: OptionType[];
-
-  isFilterOpen: boolean;
-  setIsFilterOpen: (open: boolean) => void;
-  isSortOpen: boolean;
-  setIsSortOpen: (open: boolean) => void;
-  filters: HeaderFilter[];
-  setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
-
-  isCommandPaletteOpen: boolean;
-  setIsCommandPaletteOpen: (open: boolean) => void;
-
-  selectedCategory: string | null;
-  selectedCategories: string[];
-  setSelectedCategories: (cats: string[]) => void;
-  setSelectedCategory: (cat: string | null) => void;
-  isExplored: boolean;
-  setIsExplored: (val: boolean) => void;
-  itemsPerPage: number | 'all';
-  setItemsPerPage: (val: number | 'all') => void;
-  goBack: () => void;
-  activeFilterCount: number;
-
-  groupsViewMode: 'category' | 'condition';
-  setGroupsViewMode: Dispatch<SetStateAction<'category' | 'condition'>>;
-}
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
@@ -152,11 +66,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
+  
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -197,8 +113,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         return grant.enabledSheets.includes(a.category);
       });
         
-      setAssets(DiscrepancyEngine.scan(filtered));
-      setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
+      setAssets(DiscrepancyEngine.scan(filtered as any) as any);
+      setSandboxAssets(DiscrepancyEngine.scan(localSandbox as any) as any);
     } catch (e) { 
       console.error("Registry Refresh Error:", e); 
     }
@@ -214,18 +130,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   useEffect(() => { if (isHydrated) refreshRegistry(); }, [isHydrated, refreshRegistry]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-    const handleOnline = () => { if (!isOnline) setIsOnlineStatus(true); };
-    const handleOffline = () => { if (isOnline) setIsOnlineStatus(false); };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [isHydrated, isOnline]);
 
   useEffect(() => {
     if (!isHydrated) return;

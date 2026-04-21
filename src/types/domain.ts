@@ -1,13 +1,11 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Authoritative type definitions for the entire asset management system.
- * Updated Phase 1940: Added missing technical fields to the Asset interface.
- * Updated Phase 1985: Hardened for build with GIS and Evidence parameters.
- * Updated Phase 1996: Unified optional property parity with validation schema.
- * Phase 2010: Synchronized with AssetSchema to resolve Form Resolver errors.
+ * Updated Phase 2010: Final alignment for production build and App Hosting support.
  */
 
-import type { RegistryHeader } from './registry';
+import type { RegistryHeader, HeaderFilter } from './registry';
+import { Dispatch, SetStateAction } from 'react';
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
@@ -66,21 +64,6 @@ export interface OptionType {
   label: string;
   value: string;
   count?: number;
-}
-
-export interface SortConfig {
-  key: string;
-  direction: 'asc' | 'desc';
-}
-
-export interface DataActions {
-  onImport?: () => void;
-  onScanAndImport?: () => void;
-  onExport?: () => void;
-  onAddAsset?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
-  isImporting?: boolean;
 }
 
 export interface SectionHierarchy {
@@ -190,10 +173,6 @@ export interface Asset {
   updateCount: number;
   unseenUpdateFields: string[];
   previousState?: any | null;
-  sourceGroup?: string;
-  sourceColumnAGroup?: string;
-  templateId?: string;
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   pendingChanges?: any;
   changeSubmittedBy?: {
     displayName: string;
@@ -331,4 +310,83 @@ export interface ErrorLogEntry {
     result?: string; 
   };
   adminComment?: string;
+}
+
+export interface AppStateContextType {
+  assets: Asset[];
+  filteredAssets: Asset[];
+  sandboxAssets: Asset[];
+  dataSource: DataSource;
+  setDataSource: (source: DataSource) => void;
+  isOnline: boolean;
+  setIsOnline: (status: boolean) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  isSyncing: boolean;
+  appSettings: AppSettings | null;
+  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
+  settingsLoaded: boolean;
+  isHydrated: boolean;
+  activeGrantIds: string[];
+  activeGrantId: string | null;
+  activeView: WorkstationView;
+  setActiveView: (view: WorkstationView) => void;
+  refreshRegistry: () => Promise<void>;
+  
+  manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
+  manualUpload: () => Promise<void>;
+  executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
+  syncSummary: SyncSummary | null;
+  isSyncConfirmOpen: boolean;
+  setIsSyncConfirmOpen: (open: boolean) => void;
+
+  setReadAuthority: (node: AuthorityNode) => Promise<void>;
+  
+  headers: RegistryHeader[];
+  setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
+  sortKey: string;
+  setSortKey: Dispatch<SetStateAction<string>>;
+  sortDir: 'asc' | 'desc';
+  setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
+
+  selectedLocations: string[];
+  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
+  selectedAssignees: string[];
+  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
+  selectedStatuses: string[];
+  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedConditions: string[];
+  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
+  missingFieldFilter: string;
+  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
+
+  locationOptions: OptionType[];
+  assigneeOptions: OptionType[];
+  conditionOptions: OptionType[];
+  statusOptions: OptionType[];
+  categoryOptions: OptionType[];
+
+  isFilterOpen: boolean;
+  setIsFilterOpen: (open: boolean) => void;
+  isSortOpen: boolean;
+  setIsSortOpen: (open: boolean) => void;
+  filters: HeaderFilter[];
+  setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
+
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+
+  selectedCategory: string | null;
+  selectedCategories: string[];
+  setSelectedCategories: (cats: string[]) => void;
+  setSelectedCategory: (cat: string | null) => void;
+  isExplored: boolean;
+  setIsExplored: (val: boolean) => void;
+  itemsPerPage: number | 'all';
+  setItemsPerPage: (val: number | 'all') => void;
+  goBack: () => void;
+  activeFilterCount: number;
+
+  groupsViewMode: 'category' | 'condition';
+  setGroupsViewMode: Dispatch<SetStateAction<'category' | 'condition'>>;
 }

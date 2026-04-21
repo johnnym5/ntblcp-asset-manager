@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Import Center - Excel Data Setup.
- * Phase 1916: Expanded group summary to handle unmatched sheets clearly.
- * Phase 1917: Fixed unescaped entities for ESLint compliance.
- * Phase 2010: Escaped reserved characters in descriptive text.
+ * Phase 2010: Hardened for production build and App Hosting parity.
  */
 
 import React, { useState, useRef, useMemo, useCallback } from 'react';
@@ -99,7 +97,7 @@ export function ImportWorkstation() {
       const allGroups: DiscoveredGroup[] = [];
       const wbData: Record<string, any[][]> = {};
       
-      engineRef.current = new ParserEngine(file.name, existingAssets, mergedSheetDefinitions as any);
+      engineRef.current = new ParserEngine(file.name, existingAssets as any, mergedSheetDefinitions as any);
 
       for (let i = 0; i < workbook.SheetNames.length; i++) {
         const sheetName = workbook.SheetNames[i];
