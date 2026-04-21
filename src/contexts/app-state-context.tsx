@@ -8,6 +8,7 @@
  * Phase 1930: Hardened refresh logic for onboarding & returned sync results for auto-execution.
  * Phase 1960: Overhauled filteredAssets logic to support advanced logic tokens from Dashboard Pulses.
  * Phase 1995: Fixed Context Provider value to include all missing state properties and activeGrantId.
+ * Phase 2010: Added missing setters and properties to the interface to resolve build errors.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -57,7 +58,6 @@ interface AppStateContextType {
   setActiveView: (view: WorkstationView) => void;
   refreshRegistry: () => Promise<void>;
   
-  // Sync High-Fidelity Pulse
   manualDownload: (stateScopes?: string[]) => Promise<SyncSummary | null>;
   manualUpload: () => Promise<void>;
   executeSync: (strategy: SyncStrategy, overrideSummary?: SyncSummary) => Promise<void>;
@@ -143,7 +143,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
   const [groupsViewMode, setGroupsViewMode] = useState<'category' | 'condition'>('category');
   
-  // Sync Governance State
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
 
@@ -207,9 +206,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => { 
     setIsHydrated(true);
-    const savedStatus = localStorage.getItem('assetain-online-status');
-    if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
-    else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
+    if (typeof window !== 'undefined') {
+      const savedStatus = localStorage.getItem('assetain-online-status');
+      if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
+      else setIsOnlineStatus(navigator.onLine);
+    }
   }, []);
 
   useEffect(() => { if (isHydrated) refreshRegistry(); }, [isHydrated, refreshRegistry]);
@@ -411,15 +412,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const areAssetsIdentical = useCallback((local: Asset, remote: Asset): boolean => {
     const keysToIgnore = ['syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'updateCount', 'unseenUpdateFields', 'importMetadata'];
-    
-    const localClean = Object.keys(local)
-      .filter(k => !keysToIgnore.includes(k))
-      .reduce((obj, key) => ({ ...obj, [key]: (local as any)[key] }), {});
-      
-    const remoteClean = Object.keys(remote)
-      .filter(k => !keysToIgnore.includes(k))
-      .reduce((obj, key) => ({ ...obj, [key]: (remote as any)[key] }), {});
-
+    const localClean = Object.keys(local).filter(k => !keysToIgnore.includes(k)).reduce((obj, key) => ({ ...obj, [key]: (local as any)[key] }), {});
+    const remoteClean = Object.keys(remote).filter(k => !keysToIgnore.includes(k)).reduce((obj, key) => ({ ...obj, [key]: (remote as any)[key] }), {});
     return JSON.stringify(localClean) === JSON.stringify(remoteClean);
   }, []);
 
@@ -427,79 +421,51 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (!isOnline) return null;
     setIsSyncing(true);
     addNotification({ title: "Scanning Cloud Authority...", description: "Reconciling timestamps for global parity." });
-    
     try {
-      const currentGrantIds = (appSettings?.activeGrantIds && appSettings.activeGrantIds.length > 0)
-        ? appSettings.activeGrantIds 
-        : (appSettings?.grants.map(g => g.id) || []);
-      
-      if (currentGrantIds.length === 0) {
-        setIsSyncing(false);
-        return null;
-      }
-
+      const currentGrantIds = (appSettings?.activeGrantIds && appSettings.activeGrantIds.length > 0) ? appSettings.activeGrantIds : (appSettings?.grants.map(g => g.id) || []);
+      if (currentGrantIds.length === 0) { setIsSyncing(false); return null; }
       let allRemoteAssets: Asset[] = [];
       for (const gid of currentGrantIds) {
         const projectAssets = await FirestoreService.getProjectAssets(gid, stateScopes);
         allRemoteAssets = [...allRemoteAssets, ...projectAssets];
       }
-
       const filteredRemote = allRemoteAssets.filter(a => {
         const grant = appSettings?.grants.find(g => g.id === a.grantId);
         if (!grant || grant.enabledSheets.length === 0) return true;
         return grant.enabledSheets.includes(a.category);
       });
-
       const localAssets = await storage.getAssets();
       const localMap = new Map(localAssets.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
-
       const newItems: Asset[] = [];
       const existingItems: Asset[] = [];
       const autoUpdateItems: Asset[] = [];
-
       filteredRemote.forEach(remote => {
         const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
         const local = localMap.get(id);
-        
-        if (!local) {
-          newItems.push(remote);
-        } else {
+        if (!local) newItems.push(remote);
+        else {
           if (!areAssetsIdentical(local, remote)) {
             const remoteTime = new Date(remote.lastModified).getTime();
             const localTime = new Date(local.lastModified).getTime();
-            
-            if (remoteTime > localTime) {
-              autoUpdateItems.push(remote);
-            } else if (localTime > remoteTime && local.syncStatus === 'local') {
-              existingItems.push(remote);
-            }
+            if (remoteTime > localTime) autoUpdateItems.push(remote);
+            else if (localTime > remoteTime && local.syncStatus === 'local') existingItems.push(remote);
           }
         }
       });
-
       const totalCount = newItems.length + autoUpdateItems.length + existingItems.length;
       if (totalCount === 0) {
         addNotification({ title: "Parity Confirmed", description: "Your regional registry is in sync with the cloud." });
         setIsSyncing(false);
         return null;
       }
-
-      const summary: SyncSummary = { 
-        type: 'DOWNLOAD', 
-        newItems: [...newItems, ...autoUpdateItems], 
-        existingItems, 
-        totalCount 
-      };
-      
+      const summary: SyncSummary = { type: 'DOWNLOAD', newItems: [...newItems, ...autoUpdateItems], existingItems, totalCount };
       setSyncSummary(summary);
       setIsSyncConfirmOpen(true);
       return summary;
     } catch (e) {
       addNotification({ title: "Sync Scan Failed", variant: "destructive" });
       return null;
-    } finally {
-      setIsSyncing(false);
-    }
+    } finally { setIsSyncing(false); }
   }, [isOnline, appSettings, areAssetsIdentical]);
 
   const manualUpload = useCallback(async () => {
@@ -508,68 +474,43 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     try {
       const queue = await storage.getQueue();
       const pending = queue.filter(q => q.status === 'PENDING');
-      
       if (pending.length === 0) {
         addNotification({ title: "Local Store Synchronized", description: "Zero modifications pending upload." });
         setIsSyncing(false);
         return;
       }
-
-      setSyncSummary({ 
-        type: 'UPLOAD', 
-        newItems: pending.map(q => q.payload as any), 
-        existingItems: [],
-        totalCount: pending.length 
-      });
+      setSyncSummary({ type: 'UPLOAD', newItems: pending.map(q => q.payload as any), existingItems: [], totalCount: pending.length });
       setIsSyncConfirmOpen(true);
-    } finally {
-      setIsSyncing(false);
-    }
+    } finally { setIsSyncing(false); }
   }, [isOnline]);
 
   const executeSync = async (strategy: SyncStrategy, overrideSummary?: SyncSummary) => {
     const activeSummary = overrideSummary || syncSummary;
     if (!activeSummary) return;
-    
     setIsSyncing(true);
     setIsSyncConfirmOpen(false);
-
     try {
       if (activeSummary.type === 'DOWNLOAD') {
         const local = await storage.getAssets();
         const localMap = new Map(local.map(a => [getFuzzySignature(a.assetIdCode || a.serialNumber || a.id), a]));
-
         let nextAssets = [...local];
-        
         activeSummary.newItems.forEach(item => {
           const id = getFuzzySignature(item.assetIdCode || item.serialNumber || item.id);
           const existing = localMap.get(id);
-          if (existing) {
-            nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...item, syncStatus: 'synced' } : a);
-          } else {
-            nextAssets.push({ ...item, syncStatus: 'synced' });
-          }
+          if (existing) nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...item, syncStatus: 'synced' } : a);
+          else nextAssets.push({ ...item, syncStatus: 'synced' });
         });
-
         if (strategy === 'UPDATE' && activeSummary.existingItems.length > 0) {
           activeSummary.existingItems.forEach(remote => {
             const id = getFuzzySignature(remote.assetIdCode || remote.serialNumber || remote.id);
             nextAssets = nextAssets.map(a => getFuzzySignature(a.assetIdCode || a.serialNumber || a.id) === id ? { ...remote, syncStatus: 'synced' } : a);
           });
         }
-
         await storage.saveAssets(nextAssets);
         addNotification({ title: "Registry Parity Established", description: `Processed ${activeSummary.totalCount} record pulses.`, variant: "success" });
-      } else {
-        await processSyncQueue();
-      }
+      } else { await processSyncQueue(); }
       await refreshRegistry();
-    } catch (e) {
-      addNotification({ title: "Sync Execution Failure", variant: "destructive" });
-    } finally {
-      setIsSyncing(false);
-      setSyncSummary(null);
-    }
+    } catch (e) { addNotification({ title: "Sync Execution Failure", variant: "destructive" }); } finally { setIsSyncing(false); setSyncSummary(null); }
   };
 
   return (

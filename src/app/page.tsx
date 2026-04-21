@@ -4,6 +4,7 @@
  * @fileOverview Application Shell - Home Hub.
  * Optimized for Production Deployment & Simplified Terminology.
  * Phase 1914: Fixed TooltipProvider ReferenceError by leveraging root provider.
+ * Phase 2010: Added Refresh button to the header sync cluster.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -146,8 +147,6 @@ export default function HomeHub() {
 
   const jumpOptions = useMemo(() => {
     const base = [];
-    
-    // Page access logic
     if (perms?.page_dashboard) base.push({ label: 'Home Hub', icon: LayoutDashboard, onSelect: () => setActiveView('DASHBOARD') });
     if (perms?.page_registry) base.push({ label: 'Asset List', icon: FolderOpen, onSelect: () => setActiveView('REGISTRY') });
     if (perms?.page_registry) base.push({ label: 'Verification Queue', icon: ClipboardCheck, onSelect: () => setActiveView('VERIFY') });
@@ -156,18 +155,15 @@ export default function HomeHub() {
     if (perms?.page_alerts) base.push({ label: 'Issue Alerts', icon: ShieldAlert, onSelect: () => setActiveView('ALERTS') });
     if (perms?.page_audit_log) base.push({ label: 'Activity History', icon: HistoryIcon, onSelect: () => setActiveView('AUDIT_LOG') });
     if (perms?.page_sync_queue) base.push({ label: 'Sync Queue', icon: Activity, onSelect: () => setActiveView('SYNC_QUEUE') });
-
     if (isAdmin) {
       if (perms?.func_import) base.push({ label: 'Import Data', icon: FileUp, onSelect: () => setActiveView('IMPORT') });
       if (perms?.page_users) base.push({ label: 'Personnel List', icon: UserIcon, onSelect: () => setActiveView('USERS') });
       if (perms?.page_settings) base.push({ label: 'System Settings', icon: SettingsIcon, onSelect: () => setActiveView('SETTINGS') });
     }
-
     if (userProfile?.role === 'SUPERADMIN') {
       if (perms?.page_infrastructure) base.push({ label: 'System Infrastructure', icon: Monitor, onSelect: () => setActiveView('INFRASTRUCTURE') });
       if (perms?.page_database) base.push({ label: 'Database Center', icon: Terminal, onSelect: () => setActiveView('DATABASE') });
     }
-
     return base;
   }, [isAdmin, userProfile?.role, perms, setActiveView]);
 
@@ -297,9 +293,9 @@ export default function HomeHub() {
             title="Sync Control"
             options={[
               { label: 'Sync Hub', icon: Activity, onSelect: () => setIsSyncStatusOpen(true) },
+              { label: 'Refresh Registry', icon: RefreshCw, onSelect: refreshRegistry },
               { label: 'Fetch Data', icon: Download, onSelect: handleDownloadPulse, disabled: !isOnline },
-              { label: 'Save Changes', icon: Upload, onSelect: manualUpload, disabled: !isOnline },
-              ...(isAdmin ? [{ label: 'Force Sync', icon: RefreshCw, onSelect: refreshRegistry }] : [])
+              { label: 'Save Changes', icon: Upload, onSelect: manualUpload, disabled: !isOnline }
             ]}
           >
             <div 
@@ -315,6 +311,7 @@ export default function HomeHub() {
                 </div>
               ) : (
                 <>
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={refreshRegistry} disabled={isSyncing} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><RefreshCw className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Refresh Pulse</TooltipContent></Tooltip>
                   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDownloadPulse} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Get Updates</TooltipContent></Tooltip>
                   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-8 w-8 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary"><Upload className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent className="text-[8px] font-black uppercase">Save Work</TooltipContent></Tooltip>
                 </>

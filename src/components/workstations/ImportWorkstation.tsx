@@ -4,6 +4,7 @@
  * @fileOverview Import Center - Excel Data Setup.
  * Phase 1916: Expanded group summary to handle unmatched sheets clearly.
  * Phase 1917: Fixed unescaped entities for ESLint compliance.
+ * Phase 2010: Escaped reserved characters in descriptive text.
  */
 
 import React, { useState, useRef, useMemo, useCallback } from 'react';

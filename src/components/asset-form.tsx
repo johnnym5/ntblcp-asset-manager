@@ -4,6 +4,7 @@
  * @fileOverview AssetForm - Dynamic Record Workstation.
  * Phase 1915: Removed redundant TooltipProvider.
  * Phase 2005: Enforced strict governance - only Admins bypass approval.
+ * Phase 2010: Synchronized validation resolver with Asset domain interface.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -102,6 +103,8 @@ export default function AssetForm({
         const defaultGrantId = activeGrantIds[0] || (appSettings?.grants[0]?.id) || '';
         form.reset({
           id: crypto.randomUUID(),
+          sn: "",
+          assetIdCode: "",
           grantId: defaultGrantId,
           status: 'UNVERIFIED',
           condition: 'New',
@@ -141,8 +144,6 @@ export default function AssetForm({
             updateCount: (asset?.updateCount || 0) + 1
         };
 
-        // GOVERNANCE PULSE: Only Admins can save directly.
-        // Everyone else generates a PENDING record for the inbox.
         if (!isAdmin && asset) {
           const changes: Partial<Asset> = {};
           const keysToCheck = ['description', 'assetIdCode', 'serialNumber', 'location', 'custodian', 'condition', 'remarks', 'metadata', 'chassisNo', 'engineNo'];
@@ -185,7 +186,6 @@ export default function AssetForm({
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
-    // Verification mode allows condition/remarks/status edits by Verifiers
     const assessmentFields = ['status', 'condition', 'remarks'];
     if (isVerificationMode && assessmentFields.includes(fieldName)) return false;
     return true;

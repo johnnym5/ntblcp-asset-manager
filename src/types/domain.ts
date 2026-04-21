@@ -4,6 +4,7 @@
  * Updated Phase 1940: Added missing technical fields to the Asset interface.
  * Updated Phase 1985: Hardened for build with GIS and Evidence parameters.
  * Updated Phase 1996: Unified optional property parity with validation schema.
+ * Phase 2010: Synchronized with AssetSchema to resolve Form Resolver errors.
  */
 
 import type { RegistryHeader } from './registry';
@@ -40,7 +41,6 @@ export type WorkstationView =
   | 'ANOMALIES';
 
 export interface UserPermissions {
-  // Page Access
   page_dashboard: boolean;
   page_registry: boolean;
   page_groups: boolean;
@@ -52,7 +52,6 @@ export interface UserPermissions {
   page_infrastructure: boolean;
   page_database: boolean;
   page_settings: boolean;
-  // Function Access
   func_add_asset: boolean;
   func_edit_asset: boolean;
   func_delete_asset: boolean;
@@ -142,16 +141,10 @@ export interface Asset {
   description: string;
   category: string;
   grantId: string; 
-  
-  // Data Synchronization Status
   syncStatus?: SyncStatus;
-
-  // Hierarchical Context
   section: string;
   subsection: string;
   assetFamily: string;
-  
-  // Location & Assignment
   location: string; 
   normalizedLocation?: string;
   normalizedState?: string;
@@ -159,12 +152,9 @@ export interface Asset {
   normalizedLga?: string;
   locationConfidence?: MatchConfidence;
   locationStatus?: LocationMatchStatus;
-  
   custodian: string;
   lga: string;
   site: string;
-  
-  // State & Assessment
   status: VerificationStatus;
   condition: string;
   conditionGroup: ConditionGroup;
@@ -172,11 +162,8 @@ export interface Asset {
   conditionHistory?: ConditionAuditEntry[];
   discrepancyFlag?: boolean;
   reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
-  
   discrepancies: AssetDiscrepancy[];
   overallFidelityScore: number;
-
-  // Financial & Technical
   purchaseDate?: string;
   value: number;
   purchasePriceUsd: number;
@@ -193,27 +180,21 @@ export interface Asset {
   pvJvNo: string;
   usefulLifeYears: string;
   funder: string;
-  
   classification?: AssetClassification;
-
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
   metadata: Record<string, unknown>;
-  
   lastModified: string;
   lastModifiedBy: string;
   lastModifiedByState?: string;
-
   updateCount: number;
   unseenUpdateFields: string[];
-  previousState?: Partial<Asset> | null;
-  
+  previousState?: any | null;
   sourceGroup?: string;
   sourceColumnAGroup?: string;
   templateId?: string;
-
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-  pendingChanges?: Partial<Asset>;
+  pendingChanges?: any;
   changeSubmittedBy?: {
     displayName: string;
     loginName: string;
@@ -221,8 +202,6 @@ export interface Asset {
   };
   adminComment?: string;
   yearBucket?: number;
-
-  // Visual & Spatial pulses
   photoDataUri?: string;
   photoUrl?: string;
   signatureDataUri?: string;
@@ -268,8 +247,8 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   readAuthority: AuthorityNode;
-  activeGrantId: string | null; // Compatibility pulse
-  activeGrantIds: string[]; // Enabled multiple projects
+  activeGrantId: string | null; 
+  activeGrantIds: string[]; 
   grants: Grant[];
   uxMode: UXMode;
   onboardingComplete: boolean;
