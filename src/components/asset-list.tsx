@@ -607,7 +607,7 @@ export default function AssetList() {
                         <TableRow>
                             <TableHead className="w-[50px]">
                                 <Checkbox
-                                    checked={allCategoryResultsSelected}
+                                    checked={areAllCategoryResultsSelected}
                                     onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                                     aria-label="Select all"
                                     disabled={isGuest}

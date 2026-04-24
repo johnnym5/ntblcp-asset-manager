@@ -41,7 +41,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { ASSET_CONDITIONS } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TactileMenu } from '@/components/TactileMenu';
+import { TactileMenu, type TactileOption } from '@/components/TactileMenu';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -149,7 +149,7 @@ export function RegistryTable({
           const grantId = (record.rawRow as any).grantId;
           const grantName = appSettings?.grants.find(g => g.id === grantId)?.name || 'Registry';
 
-          const menuOptions = [
+          const menuOptions: TactileOption[] = [
             { label: 'View Profile', icon: Maximize2, onClick: () => onToggleExpand(record.id) },
             { label: 'Edit Record', icon: Edit3, onClick: () => onInspect?.(record.id) }
           ];
@@ -197,7 +197,7 @@ export function RegistryTable({
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[13px] font-black uppercase text-foreground leading-none truncate">{String(record.rawRow.description || 'Untitled Asset')}</span>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {record.rawRow.assetIdCode || 'UNSET'}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1">TAG: {String(record.rawRow.assetIdCode || 'UNSET')}</span>
                     </div>
                   </div>
 

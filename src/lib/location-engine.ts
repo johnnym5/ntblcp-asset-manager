@@ -73,7 +73,7 @@ export const LocationEngine = {
     };
   },
 
-  _pulse(raw: string, state: StateInfo, confidence: MatchConfidence, status: LocationMatchStatus): LocationPulse {
+  _pulse(raw: string, state: StateInfo, confidence: MatchConfidence, status: LocationMatchStatus): LocationData {
     return {
       raw,
       normalized: state.name,

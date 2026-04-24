@@ -702,7 +702,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       onEdit={handleEditAsset} 
                       onQuickUpdate={handleQuickUpdate} 
                       onUpdateHeader={handleUpdateHeader} 
-                      onSync={handleSyncAssetPulse}
                       isHeaderEditingMode={isHeaderEditingMode} 
                     />
                   )}
