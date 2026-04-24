@@ -380,12 +380,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       isExplored, setIsExplored,
       itemsPerPage, setItemsPerPage, goBack: () => { if (activeView === 'REGISTRY' && (isExplored || selectedCategories.length > 0)) { setIsExplored(false); setSelectedCategoriesStatus([]); } else setActiveViewStatus('DASHBOARD'); },
       activeFilterCount: selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + (selectedCategories.length > 0 ? 1 : 0) + filters.length,
-      groupsViewMode, setGroupsViewMode,
-      selectedLocations, setSelectedLocations,
-      selectedAssignees, setSelectedAssignees,
-      selectedStatuses, setSelectedStatuses,
-      selectedConditions, setSelectedConditions,
-      missingFieldFilter, setMissingFieldFilter
+      groupsViewMode, setGroupsViewMode
     }}>
       <Suspense fallback={null}><ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} /></Suspense>
       {children}

@@ -145,7 +145,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
                     className="w-full h-full py-4 pl-6"
                     options={[
                       { label: 'Edit Profile', icon: Edit, onClick: () => handleEditUser(user) },
-                      { label: 'Copy Email', icon: Mail, onClick: () => navigator.clipboard.writeText(user.email) },
+                      { label: 'Copy Email', icon: Mail, onClick: () => navigator.clipboard.writeText(user.email || '') },
                       { label: 'Purge Identity', icon: Trash2, onClick: () => setUserToDelete(user), destructive: true, disabled: adminProfile?.loginName === user.loginName }
                     ]}
                   >

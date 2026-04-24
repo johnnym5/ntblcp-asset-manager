@@ -119,6 +119,15 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     fileInputRef.current?.click();
   };
 
+  const handleSetActiveGrant = async (grantId: string) => {
+    if (!appSettings) return;
+    const nextSettings: AppSettings = { ...appSettings, activeGrantId: grantId, activeGrantIds: [grantId] };
+    await storage.saveSettings(nextSettings);
+    if (isOnline) await FirestoreService.updateSettings({ activeGrantId: grantId, activeGrantIds: [grantId] });
+    setAppSettings(nextSettings);
+    await refreshRegistry();
+  };
+
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!appSettings || !activeGrantId) return;
     const file = event.target.files?.[0];
@@ -245,7 +254,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              onClick={() => setActiveGrantId(grant.id)}
+                              onClick={() => handleSetActiveGrant(grant.id)}
                               className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-white/5 text-white transition-all"
                             >
                               Set Active

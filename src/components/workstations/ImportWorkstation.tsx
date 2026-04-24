@@ -40,7 +40,6 @@ import { cn, getFuzzySignature } from '@/lib/utils';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { normalizeHeaderName } from '@/lib/registry-utils';
 import type { SheetDefinition } from '@/types/domain';
-import { useToast } from '@/hooks/use-toast';
 
 type ImportStep = 'INGEST' | 'SCANNING' | 'STRUCTURE' | 'RECONCILE' | 'SUMMARY';
 type MergeStrategy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';

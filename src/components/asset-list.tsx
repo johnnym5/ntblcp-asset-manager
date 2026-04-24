@@ -408,7 +408,7 @@ export default function AssetList() {
                         <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
                         <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
                     </div>
-                  ) : null}
+                  )}
               </CardContent>
               <CardFooter className="pt-0 pb-4">
                 <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
@@ -607,7 +607,7 @@ export default function AssetList() {
                         <TableRow>
                             <TableHead className="w-[50px]">
                                 <Checkbox
-                                    checked={allCategoryResultsSelected}
+                                    checked={areAllCategoryResultsSelected}
                                     onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                                     aria-label="Select all"
                                     disabled={isGuest}

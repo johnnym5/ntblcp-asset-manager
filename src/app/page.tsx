@@ -119,7 +119,7 @@ export default function HomeHub() {
 
   const isAdmin = userProfile?.isAdmin || userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const perms = userProfile?.permissions;
-  const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
+  const pendingApprovalsCount = assets.filter(a => a.approvalStatus === 'pending').length;
 
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
