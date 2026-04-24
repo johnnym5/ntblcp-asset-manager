@@ -28,7 +28,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
-import type { SortConfig } from "@/types/domain";
+
+
+interface SortConfig {
+  key: keyof Asset;
+  direction: "asc" | "desc";
+}
 
 interface RegistryTableProps {
   assets: Asset[];

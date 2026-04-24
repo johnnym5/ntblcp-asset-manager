@@ -37,9 +37,9 @@ export function QRScannerDialog({ isOpen, onOpenChange, onScanSuccess }: QRScann
       const timer = setTimeout(() => {
         try {
           scannerRef.current = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-          scannerRef.current.render((decodedText) => {
+          scannerRef.current.render((decodedText: string) => {
             onScanSuccess(decodedText);
-            scanner.clear();
+            scannerRef.current?.clear();
             onOpenChange(false);
           }, () => {});
           setIsInitializing(false);

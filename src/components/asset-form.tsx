@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -75,7 +75,7 @@ export default function AssetForm({
   const { activeGrantIds, appSettings, headers: globalHeaders } = useAppState();
   
   const form = useForm<Asset>({
-    resolver: zodResolver(AssetSchema),
+    resolver: zodResolver(AssetSchema) as Resolver<Asset>,
     mode: 'onChange',
   });
 

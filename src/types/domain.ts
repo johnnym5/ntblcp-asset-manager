@@ -270,7 +270,6 @@ export interface AuthorizedUser {
   canEditAssets?: boolean;
   canVerifyAssets?: boolean;
   permissions?: UserPermissions;
-  isGuest?: boolean;
 }
 
 export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';
